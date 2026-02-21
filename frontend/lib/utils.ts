@@ -73,11 +73,11 @@ export function formatDate(dateStr: string | Date): string {
  * Returns "Feb 18, 2:30 PM" style format.
  */
 export function formatDateTime(dateStr: string): string {
-  // If no timezone info, treat as UTC (backend stores naive UTC datetimes)
-  const normalized =
-    typeof dateStr === "string" && !dateStr.endsWith("Z") && !dateStr.includes("+")
-      ? dateStr + "Z"
-      : dateStr;
+  // If no timezone info, treat as UTC (backend stores naive UTC datetimes).
+  // Check for "Z", "+", or trailing "-HH:MM" offset (but not the date hyphen).
+  const hasTimezone =
+    dateStr.endsWith("Z") || dateStr.includes("+") || /[+-]\d{2}:\d{2}$/.test(dateStr);
+  const normalized = hasTimezone ? dateStr : dateStr + "Z";
   const d = new Date(normalized);
   return d.toLocaleString("en-US", {
     month: "short",
@@ -94,11 +94,11 @@ export function formatDateTime(dateStr: string): string {
  * Returns "3:06 PM" style format.
  */
 export function formatTime(dateStr: string): string {
-  // If no timezone info, treat as UTC (backend stores naive UTC datetimes)
-  const normalized =
-    typeof dateStr === "string" && !dateStr.endsWith("Z") && !dateStr.includes("+")
-      ? dateStr + "Z"
-      : dateStr;
+  // If no timezone info, treat as UTC (backend stores naive UTC datetimes).
+  // Check for "Z", "+", or trailing "-HH:MM" offset (but not the date hyphen).
+  const hasTimezone =
+    dateStr.endsWith("Z") || dateStr.includes("+") || /[+-]\d{2}:\d{2}$/.test(dateStr);
+  const normalized = hasTimezone ? dateStr : dateStr + "Z";
   const d = new Date(normalized);
   return d.toLocaleTimeString("en-US", {
     hour: "numeric",

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DashboardData } from "@/lib/types";
@@ -9,9 +9,11 @@ vi.mock("@/lib/hooks", () => ({
   useDashboard: () => mockUseDashboard(),
 }));
 
-// Mock next/navigation for BottomNav
+// Mock next/navigation for BottomNav + useRouter
+const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
   usePathname: () => "/",
+  useRouter: () => ({ push: mockPush }),
 }));
 
 import DashboardPage from "@/app/page";
@@ -153,6 +155,32 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Recent Trades")).toBeInTheDocument();
     expect(screen.getByText("55-56°F")).toBeInTheDocument();
     expect(screen.getByText("WON")).toBeInTheDocument();
+  });
+
+  it("navigates to trades when Open Positions is clicked", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<DashboardPage />);
+    const openPositionsCard = screen.getByText("Open Positions").closest("button");
+    expect(openPositionsCard).toBeInTheDocument();
+    fireEvent.click(openPositionsCard!);
+    expect(mockPush).toHaveBeenCalledWith("/trades");
+  });
+
+  it("renders market section headers for recent trades", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<DashboardPage />);
+    // groupByMarket creates "New York High Temp Tue, Feb 18" header
+    expect(screen.getByText(/New York High Temp/)).toBeInTheDocument();
   });
 
   it("handles empty dashboard", () => {

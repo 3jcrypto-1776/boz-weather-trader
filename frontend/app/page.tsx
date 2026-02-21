@@ -8,12 +8,13 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import TradeCard from "@/components/trade-card/trade-card";
 import { useDashboard } from "@/lib/hooks";
-import { groupTrades } from "@/lib/trade-grouping";
+import { groupByMarket } from "@/lib/trade-grouping";
 import type { DashboardData } from "@/lib/types";
 import { centsToDollars, formatDateTime, formatPnL, CITY_NAMES } from "@/lib/utils";
 
@@ -22,34 +23,41 @@ function StatCard({
   value,
   icon: Icon,
   color = "text-gray-900",
+  onClick,
 }: {
   label: string;
   value: string;
   icon: React.ElementType;
   color?: string;
+  onClick?: () => void;
 }) {
+  const Wrapper = onClick ? "button" : "div";
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+    <Wrapper
+      className={`bg-white rounded-lg border border-gray-200 shadow-sm p-4 text-left w-full ${onClick ? "cursor-pointer hover:border-boz-primary transition-colors" : ""}`}
+      onClick={onClick}
+    >
       <div className="flex items-center gap-2 mb-1">
         <Icon size={16} className="text-boz-neutral" />
         <span className="text-xs text-boz-neutral">{label}</span>
       </div>
       <span className={`text-lg font-bold ${color}`}>{value}</span>
-    </div>
+    </Wrapper>
   );
 }
 
 function DashboardContent({ data }: { data: DashboardData }) {
+  const router = useRouter();
   const pnlColor =
     data.today_pnl_cents >= 0 ? "text-boz-success" : "text-boz-danger";
   const PnlIcon = data.today_pnl_cents >= 0 ? TrendingUp : TrendingDown;
 
-  const groupedPositions = useMemo(
-    () => groupTrades(data.active_positions),
+  const positionMarkets = useMemo(
+    () => groupByMarket(data.active_positions),
     [data.active_positions],
   );
-  const groupedRecent = useMemo(
-    () => groupTrades(data.recent_trades),
+  const recentMarkets = useMemo(
+    () => groupByMarket(data.recent_trades),
     [data.recent_trades],
   );
 
@@ -72,6 +80,7 @@ function DashboardContent({ data }: { data: DashboardData }) {
           label="Open Positions"
           value={String(data.active_positions.length)}
           icon={Activity}
+          onClick={() => router.push("/trades")}
         />
         <StatCard
           label="Next Launch"
@@ -127,28 +136,46 @@ function DashboardContent({ data }: { data: DashboardData }) {
       )}
 
       {/* Active Positions */}
-      {groupedPositions.length > 0 && (
+      {positionMarkets.length > 0 && (
         <section className="mb-6">
           <h2 className="text-sm font-semibold text-gray-900 mb-3">
             Open Positions
           </h2>
-          <div className="space-y-2">
-            {groupedPositions.map((group) => (
-              <TradeCard key={group.groupKey} group={group} />
+          <div className="space-y-4">
+            {positionMarkets.map((market) => (
+              <div key={market.marketKey}>
+                <h3 className="text-xs font-medium text-boz-neutral mb-2">
+                  {market.label}
+                </h3>
+                <div className="space-y-2">
+                  {market.groups.map((group) => (
+                    <TradeCard key={group.groupKey} group={group} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </section>
       )}
 
       {/* Recent Trades */}
-      {groupedRecent.length > 0 && (
+      {recentMarkets.length > 0 && (
         <section>
           <h2 className="text-sm font-semibold text-gray-900 mb-3">
             Recent Trades
           </h2>
-          <div className="space-y-2">
-            {groupedRecent.map((group) => (
-              <TradeCard key={group.groupKey} group={group} />
+          <div className="space-y-4">
+            {recentMarkets.map((market) => (
+              <div key={market.marketKey}>
+                <h3 className="text-xs font-medium text-boz-neutral mb-2">
+                  {market.label}
+                </h3>
+                <div className="space-y-2">
+                  {market.groups.map((group) => (
+                    <TradeCard key={group.groupKey} group={group} />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </section>
