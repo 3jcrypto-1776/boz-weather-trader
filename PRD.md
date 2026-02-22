@@ -1,8 +1,8 @@
 # Product Requirements Document (PRD)
 # Boz Weather Trader
 
-**Version:** 1.2
-**Date:** February 19, 2026
+**Version:** 1.3
+**Date:** February 22, 2026
 **Status:** All P0+P1 complete (32 phases, 1407 tests)
 
 ---
@@ -150,6 +150,8 @@ potential for mispricing that our model can exploit.
         │   - EV calculator           │
         │   - Risk management         │
         │   - Trade post-mortem gen   │
+        │   - WebSocket streaming     │
+        │   - Prometheus metrics      │
         └──────┬──────────┬───────────┘
                │          │
     ┌──────────▼──┐  ┌────▼──────────┐
@@ -274,24 +276,28 @@ This makes adding new market types straightforward without touching the core tra
 - **Dashboard**: Overview of active positions, P&L, model predictions
 - **Markets View**: Market type selector (high temp active, others "Coming Soon"), current markets with model probabilities vs. market prices
 - **Trade Queue**: Pending trades awaiting approval (in Manual mode)
-- **Trade History & Post-Mortems**: Full audit log of all trades, each with an executive summary explaining why the trade was taken and why it won or lost (see Section 3.6)
+- **Trade History & Post-Mortems**: Full audit log of all trades grouped by market/position, each with a multi-section narrative post-mortem explaining why the trade was taken and why it won or lost (see Section 3.6). Trades are grouped by market ticker with VWAP and quantity badges.
+- **Trade Calendar**: Monthly calendar grid showing daily P&L (color-coded green/red), trade counts, and win rates. Clickable day cells drill down to individual trade cards. Calendar is the default view in the Trades tab, with a History tab for the full trade list.
 - **Settings**: Trading mode toggle (auto/manual), risk parameters (including cooldown controls), city selection, notification preferences
-- **Performance**: Charts showing cumulative P&L, accuracy metrics, ROI per city
+- **Performance**: Brier score summary, calibration chart (predicted vs actual probability scatter plot), per-source accuracy chart (MAE/RMSE bar chart with bias annotations), ROI by city, cumulative P&L charts
 - **PWA Features**: Installable to home screen, push notifications, offline-capable for cached data
 
 ### 3.3 Tech Stack
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
-| Frontend | Next.js + React + Tailwind CSS | PWA support, SSR, great mobile experience |
+| Frontend | Next.js 14 + React + Tailwind CSS | PWA support, SSR, great mobile experience |
+| Charts | Recharts | Responsive charting (P&L, calibration scatter, source accuracy bars, calendar) |
 | PWA | next-pwa / Workbox | Service worker, offline caching, push notifications |
-| Backend | Python (FastAPI) | Best ML/data science ecosystem, async support |
-| Database | PostgreSQL + Redis | Relational data + caching/task queue |
-| ML | XGBoost, scikit-learn, pandas, numpy | Proven for tabular data / time-series |
+| Backend | Python 3.11+ (FastAPI) | Best ML/data science ecosystem, async support |
+| Database | PostgreSQL 16 + Redis 7 | Relational data + caching/task queue |
+| ML | XGBoost, scikit-learn (Random Forest + Ridge), scipy, numpy | Multi-model ensemble for tabular data / time-series |
 | Task Queue | Celery + Redis | Scheduled jobs (data fetch, model runs, trade execution) |
+| Monitoring | Prometheus + Grafana + Alertmanager | Metrics collection, dashboards (3), alerting (17 rules) |
 | Notifications | Web Push API (via pywebpush) | Push notifications to PWA on all devices |
-| Containerization | Docker + Docker Compose | Self-hostable on homelab, VPS, or cloud |
-| Auth | Kalshi API keys (user-provided, encrypted at rest) | No password storage needed |
+| Real-time | WebSocket (FastAPI) + Redis pub/sub | Live event streaming to browser, SWR revalidation |
+| Containerization | Docker + Docker Compose (9 services) | Self-hostable on homelab, VPS, or cloud |
+| Auth | Kalshi API keys (user-provided, RSA-PSS signed, encrypted at rest) | No password storage needed |
 
 ### 3.4 Deployment Options
 
@@ -378,7 +384,7 @@ Step 6: Initial Settings
 
 After each market settles, Boz Weather Trader automatically generates a structured post-mortem for every trade. This explains **why** the trade was taken and **why** it won or lost — like a mini executive brief for each trade.
 
-**Post-Mortem Template:**
+**Post-Mortem Template (5 structured sections):**
 ```
 TRADE #247 — NYC High Temp | Feb 16, 2026
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -399,17 +405,21 @@ WHY WE TOOK THIS TRADE
   • Open-Meteo ensemble average: 54.2°F (closer to our prediction)
   • Historical forecast error for NYC in February: ±2.1°F std dev
 
-WHY IT WORKED (or DIDN'T WORK)
-  • A cold front moved through faster than the GFS model predicted,
-    keeping temps lower than the NWS consensus
-  • ECMWF's 54°F forecast was spot-on
-  • Market was over-weighting the NWS point forecast and ignoring
-    the European model divergence
+FORECAST ACCURACY (conditional — only shown when settlement data available)
+  • NWS forecast: 56°F (off by 2°F)
+  • ECMWF: 54°F (spot on)
+  • GFS: 55°F (off by 1°F)
 
-MODEL CONFIDENCE AT TIME OF TRADE
-  Confidence: HIGH (model agreement: 3 of 4 sources within 1°F)
+TRADE ECONOMICS
+  Entry: $0.38 × 1 contract = $0.38 cost
+  Settlement: $1.00 (bracket won)
+  Fees: ~$0.01 trading + $0.06 settlement
+  Net P&L: +$0.55
   EV at entry: +$0.12 per contract
+  Confidence: HIGH (model agreement: 3 of 4 sources within 1°F)
 ```
+
+Post-mortems are rendered in the frontend with expandable sections. Each ALL-CAPS header becomes a collapsible section. Users can regenerate post-mortems via a dedicated API endpoint if the narrative needs updating after new data arrives.
 
 **Data captured for each post-mortem:**
 - All weather model forecasts at time of trade (NWS, GFS, ECMWF, etc.)
@@ -427,12 +437,16 @@ All data lives inside the Docker setup, on whatever machine hosts the bot.
 
 ```
 Your Machine (homelab / cloud VPS)
-  └── Docker
-       ├── Container: backend     (FastAPI — Python app)
-       ├── Container: frontend    (Next.js — PWA dashboard)
-       ├── Container: postgres    (PostgreSQL — all persistent data)
-       ├── Container: redis       (Redis — cache + task queue)
-       └── Container: celery      (Celery worker — scheduled jobs)
+  └── Docker Compose (9 services)
+       ├── Container: backend        (FastAPI — Python app, REST API + WebSocket)
+       ├── Container: frontend       (Next.js — PWA dashboard)
+       ├── Container: postgres       (PostgreSQL 16 — all persistent data)
+       ├── Container: redis          (Redis 7 — cache + task queue + pub/sub)
+       ├── Container: celery-worker  (Celery worker — async task execution)
+       ├── Container: celery-beat    (Celery beat — scheduled job triggers)
+       ├── Container: prometheus     (Prometheus — metrics scraping + alerting rules)
+       ├── Container: grafana        (Grafana — 3 auto-provisioned dashboards)
+       └── Container: alertmanager   (Alertmanager — webhook alert routing)
 
        └── Volume: /data/postgres   ← your actual data lives here on disk
        └── Volume: /data/redis      ← cache data
@@ -475,17 +489,22 @@ Your Machine (homelab / cloud VPS)
 - [x] **Trade logging** - Full audit trail of every trade placed with reasoning (Phase 4)
 - [x] **Trade post-mortems** - Auto-generated executive summary for each trade after settlement (Phase 3, 14)
 - [x] **Structured logging** - Module-tagged, leveled logs to stdout + database (Phase 1)
-- [x] **Unit + safety tests** - Every module ships with tests; 834 backend + 110 frontend = 944 tests (All phases)
-- [x] **CI/CD pipeline** - GitHub Actions: 3 parallel jobs (lint, test, frontend) (Phase 8)
+- [x] **Unit + safety tests** - Every module ships with tests; 1244 backend + 163 frontend = 1407 tests (All phases)
+- [x] **CI/CD pipeline** - GitHub Actions: 4 parallel jobs (backend-lint, backend-test w/ coverage, frontend, docker-build) (Phase 8, 22)
 - [x] **Docker Compose deployment** - 9-service Docker Compose (backend, frontend, postgres, redis, celery worker/beat, prometheus, grafana, alertmanager) (Phase 6, 16, 19)
 - [x] **Market type selector UI** - High Temp active, others show "Coming Soon" (Phase 5)
 - [x] **Demo mode** - Safe demo/production toggle, new users start in demo mode (Phase 15, 17)
+- [x] **Monitoring & alerting** - Prometheus metrics, 3 Grafana dashboards, 17 alert rules, Alertmanager webhook routing (Phases 12, 16, 19, 21)
 
 #### P1 - Should Have
 - [x] **Multi-city support** - Trade all 4 cities (NYC, Chicago, Miami, Austin) simultaneously (Phase 2 — active_cities in user settings)
 - [x] **Real-time price updates** - WebSocket connection to Kalshi for live orderbook data + Redis cache (Phase 18, 20)
 - [x] **Push notifications** - Web push for trade executions, settlements, alerts (Phase 3 — NotificationService)
-- [x] **Performance analytics** - Cumulative P&L charts, win rate, ROI per city (Phase 5 — performance page + charts)
+- [x] **Performance analytics** - Brier score, calibration chart, source accuracy, ROI by city, cumulative P&L (Phase 5, 32)
+- [x] **Trade Calendar** - Monthly grid with daily P&L, trade counts, win rates; clickable day drill-down to trade cards; Calendar/History tabs (Phase 32)
+- [x] **Kalshi portfolio sync** - Reconciles app Trade records with actual Kalshi filled orders, auto-sync every 15 min + manual button (Phase 29)
+- [x] **Trade grouping by market** - Frontend GroupedTrade aggregation, market section headers, VWAP, quantity badges (Phase 30)
+- [x] **Rich trade post-mortems** - Multi-section narrative (5 sections), expandable display, regenerate endpoint (Phase 31)
 - [x] **PWA install prompt** - Installable via manifest.json + next-pwa service worker (Phase 5)
 - [x] **Log viewer in dashboard** - Filterable log viewer with module/level/time filters (Phase 5)
 - [x] **One-click cloud deploy** - Railway / Fly.io / Oracle Cloud deploy guides in README (Phase 28)
@@ -676,7 +695,7 @@ User opens PWA → sees trade queue
 
 **Every module ships with tests. No exceptions.** Each sub-agent writes tests alongside its code — testing is not a separate phase, it's part of building each feature. Code is not considered complete until its tests pass.
 
-**Test framework:** pytest (Python backend) + Jest/Vitest (Next.js frontend)
+**Test framework:** pytest (Python backend) + Vitest + React Testing Library (Next.js frontend)
 
 ### 8.2 Test Layers
 
@@ -801,17 +820,11 @@ The PWA dashboard includes a **Log Viewer** page where users can:
 Tests run automatically on every commit via GitHub Actions:
 
 ```
-On every push / PR:
-  1. Lint: ruff (Python) + ESLint (TypeScript)
-  2. Unit tests: pytest (backend) + Jest (frontend)
-  3. Integration tests: docker-compose up test containers
-  4. Safety tests: run full safety test suite
-  5. Coverage report: fail if below thresholds (80% backend, 70% frontend)
-
-On merge to main:
-  6. Build Docker images
-  7. Run simulation test against 7 days of historical data
-  8. Tag release if all pass
+On every push to master / PR targeting master (4 parallel jobs):
+  Job 1: Backend Lint — ruff check + ruff format --check on backend/ and tests/
+  Job 2: Backend Tests — pytest (1244 tests, in-memory SQLite, no Docker needed) + coverage artifact
+  Job 3: Frontend — ESLint (next lint) + Vitest (163 tests)
+  Job 4: Docker Build — smoke test that backend + frontend Dockerfiles build successfully
 ```
 
 ### 8.6 Testing Requirements Per Agent
