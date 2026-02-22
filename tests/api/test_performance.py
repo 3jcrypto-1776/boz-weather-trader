@@ -131,6 +131,48 @@ async def test_performance_cumulative_pnl(
     assert cpnl[1]["cumulative_pnl"] == 30
 
 
+async def test_performance_cost_by_city(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    """GET /api/performance returns cost_by_city (price * quantity per city)."""
+    # NYC trade: 25 cents * 1 quantity = 25
+    nyc_trade = make_trade(
+        user_id="test-user-001",
+        city="NYC",
+        status=TradeStatus.WON,
+        pnl_cents=75,
+        settled_at=datetime.now(UTC),
+    )
+    # CHI trade: 25 cents * 1 quantity = 25
+    chi_trade = make_trade(
+        user_id="test-user-001",
+        city="CHI",
+        status=TradeStatus.LOST,
+        pnl_cents=-25,
+        settled_at=datetime.now(UTC),
+    )
+    db.add(nyc_trade)
+    db.add(chi_trade)
+    await db.flush()
+
+    response = await client.get("/api/performance")
+    assert response.status_code == 200
+    data = response.json()
+    assert "cost_by_city" in data
+    # make_trade defaults price_cents=25, quantity=1 → cost=25
+    assert data["cost_by_city"]["NYC"] == 25
+    assert data["cost_by_city"]["CHI"] == 25
+
+
+async def test_performance_cost_by_city_empty(client: AsyncClient) -> None:
+    """GET /api/performance returns empty cost_by_city when no trades."""
+    response = await client.get("/api/performance")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["cost_by_city"] == {}
+
+
 async def test_performance_unauthenticated(unauthed_client: AsyncClient) -> None:
     """GET /api/performance returns 401 when not authenticated."""
     response = await unauthed_client.get("/api/performance")

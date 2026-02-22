@@ -7,6 +7,8 @@ with Kalshi's actual portfolio.
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +32,7 @@ TRADES_PER_PAGE = 20
 async def get_trades(
     city: CityCode | None = None,
     status: str | None = None,
+    trade_date: date | None = None,
     page: int = 1,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -39,6 +42,7 @@ async def get_trades(
     Args:
         city: Optional city code filter (NYC, CHI, MIA, AUS).
         status: Optional status filter (OPEN, WON, LOST, CANCELED).
+        trade_date: Optional date filter (YYYY-MM-DD) for calendar drill-down.
         page: Page number (1-indexed, defaults to 1).
         user: The authenticated user.
         db: Async database session.
@@ -58,6 +62,10 @@ async def get_trades(
     if status is not None:
         base_query = base_query.where(Trade.status == status)
         count_query = count_query.where(Trade.status == status)
+
+    if trade_date is not None:
+        base_query = base_query.where(func.date(Trade.trade_date) == trade_date)
+        count_query = count_query.where(func.date(Trade.trade_date) == trade_date)
 
     # Get total count
     total_result = await db.execute(count_query)

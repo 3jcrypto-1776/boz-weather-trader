@@ -9,6 +9,8 @@ import type {
   AuthValidateRequest,
   AuthValidateResponse,
   BracketPrediction,
+  CalibrationReport,
+  CalendarMonth,
   CityCode,
   DashboardData,
   LogEntry,
@@ -16,6 +18,7 @@ import type {
   PerformanceData,
   PushSubscriptionPayload,
   SettingsUpdate,
+  SourceAccuracy,
   SyncResult,
   TradeRecord,
   TradesPage,
@@ -137,11 +140,13 @@ export async function fetchMarkets(
 export async function fetchTrades(
   page: number = 1,
   city?: CityCode,
-  status?: string
+  status?: string,
+  date?: string
 ): Promise<TradesPage> {
   const params = new URLSearchParams({ page: String(page) });
   if (city) params.set("city", city);
   if (status) params.set("status", status);
+  if (date) params.set("trade_date", date);
   return apiFetch<TradesPage>(`/api/trades?${params.toString()}`);
 }
 
@@ -216,4 +221,35 @@ export async function subscribePush(
     method: "POST",
     body: JSON.stringify(subscription),
   });
+}
+
+// ─── Accuracy (2 endpoints) ───
+
+export async function fetchCalibration(
+  city: CityCode = "NYC",
+  lookbackDays: number = 90
+): Promise<CalibrationReport> {
+  return apiFetch<CalibrationReport>(
+    `/api/accuracy/calibration?city=${city}&lookback_days=${lookbackDays}`
+  );
+}
+
+export async function fetchSourceAccuracy(
+  city: CityCode = "NYC",
+  lookbackDays: number = 90
+): Promise<SourceAccuracy[]> {
+  return apiFetch<SourceAccuracy[]>(
+    `/api/accuracy/sources?city=${city}&lookback_days=${lookbackDays}`
+  );
+}
+
+// ─── Calendar (1 endpoint) ───
+
+export async function fetchCalendar(
+  year: number,
+  month: number
+): Promise<CalendarMonth> {
+  return apiFetch<CalendarMonth>(
+    `/api/trades/calendar?year=${year}&month=${month}`
+  );
 }

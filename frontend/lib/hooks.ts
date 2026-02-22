@@ -14,22 +14,28 @@ import useSWR, { type SWRConfiguration } from "swr";
 
 import {
   fetchAuthStatus,
+  fetchCalendar,
+  fetchCalibration,
   fetchDashboard,
   fetchLogs,
   fetchMarkets,
   fetchPendingTrades,
   fetchPerformance,
   fetchSettings,
+  fetchSourceAccuracy,
   fetchTrades,
 } from "./api";
 import type {
   AuthStatusResponse,
   BracketPrediction,
+  CalendarMonth,
+  CalibrationReport,
   CityCode,
   DashboardData,
   LogEntry,
   PendingTrade,
   PerformanceData,
+  SourceAccuracy,
   TradesPage,
   UserSettings,
 } from "./types";
@@ -92,15 +98,17 @@ export function useTrades(
   page: number = 1,
   city?: CityCode,
   status?: string,
+  date?: string,
   config?: SWRConfiguration
 ) {
   const params = new URLSearchParams({ page: String(page) });
   if (city) params.set("city", city);
   if (status) params.set("status", status);
+  if (date) params.set("trade_date", date);
 
   return useSWR<TradesPage>(
     `/api/trades?${params.toString()}`,
-    () => fetchTrades(page, city, status),
+    () => fetchTrades(page, city, status, date),
     {
       refreshInterval: 0,
       ...config,
@@ -153,5 +161,45 @@ export function usePerformance(config?: SWRConfiguration) {
       refreshInterval: 0,
       ...config,
     }
+  );
+}
+
+// ─── Accuracy / Calibration ───
+
+export function useCalibration(
+  city?: CityCode,
+  config?: SWRConfiguration
+) {
+  const cityParam = city || "NYC";
+  return useSWR<CalibrationReport>(
+    `/api/accuracy/calibration?city=${cityParam}`,
+    () => fetchCalibration(cityParam),
+    { refreshInterval: 0, ...config }
+  );
+}
+
+export function useSourceAccuracy(
+  city?: CityCode,
+  config?: SWRConfiguration
+) {
+  const cityParam = city || "NYC";
+  return useSWR<SourceAccuracy[]>(
+    `/api/accuracy/sources?city=${cityParam}`,
+    () => fetchSourceAccuracy(cityParam),
+    { refreshInterval: 0, ...config }
+  );
+}
+
+// ─── Calendar ───
+
+export function useCalendar(
+  year: number,
+  month: number,
+  config?: SWRConfiguration
+) {
+  return useSWR<CalendarMonth>(
+    `/api/trades/calendar?year=${year}&month=${month}`,
+    () => fetchCalendar(year, month),
+    { refreshInterval: 0, ...config }
   );
 }

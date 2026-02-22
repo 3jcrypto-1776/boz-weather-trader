@@ -3,7 +3,7 @@
 
 **Version:** 1.2
 **Date:** February 19, 2026
-**Status:** All P0+P1 complete (28 phases, 1301 tests)
+**Status:** All P0+P1 complete (32 phases, 1407 tests)
 
 ---
 
@@ -539,7 +539,10 @@ Your Machine (homelab / cloud VPS)
 | 27 | Multi-model ML ensemble | XGBoost + Random Forest + Ridge with inverse-RMSE weighting, training pipeline, graceful degradation | 57 |
 | 28 | One-click cloud deploy | README, Railway/Fly.io/Oracle guides, fly.toml, railway.json, docker-compose.cloud.yml, generate-env.sh | — |
 | 29 | Kalshi portfolio sync | Reconcile app Trade records with Kalshi filled orders, auto-sync every 15 min + manual button, SyncResult schema, sync metrics | 25 |
-| **Total** | | **1219 backend + 110 frontend = 1329 tests** | |
+| 30 | Trade grouping by market | Frontend-only GroupedTrade aggregation, market section headers, VWAP, quantity badges | 28 (frontend) |
+| 31 | Rich trade post-mortem | Multi-section narrative (5 sections), API+frontend display, regenerate endpoint | 9 backend + 12 frontend |
+| 32 | Performance + Calendar | Brier score, calibration chart, source accuracy, ROI by city, monthly calendar grid with daily P&L/trade counts/win rates, clickable day drill-down, Calendar/History tabs | 14 backend + 13 frontend |
+| **Total** | | **1244 backend + 163 frontend = 1407 tests** | |
 
 ---
 

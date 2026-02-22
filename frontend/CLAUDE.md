@@ -20,7 +20,8 @@ frontend/
 │   └── performance/        → P&L charts, accuracy metrics
 ├── components/             → Reusable UI components
 │   ├── ui/                 → Base UI primitives (buttons, cards, inputs)
-│   ├── charts/             → P&L charts, probability visualizations
+│   ├── charts/             → P&L charts, calibration chart, source accuracy chart
+│   ├── calendar/           → Calendar grid + day detail panel
 │   ├── trade-card/         → Trade display with post-mortem expandable
 │   └── bracket-view/       → Visual bracket probability display
 ├── lib/                    → Utilities, API client, types

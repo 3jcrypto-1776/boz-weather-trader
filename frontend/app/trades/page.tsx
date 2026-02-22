@@ -1,18 +1,29 @@
 "use client";
 
-import { BarChart3, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import {
+  BarChart3,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  List,
+  RefreshCw,
+} from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
+import CalendarGrid from "@/components/calendar/calendar-grid";
+import DayDetailPanel from "@/components/calendar/day-detail-panel";
 import TradeCard from "@/components/trade-card/trade-card";
 import EmptyState from "@/components/ui/empty-state";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { syncTrades } from "@/lib/api";
-import { useTrades } from "@/lib/hooks";
+import { useCalendar, useTrades } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
 import type { CityCode, SyncResult, TradeStatus } from "@/lib/types";
-import { centsToDollars, formatPnL } from "@/lib/utils";
+import { formatPnL, formatProbability } from "@/lib/utils";
+
+type ViewTab = "calendar" | "history";
 
 const CITY_OPTIONS: (CityCode | "ALL")[] = ["ALL", "NYC", "CHI", "MIA", "AUS"];
 const STATUS_OPTIONS: (TradeStatus | "ALL")[] = [
@@ -23,7 +34,183 @@ const STATUS_OPTIONS: (TradeStatus | "ALL")[] = [
   "CANCELED",
 ];
 
-export default function TradesPage() {
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// ─── Calendar Tab ───
+
+function CalendarView() {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const { data, isLoading, error } = useCalendar(year, month);
+
+  const goToPrevMonth = useCallback(() => {
+    setSelectedDate(null);
+    if (month === 1) {
+      setMonth(12);
+      setYear((y) => y - 1);
+    } else {
+      setMonth((m) => m - 1);
+    }
+  }, [month]);
+
+  const goToNextMonth = useCallback(() => {
+    setSelectedDate(null);
+    if (month === 12) {
+      setMonth(1);
+      setYear((y) => y + 1);
+    } else {
+      setMonth((m) => m + 1);
+    }
+  }, [month]);
+
+  const goToThisMonth = useCallback(() => {
+    setSelectedDate(null);
+    const n = new Date();
+    setYear(n.getFullYear());
+    setMonth(n.getMonth() + 1);
+  }, []);
+
+  const handleDayClick = useCallback((date: string) => {
+    setSelectedDate((prev) => (prev === date ? null : date));
+  }, []);
+
+  const selectedDayStats = useMemo(() => {
+    if (!selectedDate || !data) return null;
+    return data.days.find((d) => d.date === selectedDate) ?? null;
+  }, [selectedDate, data]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-10" />
+        <Skeleton className="h-[400px]" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-boz-danger">
+        {error.message || "Unable to load calendar data"}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Month Navigation */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={goToPrevMonth}
+            className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <h2 className="text-sm font-bold min-w-[140px] text-center">
+            {MONTH_NAMES[month - 1]} {year}
+          </h2>
+          <button
+            onClick={goToNextMonth}
+            className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50"
+          >
+            <ChevronRight size={16} />
+          </button>
+          <button
+            onClick={goToThisMonth}
+            className="min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50 ml-1"
+          >
+            This month
+          </button>
+        </div>
+      </div>
+
+      {/* Monthly Summary Bar */}
+      {data && data.total_trades > 0 && (
+        <div className="flex flex-wrap gap-4 mb-3 text-xs bg-white rounded-lg border border-gray-200 px-4 py-2.5">
+          <span className="text-boz-neutral">Monthly stats:</span>
+          <span
+            className={`font-bold ${
+              data.total_pnl_cents >= 0
+                ? "text-boz-success"
+                : "text-boz-danger"
+            }`}
+          >
+            {formatPnL(data.total_pnl_cents)}
+          </span>
+          <span className="text-boz-neutral">
+            {data.total_trades} trades
+          </span>
+          <span className="text-boz-neutral">
+            {data.total_wins}W / {data.total_losses}L
+          </span>
+          {data.total_trades > 0 && (
+            <span className="text-boz-neutral">
+              {formatProbability(data.total_wins / data.total_trades)} win rate
+            </span>
+          )}
+          <span className="text-boz-neutral">
+            {data.trading_days} trading day{data.trading_days !== 1 ? "s" : ""}
+          </span>
+        </div>
+      )}
+
+      {/* Calendar Grid */}
+      <CalendarGrid
+        year={year}
+        month={month}
+        days={data?.days ?? []}
+        onDayClick={handleDayClick}
+        selectedDate={selectedDate}
+      />
+
+      {/* Weekly Summaries */}
+      {data && data.weeks.length > 0 && (
+        <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-2">
+          {data.weeks.map((week, idx) => (
+            <div
+              key={week.week_number}
+              className="bg-white rounded-lg border border-gray-200 px-3 py-2"
+            >
+              <span className="text-[10px] text-boz-neutral">
+                Week {idx + 1}
+              </span>
+              <div
+                className={`text-sm font-bold ${
+                  week.pnl_cents >= 0 ? "text-boz-success" : "text-boz-danger"
+                }`}
+              >
+                {formatPnL(week.pnl_cents)}
+              </div>
+              <span className="text-[10px] text-boz-neutral">
+                {week.trading_days} day{week.trading_days !== 1 ? "s" : ""}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Day Detail Panel */}
+      {selectedDate && selectedDayStats && (
+        <DayDetailPanel
+          date={selectedDate}
+          dayStats={selectedDayStats}
+          onClose={() => setSelectedDate(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── History Tab (existing trade list) ───
+
+function HistoryView() {
   const [page, setPage] = useState(1);
   const [cityFilter, setCityFilter] = useState<CityCode | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<TradeStatus | "ALL">("ALL");
@@ -31,17 +218,23 @@ export default function TradesPage() {
 
   const city = cityFilter === "ALL" ? undefined : cityFilter;
   const status = statusFilter === "ALL" ? undefined : statusFilter;
-  const { data, error, isLoading, mutate: mutateTrades } = useTrades(page, city, status);
+  const {
+    data,
+    error,
+    isLoading,
+    mutate: mutateTrades,
+  } = useTrades(page, city, status);
   const { showToast } = useToast();
 
   const totalPages = data ? Math.ceil(data.total / 20) : 0;
 
-  // Group trades by market for section headers
   const trades = data?.trades;
   const markets = useMemo(() => groupByMarket(trades ?? []), [trades]);
 
-  // Calculate summary stats from current page (visible trades)
-  const totalPnl = (trades ?? []).reduce((sum, t) => sum + (t.pnl_cents ?? 0), 0);
+  const totalPnl = (trades ?? []).reduce(
+    (sum, t) => sum + (t.pnl_cents ?? 0),
+    0
+  );
   const wonCount = (trades ?? []).filter((t) => t.status === "WON").length;
   const lostCount = (trades ?? []).filter((t) => t.status === "LOST").length;
 
@@ -67,7 +260,8 @@ export default function TradesPage() {
       showToast({
         variant: "warning",
         title: "Sync failed",
-        message: err instanceof Error ? err.message : "Unable to sync with Kalshi",
+        message:
+          err instanceof Error ? err.message : "Unable to sync with Kalshi",
       });
     } finally {
       setSyncing(false);
@@ -75,9 +269,9 @@ export default function TradesPage() {
   }, [mutateTrades, showToast]);
 
   return (
-    <ErrorBoundary>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold">Trade History</h1>
+    <>
+      {/* Sync button */}
+      <div className="flex justify-end mb-3">
         <button
           onClick={handleSync}
           disabled={syncing}
@@ -131,13 +325,9 @@ export default function TradesPage() {
       {/* Summary stats */}
       {data && data.total > 0 && (
         <div className="flex gap-4 mb-4 text-xs">
-          <span className="text-boz-neutral">
-            {data.total} total trades
-          </span>
+          <span className="text-boz-neutral">{data.total} total trades</span>
           {wonCount > 0 && (
-            <span className="text-boz-success font-medium">
-              {wonCount} won
-            </span>
+            <span className="text-boz-success font-medium">{wonCount} won</span>
           )}
           {lostCount > 0 && (
             <span className="text-boz-danger font-medium">
@@ -218,6 +408,50 @@ export default function TradesPage() {
           )}
         </>
       )}
+    </>
+  );
+}
+
+// ─── Main Trades Page ───
+
+export default function TradesPage() {
+  const [activeTab, setActiveTab] = useState<ViewTab>("calendar");
+
+  return (
+    <ErrorBoundary>
+      {/* Header with tabs */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold">Trades</h1>
+
+        {/* View tabs */}
+        <div className="flex bg-gray-100 rounded-lg p-0.5">
+          <button
+            onClick={() => setActiveTab("calendar")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              activeTab === "calendar"
+                ? "bg-white text-boz-primary shadow-sm"
+                : "text-boz-neutral hover:text-gray-900"
+            }`}
+          >
+            <Calendar size={14} />
+            Calendar
+          </button>
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              activeTab === "history"
+                ? "bg-white text-boz-primary shadow-sm"
+                : "text-boz-neutral hover:text-gray-900"
+            }`}
+          >
+            <List size={14} />
+            History
+          </button>
+        </div>
+      </div>
+
+      {/* Tab content */}
+      {activeTab === "calendar" ? <CalendarView /> : <HistoryView />}
     </ErrorBoundary>
   );
 }

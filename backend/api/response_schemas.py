@@ -95,6 +95,7 @@ class PerformanceData(BaseModel):
     worst_trade_pnl_cents: int
     cumulative_pnl: list[CumulativePnlPoint]
     pnl_by_city: dict[str, int]
+    cost_by_city: dict[str, int] = {}  # city -> total cost in cents (for ROI)
     accuracy_over_time: list[AccuracyPoint]
 
 
@@ -150,6 +151,40 @@ class AccuracyOverview(BaseModel):
 
     sources: list[SourceAccuracy]
     calibration: CalibrationReport
+
+
+class CalendarDay(BaseModel):
+    """Daily trading stats for the calendar view."""
+
+    date: str  # YYYY-MM-DD
+    trade_count: int
+    wins: int
+    losses: int
+    pnl_cents: int
+    win_rate: float  # 0.0 to 1.0
+
+
+class CalendarWeek(BaseModel):
+    """Weekly summary for the calendar sidebar."""
+
+    week_number: int
+    pnl_cents: int
+    trade_count: int
+    trading_days: int
+
+
+class CalendarMonth(BaseModel):
+    """Full month of calendar data with daily stats, weekly summaries, and totals."""
+
+    year: int
+    month: int
+    days: list[CalendarDay]
+    weeks: list[CalendarWeek]
+    total_pnl_cents: int
+    total_trades: int
+    total_wins: int
+    total_losses: int
+    trading_days: int
 
 
 class SettingsUpdate(BaseModel):

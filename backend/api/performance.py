@@ -90,6 +90,7 @@ async def get_performance(
             worst_trade_pnl_cents=0,
             cumulative_pnl=[],
             pnl_by_city={},
+            cost_by_city={},
             accuracy_over_time=[],
         )
 
@@ -137,6 +138,23 @@ async def get_performance(
         city_val = crow.city.value if hasattr(crow.city, "value") else crow.city
         pnl_by_city[city_val] = crow.city_pnl
 
+    # ── Query 4: Cost by city (for ROI calculation) ──
+    cost_result = await db.execute(
+        select(
+            Trade.city,
+            func.coalesce(func.sum(Trade.price_cents * Trade.quantity), 0).label("city_cost"),
+        )
+        .where(
+            Trade.user_id == user.id,
+            Trade.status.in_(_SETTLED_STATUSES),
+        )
+        .group_by(Trade.city)
+    )
+    cost_by_city: dict[str, int] = {}
+    for crow in cost_result.all():
+        city_val = crow.city.value if hasattr(crow.city, "value") else crow.city
+        cost_by_city[city_val] = crow.city_cost
+
     logger.info(
         "Performance data computed",
         extra={
@@ -159,5 +177,6 @@ async def get_performance(
         worst_trade_pnl_cents=worst_trade_pnl_cents,
         cumulative_pnl=cumulative_pnl,
         pnl_by_city=pnl_by_city,
+        cost_by_city=cost_by_city,
         accuracy_over_time=accuracy_over_time,
     )

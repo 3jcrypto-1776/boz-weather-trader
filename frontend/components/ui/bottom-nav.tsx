@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   BarChart3,
   ClipboardList,
   LayoutDashboard,
@@ -18,6 +19,11 @@ const NAV_ITEMS = [
   { href: "/queue", label: "Queue", icon: ClipboardList },
   { href: "/trades", label: "Trades", icon: BarChart3 },
   { href: "/settings", label: "Settings", icon: Settings },
+];
+
+/** Extra items shown only in the desktop sidebar. */
+const DESKTOP_EXTRA_ITEMS = [
+  { href: "/performance", label: "Performance", icon: Activity },
 ];
 
 export default function BottomNav() {
@@ -93,6 +99,28 @@ export default function BottomNav() {
               </Link>
             );
           })}
+
+          {/* Divider + desktop-only extra links */}
+          <div className="border-t border-gray-200 pt-2 mt-2">
+            {DESKTOP_EXTRA_ITEMS.map((item) => {
+              const isActive = pathname.startsWith(item.href);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 min-h-[44px] px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-blue-50 text-boz-primary"
+                      : "text-boz-neutral hover:bg-gray-50 hover:text-gray-900"
+                  }`}
+                >
+                  <Icon size={20} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
         </nav>
       </aside>
     </>

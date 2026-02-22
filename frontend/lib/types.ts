@@ -184,7 +184,65 @@ export interface PerformanceData {
   worst_trade_pnl_cents: number;
   cumulative_pnl: CumulativePnlPoint[];
   pnl_by_city: Record<string, number>;
+  cost_by_city: Record<string, number>;
   accuracy_over_time: AccuracyPoint[];
+}
+
+// ─── Accuracy / Calibration ───
+
+export interface CalibrationBucket {
+  bin_start: number;
+  bin_end: number;
+  predicted_avg: number;
+  actual_rate: number;
+  sample_count: number;
+}
+
+export interface CalibrationReport {
+  city: string;
+  lookback_days: number;
+  sample_count: number;
+  brier_score: number | null;
+  calibration_buckets: CalibrationBucket[];
+  status: string;
+}
+
+export interface SourceAccuracy {
+  source: string;
+  sample_count: number;
+  mae_f: number;
+  rmse_f: number;
+  bias_f: number;
+}
+
+// ─── Calendar ───
+
+export interface CalendarDay {
+  date: string; // YYYY-MM-DD
+  trade_count: number;
+  wins: number;
+  losses: number;
+  pnl_cents: number;
+  win_rate: number; // 0.0 to 1.0
+}
+
+export interface CalendarWeek {
+  week_number: number;
+  pnl_cents: number;
+  trade_count: number;
+  trading_days: number;
+}
+
+export interface CalendarMonth {
+  year: number;
+  month: number;
+  days: CalendarDay[];
+  weeks: CalendarWeek[];
+  total_pnl_cents: number;
+  total_trades: number;
+  total_wins: number;
+  total_losses: number;
+  trading_days: number;
 }
 
 // ─── Grouped Trades (frontend-only aggregation) ───

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -83,6 +85,49 @@ async def test_trades_status_filter(
     data = response.json()
     assert data["total"] == 1
     assert data["trades"][0]["status"] == "WON"
+
+
+async def test_trades_date_filter(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    """GET /api/trades?trade_date=YYYY-MM-DD filters by date."""
+    t1 = make_trade(
+        user_id="test-user-001",
+        trade_date=date(2026, 2, 10),
+    )
+    t2 = make_trade(
+        user_id="test-user-001",
+        trade_date=date(2026, 2, 15),
+    )
+    db.add(t1)
+    db.add(t2)
+    await db.flush()
+
+    response = await client.get("/api/trades", params={"trade_date": "2026-02-10"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["trades"][0]["date"] == "2026-02-10"
+
+
+async def test_trades_date_filter_no_match(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    """GET /api/trades?trade_date returns empty when no trades on that date."""
+    t = make_trade(
+        user_id="test-user-001",
+        trade_date=date(2026, 2, 10),
+    )
+    db.add(t)
+    await db.flush()
+
+    response = await client.get("/api/trades", params={"trade_date": "2026-02-20"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 0
+    assert data["trades"] == []
 
 
 async def test_trades_unauthenticated(unauthed_client: AsyncClient) -> None:
