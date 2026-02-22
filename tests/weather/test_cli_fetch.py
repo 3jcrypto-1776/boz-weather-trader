@@ -1,8 +1,8 @@
 """Tests for NWS CLI fetch and settlement record creation.
 
 Tests cover:
-- fetch_nws_cli: Fetches CLI text from NWS for a city
-- build_cli_url: Builds correct URL for each city
+- fetch_nws_cli: Fetches CLI text from NWS via api.weather.gov (2-step JSON API)
+- build_cli_listing_url: Builds correct URL for each city
 - _fetch_cli_reports_async: Full pipeline — fetch → parse → Settlement record
 """
 
@@ -15,7 +15,7 @@ import pytest
 
 from backend.weather.cli_parser import CLIReport
 from backend.weather.exceptions import FetchError, ParseError
-from backend.weather.nws import build_cli_url
+from backend.weather.nws import build_cli_listing_url
 from backend.weather.stations import STATION_CONFIGS
 
 # ─── Sample CLI Text for Mocking ───
@@ -47,96 +47,156 @@ HEATING DEGREE DAYS
 """
 
 
-# ─── TestBuildCliUrl ───
+# ─── TestBuildCliListingUrl ───
 
 
-class TestBuildCliUrl:
-    """Test build_cli_url() — URL construction for CLI product."""
+class TestBuildCliListingUrl:
+    """Test build_cli_listing_url() — URL construction for CLI product listing."""
 
-    def test_nyc_url_contains_correct_params(self) -> None:
-        """NYC URL uses OKX office and KNYC station."""
-        url = build_cli_url("NYC")
-        assert "site=OKX" in url
-        assert "issuedby=KNYC" in url
-        assert "product=CLI" in url
-        assert "format=txt" in url
+    def test_nyc_url_contains_correct_location(self) -> None:
+        """NYC URL uses NYC cli_location."""
+        url = build_cli_listing_url("NYC")
+        assert "api.weather.gov/products/types/CLI/locations/NYC" in url
 
-    def test_chi_url_contains_correct_params(self) -> None:
-        """CHI URL uses LOT office and KMDW station."""
-        url = build_cli_url("CHI")
-        assert "site=LOT" in url
-        assert "issuedby=KMDW" in url
+    def test_chi_url_contains_correct_location(self) -> None:
+        """CHI URL uses MDW cli_location."""
+        url = build_cli_listing_url("CHI")
+        assert "api.weather.gov/products/types/CLI/locations/MDW" in url
 
-    def test_mia_url_contains_correct_params(self) -> None:
-        """MIA URL uses MFL office and KMIA station."""
-        url = build_cli_url("MIA")
-        assert "site=MFL" in url
-        assert "issuedby=KMIA" in url
+    def test_mia_url_contains_correct_location(self) -> None:
+        """MIA URL uses MIA cli_location."""
+        url = build_cli_listing_url("MIA")
+        assert "api.weather.gov/products/types/CLI/locations/MIA" in url
 
-    def test_aus_url_contains_correct_params(self) -> None:
-        """AUS URL uses EWX office and KAUS station."""
-        url = build_cli_url("AUS")
-        assert "site=EWX" in url
-        assert "issuedby=KAUS" in url
+    def test_aus_url_contains_correct_location(self) -> None:
+        """AUS URL uses AUS cli_location."""
+        url = build_cli_listing_url("AUS")
+        assert "api.weather.gov/products/types/CLI/locations/AUS" in url
 
     def test_all_cities_have_valid_urls(self) -> None:
-        """Every city in STATION_CONFIGS produces a valid CLI URL."""
+        """Every city in STATION_CONFIGS produces a valid CLI listing URL."""
         for city in STATION_CONFIGS:
-            url = build_cli_url(city)
-            assert url.startswith("https://forecast.weather.gov/product.php")
+            url = build_cli_listing_url(city)
+            assert url.startswith("https://api.weather.gov/products/types/CLI/locations/")
 
     def test_invalid_city_raises_key_error(self) -> None:
         """Unknown city code → KeyError."""
         with pytest.raises(KeyError):
-            build_cli_url("INVALID")
+            build_cli_listing_url("INVALID")
 
 
 # ─── TestFetchNwsCli ───
 
 
 class TestFetchNwsCli:
-    """Test fetch_nws_cli() — fetches CLI text from NWS."""
+    """Test fetch_nws_cli() — 2-step JSON API fetch from api.weather.gov."""
 
     @pytest.mark.asyncio
-    async def test_returns_text_response(self) -> None:
-        """Mock httpx returns text → function returns that text."""
+    async def test_returns_text_from_product(self) -> None:
+        """Listing + product fetch → returns productText."""
         from backend.weather.nws import fetch_nws_cli
 
-        with patch(
-            "backend.weather.nws.fetch_text_with_retry",
-            new_callable=AsyncMock,
-            return_value=SAMPLE_CLI_NYC,
-        ):
+        mock_fetch = AsyncMock(
+            side_effect=[
+                # Step 1: listing response
+                {"@graph": [{"id": "abc-123"}]},
+                # Step 2: product response
+                {"productText": SAMPLE_CLI_NYC},
+            ]
+        )
+        with patch("backend.weather.nws.fetch_with_retry", mock_fetch):
             result = await fetch_nws_cli("NYC")
 
         assert "TEMPERATURE" in result
         assert "MAXIMUM" in result
 
     @pytest.mark.asyncio
-    async def test_passes_correct_url_to_fetcher(self) -> None:
-        """The CLI URL built from STATION_CONFIGS is passed to fetch_text_with_retry."""
+    async def test_passes_correct_listing_url(self) -> None:
+        """The listing URL uses api.weather.gov with the correct cli_location."""
         from backend.weather.nws import fetch_nws_cli
 
-        mock_fetch = AsyncMock(return_value=SAMPLE_CLI_NYC)
-        with patch("backend.weather.nws.fetch_text_with_retry", mock_fetch):
+        mock_fetch = AsyncMock(
+            side_effect=[
+                {"@graph": [{"id": "abc-123"}]},
+                {"productText": SAMPLE_CLI_NYC},
+            ]
+        )
+        with patch("backend.weather.nws.fetch_with_retry", mock_fetch):
             await fetch_nws_cli("NYC")
 
-        call_url = mock_fetch.call_args[0][0]
-        assert "site=OKX" in call_url
-        assert "issuedby=KNYC" in call_url
+        listing_url = mock_fetch.call_args_list[0][0][0]
+        assert "api.weather.gov/products/types/CLI/locations/NYC" in listing_url
 
     @pytest.mark.asyncio
-    async def test_raises_fetch_error_on_failure(self) -> None:
-        """FetchError propagates from fetch_text_with_retry."""
+    async def test_fetches_product_by_id(self) -> None:
+        """Step 2 fetches the correct product URL using the product ID."""
+        from backend.weather.nws import fetch_nws_cli
+
+        mock_fetch = AsyncMock(
+            side_effect=[
+                {"@graph": [{"id": "xyz-789"}]},
+                {"productText": SAMPLE_CLI_NYC},
+            ]
+        )
+        with patch("backend.weather.nws.fetch_with_retry", mock_fetch):
+            await fetch_nws_cli("NYC")
+
+        product_url = mock_fetch.call_args_list[1][0][0]
+        assert product_url == "https://api.weather.gov/products/xyz-789"
+
+    @pytest.mark.asyncio
+    async def test_raises_fetch_error_on_listing_failure(self) -> None:
+        """FetchError propagates from listing step."""
         from backend.weather.nws import fetch_nws_cli
 
         with (
             patch(
-                "backend.weather.nws.fetch_text_with_retry",
+                "backend.weather.nws.fetch_with_retry",
                 new_callable=AsyncMock,
                 side_effect=FetchError("HTTP 500"),
             ),
             pytest.raises(FetchError, match="500"),
+        ):
+            await fetch_nws_cli("NYC")
+
+    @pytest.mark.asyncio
+    async def test_raises_fetch_error_on_empty_listing(self) -> None:
+        """No products in listing → FetchError."""
+        from backend.weather.nws import fetch_nws_cli
+
+        mock_fetch = AsyncMock(return_value={"@graph": []})
+        with (
+            patch("backend.weather.nws.fetch_with_retry", mock_fetch),
+            pytest.raises(FetchError, match="No CLI products"),
+        ):
+            await fetch_nws_cli("NYC")
+
+    @pytest.mark.asyncio
+    async def test_raises_fetch_error_on_empty_product_text(self) -> None:
+        """Product exists but productText is empty → FetchError."""
+        from backend.weather.nws import fetch_nws_cli
+
+        mock_fetch = AsyncMock(
+            side_effect=[
+                {"@graph": [{"id": "abc-123"}]},
+                {"productText": ""},
+            ]
+        )
+        with (
+            patch("backend.weather.nws.fetch_with_retry", mock_fetch),
+            pytest.raises(FetchError, match="Empty productText"),
+        ):
+            await fetch_nws_cli("NYC")
+
+    @pytest.mark.asyncio
+    async def test_raises_fetch_error_on_missing_product_id(self) -> None:
+        """Product in listing has no id field → FetchError."""
+        from backend.weather.nws import fetch_nws_cli
+
+        mock_fetch = AsyncMock(return_value={"@graph": [{"name": "no-id"}]})
+        with (
+            patch("backend.weather.nws.fetch_with_retry", mock_fetch),
+            pytest.raises(FetchError, match="No product ID"),
         ):
             await fetch_nws_cli("NYC")
 

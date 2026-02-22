@@ -70,9 +70,15 @@ class TestDidBracketWin:
 class TestGeneratePostmortemNarrative:
     """Test narrative generation for trade post-mortems."""
 
-    def _make_trade(self, status: TradeStatus, pnl_cents: int = 67) -> MagicMock:
+    def _make_trade(
+        self,
+        status: TradeStatus,
+        pnl_cents: int = 67,
+        fees_cents: int = 11,
+    ) -> MagicMock:
         """Create a mock Trade ORM object."""
         trade = MagicMock(spec=Trade)
+        trade.id = "abcd1234-5678-9012-3456-abcdef012345"
         trade.bracket_label = "53-54F"
         trade.side = "yes"
         trade.price_cents = 22
@@ -82,9 +88,11 @@ class TestGeneratePostmortemNarrative:
         trade.trade_date = datetime(2026, 2, 18, tzinfo=UTC)
         trade.model_probability = 0.30
         trade.market_probability = 0.22
+        trade.ev_at_entry = 0.08
         trade.confidence = "medium"
         trade.status = status
         trade.pnl_cents = pnl_cents
+        trade.fees_cents = fees_cents
         return trade
 
     def _make_settlement(self, temp: float = 53.5) -> MagicMock:
@@ -116,6 +124,87 @@ class TestGeneratePostmortemNarrative:
         # Should contain "53F" or "54F" (rounded)
         assert "53" in narrative or "54" in narrative
 
+    def test_has_section_headers(self) -> None:
+        """Rich narrative contains all expected section headers."""
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        settlement = self._make_settlement(53.5)
+        narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
+        assert "WHAT WE TRADED" in narrative
+        assert "WHAT HAPPENED" in narrative
+        assert "WHY WE TOOK THIS TRADE" in narrative
+        assert "TRADE ECONOMICS" in narrative
+
+    def test_includes_station_name(self) -> None:
+        """Narrative includes the station name from STATION_CONFIGS."""
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        settlement = self._make_settlement(53.5)
+        narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
+        # NYC station is Central Park
+        assert "Central Park" in narrative
+
+    def test_includes_city_name(self) -> None:
+        """Narrative includes the human-readable city name."""
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        settlement = self._make_settlement(53.5)
+        narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
+        assert "New York" in narrative
+
+    def test_includes_edge_pp(self) -> None:
+        """Narrative includes the model-vs-market edge in percentage points."""
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        settlement = self._make_settlement(53.5)
+        narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
+        # model=0.30, market=0.22 => 8 pp edge
+        assert "8 pp edge" in narrative
+
+    def test_includes_ev_at_entry(self) -> None:
+        """Narrative includes the EV at entry."""
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        settlement = self._make_settlement(53.5)
+        narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
+        assert "EV at entry" in narrative
+
+    def test_includes_fees_when_won(self) -> None:
+        """A winning trade narrative includes the fee amount."""
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=67, fees_cents=11)
+        settlement = self._make_settlement(53.5)
+        narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
+        assert "Fees: $0.11" in narrative
+
+    def test_no_fees_line_when_lost(self) -> None:
+        """A losing trade narrative does not have a Fees line (fees=0)."""
+        trade = self._make_trade(TradeStatus.LOST, pnl_cents=-22, fees_cents=0)
+        settlement = self._make_settlement(55.0)
+        narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
+        assert "Fees:" not in narrative
+
+    def test_includes_forecast_accuracy(self) -> None:
+        """When forecasts are provided, narrative includes FORECAST ACCURACY."""
+        from backend.common.models import WeatherForecast
+
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        settlement = self._make_settlement(53.5)
+
+        fc = MagicMock(spec=WeatherForecast)
+        fc.source = "NWS"
+        fc.forecast_high_f = 54.0
+
+        narrative = generate_postmortem_narrative(
+            trade,
+            settlement,
+            forecasts=[fc],
+        )
+        assert "FORECAST ACCURACY" in narrative
+        assert "NWS" in narrative
+        assert "54F" in narrative
+
+    def test_no_forecast_section_without_forecasts(self) -> None:
+        """Without forecasts, no FORECAST ACCURACY section."""
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        settlement = self._make_settlement(53.5)
+        narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
+        assert "FORECAST ACCURACY" not in narrative
+
 
 # ---------------------------------------------------------------------------
 # TestSettleTrade
@@ -126,6 +215,7 @@ class TestSettleTrade:
     def _make_trade(self) -> MagicMock:
         """Create a mock Trade ORM object for settlement."""
         trade = MagicMock(spec=Trade)
+        trade.id = "settle1234-5678-9012-3456-abcdef012345"
         trade.bracket_label = "53-54F"
         trade.side = "yes"
         trade.price_cents = 22
@@ -135,6 +225,7 @@ class TestSettleTrade:
         trade.trade_date = datetime(2026, 2, 18, tzinfo=UTC)
         trade.model_probability = 0.30
         trade.market_probability = 0.22
+        trade.ev_at_entry = 0.08
         trade.confidence = "medium"
         trade.status = TradeStatus.OPEN
         trade.pnl_cents = None

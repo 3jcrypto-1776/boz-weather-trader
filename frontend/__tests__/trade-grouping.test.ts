@@ -23,6 +23,8 @@ function makeTrade(overrides: Partial<TradeRecord> = {}): TradeRecord {
     settlement_temp_f: null,
     settlement_source: null,
     pnl_cents: null,
+    fees_cents: null,
+    postmortem_narrative: null,
     created_at: "2026-02-21T10:00:00Z",
     settled_at: null,
     ...overrides,
@@ -191,6 +193,34 @@ describe("groupTrades", () => {
     const trades = [makeTrade({ id: "t1", quantity: 5 })];
     const groups = groupTrades(trades);
     expect(groups[0].totalQuantity).toBe(5);
+  });
+
+  it("propagates postmortem_narrative from settled trade", () => {
+    const narrative = "WHAT WE TRADED\n  Bought YES...";
+    const trades = [
+      makeTrade({
+        id: "t1",
+        status: "WON",
+        pnl_cents: 90,
+        postmortem_narrative: narrative,
+      }),
+      makeTrade({
+        id: "t2",
+        status: "WON",
+        pnl_cents: 90,
+        postmortem_narrative: null,
+      }),
+    ];
+    const groups = groupTrades(trades);
+    expect(groups[0].postmortem_narrative).toBe(narrative);
+  });
+
+  it("returns null narrative when no trades have one", () => {
+    const trades = [
+      makeTrade({ id: "t1", status: "WON", pnl_cents: 90 }),
+    ];
+    const groups = groupTrades(trades);
+    expect(groups[0].postmortem_narrative).toBeNull();
   });
 });
 

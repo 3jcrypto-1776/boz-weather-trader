@@ -36,8 +36,17 @@ from backend.common.models import (
     WeatherForecast,
 )
 from backend.trading.ev_calculator import estimate_fees
+from backend.weather.stations import STATION_CONFIGS
 
 logger = get_logger("POSTMORTEM")
+
+# City display names for narratives
+_CITY_NAMES: dict[str, str] = {
+    "NYC": "New York",
+    "CHI": "Chicago",
+    "MIA": "Miami",
+    "AUS": "Austin",
+}
 
 
 def generate_postmortem_narrative(
@@ -45,10 +54,10 @@ def generate_postmortem_narrative(
     settlement: Settlement,
     forecasts: list[WeatherForecast],
 ) -> str:
-    """Generate a human-readable post-mortem explanation for a trade.
+    """Generate a structured post-mortem executive summary for a trade.
 
-    Compares the model prediction, market price, and actual outcome to
-    explain why the trade won or lost.
+    Produces a multi-section narrative covering what was traded, what
+    happened, why the trade was taken, forecast accuracy, and economics.
 
     Args:
         trade: The Trade ORM model (must have status set to WON or LOST).
@@ -56,44 +65,96 @@ def generate_postmortem_narrative(
         forecasts: Weather forecasts that were active at trade time.
 
     Returns:
-        A narrative string suitable for display in the PWA dashboard.
-
-    Example output:
-        "WIN (+78c): Bought YES on NYC 53-54F at 22c. Actual high was 53F.
-        Our model predicted 28% probability. Forecast accuracy:
-        NWS: 54F (+1F off); GFS: 53F (+0F off)."
+        A multi-line narrative string with section headers.
     """
+    city_code = trade.city.value if hasattr(trade.city, "value") else trade.city
+    city_name = _CITY_NAMES.get(city_code, city_code)
     actual_temp = settlement.actual_high_f
     bracket = trade.bracket_label
     side = trade.side.upper()
     price_cents = trade.price_cents
-    status = trade.status
-
-    # Determine outcome string
+    quantity = trade.quantity
     pnl_cents = trade.pnl_cents or 0
-    outcome_str = f"WIN (+{pnl_cents}c)" if status == TradeStatus.WON else f"LOSS ({pnl_cents}c)"
+    fees_cents = trade.fees_cents or 0
+    model_prob = trade.model_probability
+    market_prob = trade.market_probability
+    ev_at_entry = trade.ev_at_entry
+    confidence = trade.confidence
 
-    # Build forecast comparison (sorted by accuracy)
-    forecast_lines: list[str] = []
-    for fc in sorted(forecasts, key=lambda f: abs(f.forecast_high_f - actual_temp)):
-        diff = fc.forecast_high_f - actual_temp
-        forecast_lines.append(
-            f"{fc.source}: {fc.forecast_high_f:.0f}F ({'+' if diff >= 0 else ''}{diff:.0f}F off)"
-        )
+    # Station name from config
+    station_cfg = STATION_CONFIGS.get(city_code)
+    station_name = station_cfg.station_name if station_cfg else city_code
 
-    forecast_summary = "; ".join(forecast_lines[:4])  # top 4 models
+    # Trade date formatting
+    trade_dt = trade.trade_date
+    date_str = trade_dt.strftime("%b %d, %Y") if hasattr(trade_dt, "strftime") else str(trade_dt)
 
-    narrative = (
-        f"{outcome_str}: Bought {side} on {trade.city.value} {bracket} at "
-        f"{price_cents}c. Actual high was {actual_temp:.0f}F. "
-        f"Our model predicted {trade.model_probability:.0%} probability "
-        f"for this bracket."
+    # Result line
+    is_win = trade.status == TradeStatus.WON
+    result_emoji = "WIN" if is_win else "LOSS"
+    pnl_str = f"+${pnl_cents / 100:.2f}" if pnl_cents >= 0 else f"-${abs(pnl_cents) / 100:.2f}"
+
+    # Edge calculation
+    edge_pp = round((model_prob - market_prob) * 100)
+
+    # Bracket hit check
+    bracket_hit = _did_bracket_win(bracket, actual_temp, "yes")
+    bracket_status = "hit" if bracket_hit else "miss"
+
+    lines: list[str] = []
+
+    # Header
+    trade_id_short = trade.id[:8] if trade.id else "?"
+    lines.append(f"TRADE #{trade_id_short} -- {city_name} High Temp | {date_str}")
+    lines.append(f"Result: {result_emoji}  |  P&L: {pnl_str}")
+    lines.append("")
+
+    # WHAT WE TRADED
+    lines.append("WHAT WE TRADED")
+    contract_word = "contract" if quantity == 1 else "contracts"
+    lines.append(
+        f"  Bought {side} on {bracket} bracket"
+        f" @ ${price_cents / 100:.2f} ({quantity} {contract_word})"
     )
+    lines.append("")
 
-    if forecast_summary:
-        narrative += f" Forecast accuracy: {forecast_summary}."
+    # WHAT HAPPENED
+    lines.append("WHAT HAPPENED")
+    lines.append(f"  Actual high: {actual_temp:.0f}F ({settlement.source}, {station_name})")
+    lines.append(f"  Bracket {bracket}: {bracket_status}")
+    lines.append("")
 
-    return narrative
+    # WHY WE TOOK THIS TRADE
+    lines.append("WHY WE TOOK THIS TRADE")
+    lines.append(f"  Model predicted {model_prob:.0%} chance for this bracket")
+    lines.append(
+        f"  Market priced at {market_prob:.0%} (${price_cents / 100:.2f}) -- {edge_pp} pp edge"
+    )
+    lines.append(f"  Confidence: {confidence.upper()}")
+    lines.append("")
+
+    # FORECAST ACCURACY
+    if forecasts:
+        lines.append("FORECAST ACCURACY")
+        sorted_fc = sorted(
+            forecasts,
+            key=lambda f: abs(f.forecast_high_f - actual_temp),
+        )
+        for fc in sorted_fc[:4]:
+            diff = fc.forecast_high_f - actual_temp
+            sign = "+" if diff >= 0 else ""
+            lines.append(f"  {fc.source}: {fc.forecast_high_f:.0f}F ({sign}{diff:.0f}F off)")
+        lines.append("")
+
+    # TRADE ECONOMICS
+    lines.append("TRADE ECONOMICS")
+    lines.append(f"  EV at entry: {ev_at_entry * 100:+.1f}% per contract")
+    if fees_cents > 0:
+        lines.append(f"  Fees: ${fees_cents / 100:.2f}  |  Net P&L: {pnl_str}")
+    else:
+        lines.append(f"  Net P&L: {pnl_str}")
+
+    return "\n".join(lines)
 
 
 async def settle_trade(

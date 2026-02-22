@@ -6,6 +6,7 @@ import {
   formatDate,
   formatPnL,
   formatProbability,
+  parsePostmortemSections,
   statusColor,
   timeRemaining,
   CITY_NAMES,
@@ -144,5 +145,56 @@ describe("CITY_NAMES", () => {
     expect(CITY_NAMES.CHI).toBe("Chicago");
     expect(CITY_NAMES.MIA).toBe("Miami");
     expect(CITY_NAMES.AUS).toBe("Austin");
+  });
+});
+
+describe("parsePostmortemSections", () => {
+  it("parses multi-section narrative into header/content pairs", () => {
+    const narrative = [
+      "WHAT WE TRADED",
+      "  Bought YES on 53-54F bracket",
+      "",
+      "WHAT HAPPENED",
+      "  Actual high: 54F",
+    ].join("\n");
+
+    const sections = parsePostmortemSections(narrative);
+    expect(sections).toHaveLength(2);
+    expect(sections[0].header).toBe("WHAT WE TRADED");
+    expect(sections[0].content).toContain("Bought YES");
+    expect(sections[1].header).toBe("WHAT HAPPENED");
+    expect(sections[1].content).toContain("Actual high");
+  });
+
+  it("handles old-format single-line narrative", () => {
+    const narrative = "Simple one-line post-mortem.";
+    const sections = parsePostmortemSections(narrative);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].header).toBeNull();
+    expect(sections[0].content).toBe("Simple one-line post-mortem.");
+  });
+
+  it("captures preamble before first header", () => {
+    const narrative = [
+      "TRADE #abcd -- NYC | Feb 18",
+      "Result: WIN",
+      "",
+      "WHAT WE TRADED",
+      "  Bought YES on bracket",
+    ].join("\n");
+
+    const sections = parsePostmortemSections(narrative);
+    expect(sections.length).toBeGreaterThanOrEqual(2);
+    // First section is the preamble (header line parsed as section header)
+    // or content before first section
+    const headers = sections.map((s) => s.header).filter(Boolean);
+    expect(headers).toContain("WHAT WE TRADED");
+  });
+
+  it("returns empty content for empty narrative", () => {
+    const sections = parsePostmortemSections("");
+    expect(sections).toHaveLength(1);
+    expect(sections[0].header).toBeNull();
+    expect(sections[0].content).toBe("");
   });
 });

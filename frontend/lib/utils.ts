@@ -172,6 +172,52 @@ export function confidenceBadgeColor(confidence: string): string {
   }
 }
 
+// ─── Post-Mortem Section Parser ───
+
+export interface PostmortemSection {
+  header: string | null;
+  content: string;
+}
+
+/**
+ * Parse a multi-section post-mortem narrative into header/content pairs.
+ *
+ * Section headers are detected as ALL-CAPS lines (e.g., "WHAT WE TRADED").
+ * For old-format single-line narratives, returns one section with null header.
+ */
+export function parsePostmortemSections(narrative: string): PostmortemSection[] {
+  const lines = narrative.split("\n");
+  const sections: PostmortemSection[] = [];
+  let currentHeader: string | null = null;
+  let currentLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Section header: all uppercase letters/spaces/punctuation, 3+ chars
+    if (/^[A-Z][A-Z\s\-#|]+$/.test(trimmed) && trimmed.length >= 3) {
+      if (currentHeader !== null || currentLines.length > 0) {
+        sections.push({
+          header: currentHeader,
+          content: currentLines.join("\n").trim(),
+        });
+      }
+      currentHeader = trimmed;
+      currentLines = [];
+    } else {
+      currentLines.push(line);
+    }
+  }
+
+  if (currentHeader !== null || currentLines.length > 0) {
+    sections.push({
+      header: currentHeader,
+      content: currentLines.join("\n").trim(),
+    });
+  }
+
+  return sections;
+}
+
 // ─── Settlement Date Utilities ───
 
 const MONTH_MAP: Record<string, number> = {

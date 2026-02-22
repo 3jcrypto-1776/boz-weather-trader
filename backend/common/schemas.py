@@ -145,6 +145,8 @@ class TradeRecord(BaseModel):
     settlement_temp_f: float | None = None
     settlement_source: str | None = None
     pnl_cents: int | None = None  # Profit/loss in cents after fees
+    fees_cents: int | None = None  # Fees in cents
+    postmortem_narrative: str | None = None
     created_at: datetime
     settled_at: datetime | None = None
 

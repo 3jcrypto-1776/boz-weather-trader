@@ -157,6 +157,8 @@ def trade_to_record(trade: Trade) -> TradeRecord:
         settlement_temp_f=trade.settlement_temp_f,
         settlement_source=trade.settlement_source,
         pnl_cents=trade.pnl_cents,
+        fees_cents=trade.fees_cents,
+        postmortem_narrative=trade.postmortem_narrative,
         created_at=trade.created_at,
         settled_at=trade.settled_at,
     )

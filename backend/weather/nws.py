@@ -8,7 +8,8 @@ Key endpoints used:
   - /points/{lat},{lon}          -> Grid coordinate lookup (cached)
   - /gridpoints/{o}/{x},{y}/forecast  -> Period forecasts (Fahrenheit)
   - /gridpoints/{o}/{x},{y}          -> Raw gridpoint data (Celsius!)
-  - forecast.weather.gov/product.php  -> CLI text product (settlement temps)
+  - /products/types/CLI/locations/{loc} -> CLI product listing
+  - /products/{id}               -> CLI product text (settlement temps)
 
 All fetch operations include exponential backoff retry logic and
 rate limiting to respect NWS API guidelines.
@@ -431,34 +432,34 @@ async def fetch_nws_gridpoint(city: str) -> list[WeatherData]:
 
 # ─── CLI (Daily Climate Report) Fetcher ───
 
-NWS_CLI_BASE_URL = "https://forecast.weather.gov/product.php"
+NWS_API_CLI_URL = "https://api.weather.gov/products/types/CLI/locations"
 
 
-def build_cli_url(city: str) -> str:
-    """Build the NWS CLI product URL for a city.
+def build_cli_listing_url(city: str) -> str:
+    """Build the NWS API URL to list CLI products for a city.
 
-    The CLI (Daily Climate Report) is a text product published by NWS
-    forecast offices. It contains the official observed temperatures
-    used by Kalshi for weather market settlement.
+    Uses the api.weather.gov products endpoint which replaced the
+    legacy forecast.weather.gov/product.php endpoint.
 
     Args:
         city: Kalshi city code (NYC, CHI, MIA, AUS).
 
     Returns:
-        Full URL for the NWS CLI text product.
+        URL for the CLI product listing endpoint.
 
     Raises:
         KeyError: If city is not a valid city code.
     """
     config = STATION_CONFIGS[city]
-    return (
-        f"{NWS_CLI_BASE_URL}?site={config.nws_office}"
-        f"&issuedby={config.station_id}&product=CLI&format=txt"
-    )
+    return f"{NWS_API_CLI_URL}/{config.cli_location}"
 
 
 async def fetch_nws_cli(city: str) -> str:
     """Fetch the NWS CLI (Daily Climate Report) text for a city.
+
+    Two-step fetch via api.weather.gov:
+    1. List CLI products for the location to get the latest product ID
+    2. Fetch the product JSON to extract productText
 
     The CLI report is published ~7-8 AM local time the morning after
     the settlement day. It contains the official observed high/low
@@ -474,18 +475,74 @@ async def fetch_nws_cli(city: str) -> str:
         KeyError: If city is not a valid city code.
         FetchError: If the fetch fails after retries.
     """
-    url = build_cli_url(city)
+    listing_url = build_cli_listing_url(city)
 
     logger.info(
         "Fetching NWS CLI report",
-        extra={"data": {"city": city, "url": url}},
+        extra={"data": {"city": city, "url": listing_url}},
     )
 
-    text = await fetch_text_with_retry(url)
+    # Step 1: Get the latest CLI product ID
+    listing = await fetch_with_retry(listing_url)
+    products = listing.get("@graph", [])
+    if not products:
+        raise FetchError(f"No CLI products found for {city} at {listing_url}")
+
+    product_id = products[0].get("id")
+    if not product_id:
+        raise FetchError(f"No product ID in CLI listing for {city}")
+
+    # Step 2: Fetch the product JSON and extract productText
+    product_url = f"https://api.weather.gov/products/{product_id}"
+    product_data = await fetch_with_retry(product_url)
+    text = product_data.get("productText", "")
+
+    if not text:
+        raise FetchError(f"Empty productText in CLI product {product_id} for {city}")
 
     logger.info(
         "Fetched NWS CLI report",
-        extra={"data": {"city": city, "text_length": len(text)}},
+        extra={"data": {"city": city, "product_id": product_id, "text_length": len(text)}},
     )
 
     return text
+
+
+async def fetch_all_nws_cli(city: str, max_products: int = 10) -> list[str]:
+    """Fetch multiple recent NWS CLI reports for a city.
+
+    Used for catch-up settlement when multiple days of reports were missed.
+    Fetches up to max_products from the listing and returns their text.
+
+    Args:
+        city: Kalshi city code (NYC, CHI, MIA, AUS).
+        max_products: Maximum number of products to fetch.
+
+    Returns:
+        List of raw CLI report text strings (newest first).
+
+    Raises:
+        KeyError: If city is not a valid city code.
+        FetchError: If the listing fetch fails.
+    """
+    listing_url = build_cli_listing_url(city)
+    listing = await fetch_with_retry(listing_url)
+    products = listing.get("@graph", [])[:max_products]
+
+    results: list[str] = []
+    for product in products:
+        product_id = product.get("id")
+        if not product_id:
+            continue
+        try:
+            product_url = f"https://api.weather.gov/products/{product_id}"
+            product_data = await fetch_with_retry(product_url)
+            text = product_data.get("productText", "")
+            if text:
+                results.append(text)
+        except FetchError:
+            logger.warning(
+                "Failed to fetch CLI product",
+                extra={"data": {"city": city, "product_id": product_id}},
+            )
+    return results

@@ -471,7 +471,7 @@ async def _settle_and_postmortem() -> None:
     Finds all OPEN trades that have matching settlement data and
     settles them with P&L and narrative generation.
     """
-    from sqlalchemy import select
+    from sqlalchemy import func, select
 
     from backend.common.models import Settlement, Trade, TradeStatus
     from backend.trading.cooldown import CooldownManager
@@ -486,11 +486,13 @@ async def _settle_and_postmortem() -> None:
 
         settled_count = 0
         for trade in open_trades_result.scalars().all():
-            # Look for matching settlement data
+            # Look for matching settlement data.
+            # trade_date is a datetime; settlement_date is stored as midnight.
+            # Compare date portions only with func.date().
             settlement_result = await session.execute(
                 select(Settlement).where(
                     Settlement.city == trade.city,
-                    Settlement.settlement_date == trade.trade_date,
+                    func.date(Settlement.settlement_date) == func.date(trade.trade_date),
                 )
             )
             settlement = settlement_result.scalar_one_or_none()

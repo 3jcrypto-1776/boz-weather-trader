@@ -11,6 +11,7 @@ import {
   formatDateTime,
   formatPnL,
   formatProbability,
+  parsePostmortemSections,
   settlementCountdown,
   statusColor,
   tradeFinancials,
@@ -179,8 +180,55 @@ export default function TradeCard({ group }: TradeCardProps) {
               </div>
             </div>
           )}
+
+          {/* Post-Mortem Executive Summary */}
+          {isSettled && group.postmortem_narrative && (
+            <PostMortemDisplay narrative={group.postmortem_narrative} />
+          )}
         </div>
       )}
+    </div>
+  );
+}
+
+function PostMortemDisplay({ narrative }: { narrative: string }) {
+  const sections = parsePostmortemSections(narrative);
+
+  // Old-format: single section with no header → show as paragraph
+  if (sections.length <= 1 && !sections[0]?.header) {
+    return (
+      <div className="mt-3 pt-3 border-t border-gray-100">
+        <h4 className="text-xs font-semibold text-boz-neutral mb-2">
+          Post-Mortem
+        </h4>
+        <p className="text-xs text-gray-700 whitespace-pre-line">
+          {narrative}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <h4 className="text-xs font-semibold text-boz-neutral mb-2">
+        Post-Mortem
+      </h4>
+      <div className="space-y-2">
+        {sections.map((section, i) => (
+          <div key={i}>
+            {section.header && (
+              <h5 className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-0.5">
+                {section.header}
+              </h5>
+            )}
+            {section.content && (
+              <div className="text-xs text-gray-700 whitespace-pre-line pl-1">
+                {section.content}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -119,6 +119,11 @@ export function groupTrades(trades: TradeRecord[]): GroupedTrade[] {
     // Settlement info from any settled trade
     const settledTrade = groupTrades.find((t) => t.settlement_temp_f != null);
 
+    // Post-mortem from any trade that has one
+    const narrativeTrade = groupTrades.find(
+      (t) => t.postmortem_narrative != null,
+    );
+
     groups.push({
       groupKey: key,
       city: first.city,
@@ -141,6 +146,7 @@ export function groupTrades(trades: TradeRecord[]): GroupedTrade[] {
       latestCreatedAt: createdAts[createdAts.length - 1],
       settlement_temp_f: settledTrade?.settlement_temp_f ?? null,
       settlement_source: settledTrade?.settlement_source ?? null,
+      postmortem_narrative: narrativeTrade?.postmortem_narrative ?? null,
     });
   });
 

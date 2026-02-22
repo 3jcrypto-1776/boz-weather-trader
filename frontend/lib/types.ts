@@ -71,6 +71,8 @@ export interface TradeRecord {
   settlement_temp_f: number | null;
   settlement_source: string | null;
   pnl_cents: number | null;
+  fees_cents: number | null;
+  postmortem_narrative: string | null;
   created_at: string; // ISO datetime string
   settled_at: string | null;
 }
@@ -216,6 +218,7 @@ export interface GroupedTrade {
   latestCreatedAt: string;
   settlement_temp_f: number | null;
   settlement_source: string | null;
+  postmortem_narrative: string | null;
 }
 
 /** Market section header grouping for the trades page. */

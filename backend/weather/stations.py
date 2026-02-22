@@ -39,6 +39,7 @@ class StationConfig:
     lat: float
     lon: float
     nws_office: str
+    cli_location: str  # NWS API location code for CLI products (e.g., "NYC", "MDW")
     timezone: ZoneInfo
     standard_utc_offset: int
     grid: dict | None = field(default=None)
@@ -55,6 +56,7 @@ STATION_CONFIGS: dict[str, StationConfig] = {
         lat=40.7828,
         lon=-73.9653,
         nws_office="OKX",
+        cli_location="NYC",
         timezone=ZoneInfo("America/New_York"),
         standard_utc_offset=-5,
     ),
@@ -65,6 +67,7 @@ STATION_CONFIGS: dict[str, StationConfig] = {
         lat=41.7868,
         lon=-87.7522,
         nws_office="LOT",
+        cli_location="MDW",
         timezone=ZoneInfo("America/Chicago"),
         standard_utc_offset=-6,
     ),
@@ -75,6 +78,7 @@ STATION_CONFIGS: dict[str, StationConfig] = {
         lat=25.7959,
         lon=-80.2870,
         nws_office="MFL",
+        cli_location="MIA",
         timezone=ZoneInfo("America/New_York"),
         standard_utc_offset=-5,
     ),
@@ -85,6 +89,7 @@ STATION_CONFIGS: dict[str, StationConfig] = {
         lat=30.1945,
         lon=-97.6699,
         nws_office="EWX",
+        cli_location="AUS",
         timezone=ZoneInfo("America/Chicago"),
         standard_utc_offset=-6,
     ),

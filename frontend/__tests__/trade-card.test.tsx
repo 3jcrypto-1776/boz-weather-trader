@@ -24,6 +24,8 @@ function makeTrade(overrides: Partial<TradeRecord> = {}): TradeRecord {
     settlement_temp_f: null,
     settlement_source: null,
     pnl_cents: null,
+    fees_cents: null,
+    postmortem_narrative: null,
     created_at: "2025-02-18T10:00:00Z",
     settled_at: null,
     ...overrides,
@@ -55,6 +57,7 @@ function makeGroup(overrides: Partial<GroupedTrade> = {}): GroupedTrade {
     latestCreatedAt: trade.created_at,
     settlement_temp_f: trade.settlement_temp_f,
     settlement_source: trade.settlement_source,
+    postmortem_narrative: trade.postmortem_narrative,
     ...overrides,
   };
 }
@@ -236,5 +239,82 @@ describe("TradeCard", () => {
     fireEvent.click(screen.getByRole("button"));
 
     expect(screen.queryByText(/Individual Orders/)).not.toBeInTheDocument();
+  });
+
+  // --- Post-mortem display tests ---
+
+  it("shows post-mortem sections when expanded for settled trade", () => {
+    const narrative = [
+      "TRADE #abcd1234 -- New York High Temp | Feb 18, 2026",
+      "Result: WIN  |  P&L: +$0.67",
+      "",
+      "WHAT WE TRADED",
+      "  Bought YES on 55-56°F bracket @ $0.25 (1 contract)",
+      "",
+      "WHAT HAPPENED",
+      "  Actual high: 55F (NWS_CLI, Central Park)",
+    ].join("\n");
+
+    render(
+      <TradeCard
+        group={makeGroup({
+          status: "WON",
+          totalPnlCents: 67,
+          postmortem_narrative: narrative,
+        })}
+      />,
+    );
+
+    // Expand
+    fireEvent.click(screen.getByRole("button"));
+
+    expect(screen.getByText("WHAT WE TRADED")).toBeInTheDocument();
+    expect(screen.getByText("WHAT HAPPENED")).toBeInTheDocument();
+  });
+
+  it("does not show post-mortem for open trades", () => {
+    render(<TradeCard group={makeGroup()} />);
+
+    // Expand
+    fireEvent.click(screen.getByRole("button"));
+
+    expect(screen.queryByText("Post-Mortem")).not.toBeInTheDocument();
+    expect(screen.queryByText("WHAT WE TRADED")).not.toBeInTheDocument();
+  });
+
+  it("does not show post-mortem when narrative is null", () => {
+    render(
+      <TradeCard
+        group={makeGroup({
+          status: "WON",
+          totalPnlCents: 67,
+          postmortem_narrative: null,
+        })}
+      />,
+    );
+
+    // Expand
+    fireEvent.click(screen.getByRole("button"));
+
+    expect(screen.queryByText("WHAT WE TRADED")).not.toBeInTheDocument();
+  });
+
+  it("falls back to plain text for old-format narratives", () => {
+    render(
+      <TradeCard
+        group={makeGroup({
+          status: "WON",
+          totalPnlCents: 67,
+          postmortem_narrative: "Simple one-line post-mortem without sections.",
+        })}
+      />,
+    );
+
+    // Expand
+    fireEvent.click(screen.getByRole("button"));
+
+    expect(
+      screen.getByText("Simple one-line post-mortem without sections."),
+    ).toBeInTheDocument();
   });
 });

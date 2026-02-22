@@ -198,5 +198,5 @@ async def test_narrative_includes_forecasts(db: AsyncSession, test_user) -> None
     await settle_trade(trade, settlement, db)
 
     assert trade.postmortem_narrative is not None
-    assert "Forecast accuracy" in trade.postmortem_narrative
+    assert "FORECAST ACCURACY" in trade.postmortem_narrative
     assert "NWS" in trade.postmortem_narrative

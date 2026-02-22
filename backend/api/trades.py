@@ -125,3 +125,145 @@ async def sync_trades(
     )
 
     return result
+
+
+@router.post("/settle")
+async def settle_trades_now(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Manually trigger settlement for all OPEN trades with matching settlement data.
+
+    Fetches fresh CLI reports for all cities, creates Settlement records,
+    then settles any OPEN trades that have matching data. Useful for
+    catching up on missed scheduled settlements.
+    """
+    from backend.common.models import Settlement, TradeStatus
+    from backend.trading.postmortem import settle_trade
+    from backend.weather.cli_parser import parse_cli_text
+    from backend.weather.nws import fetch_all_nws_cli
+    from backend.weather.stations import VALID_CITIES
+
+    # Step 1: Fetch ALL available CLI reports and create Settlement records
+    cli_fetched = 0
+    for city in VALID_CITIES:
+        try:
+            cli_texts = await fetch_all_nws_cli(city)
+            for cli_text in cli_texts:
+                try:
+                    report = parse_cli_text(cli_text)
+                except Exception:
+                    continue
+
+                # Check for existing settlement
+                existing = await db.execute(
+                    select(Settlement).where(
+                        Settlement.city == city,
+                        Settlement.settlement_date == report.report_date,
+                    )
+                )
+                if existing.scalar_one_or_none() is not None:
+                    continue
+
+                settlement = Settlement(
+                    city=city,
+                    settlement_date=report.report_date,
+                    actual_high_f=report.high_f,
+                    actual_low_f=report.low_f,
+                    source="NWS_CLI",
+                    raw_data={"station": report.station, "raw_text": report.raw_text[:2000]},
+                )
+                db.add(settlement)
+                cli_fetched += 1
+        except Exception as exc:
+            logger.warning(
+                "CLI fetch failed during manual settle",
+                extra={"data": {"city": city, "error": str(exc)}},
+            )
+
+    if cli_fetched > 0:
+        await db.commit()
+
+    # Step 2: Settle OPEN trades with matching settlement data
+    open_trades_result = await db.execute(
+        select(Trade).where(Trade.user_id == user.id, Trade.status == TradeStatus.OPEN)
+    )
+
+    settled_count = 0
+    for trade in open_trades_result.scalars().all():
+        settlement_result = await db.execute(
+            select(Settlement).where(
+                Settlement.city == trade.city,
+                func.date(Settlement.settlement_date) == func.date(trade.trade_date),
+            )
+        )
+        settlement = settlement_result.scalar_one_or_none()
+        if settlement is None:
+            continue
+
+        await settle_trade(trade, settlement, db)
+        settled_count += 1
+
+    await db.commit()
+
+    logger.info(
+        "Manual settlement triggered",
+        extra={"data": {"cli_fetched": cli_fetched, "settled": settled_count}},
+    )
+
+    return {"cli_fetched": cli_fetched, "settled_count": settled_count}
+
+
+@router.post("/regenerate-postmortems")
+async def regenerate_postmortems(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Regenerate post-mortem narratives for all settled trades.
+
+    Re-runs the narrative generator with the updated rich format for
+    all WON/LOST trades that have matching settlement data.
+    """
+    from backend.common.models import Settlement, TradeStatus, WeatherForecast
+    from backend.trading.postmortem import generate_postmortem_narrative
+
+    settled_result = await db.execute(
+        select(Trade).where(
+            Trade.user_id == user.id,
+            Trade.status.in_([TradeStatus.WON, TradeStatus.LOST]),
+        )
+    )
+
+    count = 0
+    for trade in settled_result.scalars().all():
+        # Find matching settlement
+        settlement_result = await db.execute(
+            select(Settlement).where(
+                Settlement.city == trade.city,
+                func.date(Settlement.settlement_date) == func.date(trade.trade_date),
+            )
+        )
+        settlement = settlement_result.scalar_one_or_none()
+        if settlement is None:
+            continue
+
+        # Fetch forecasts for this trade
+        forecasts_result = await db.execute(
+            select(WeatherForecast).where(
+                WeatherForecast.city == trade.city,
+                WeatherForecast.forecast_date == trade.trade_date,
+            )
+        )
+        forecasts = list(forecasts_result.scalars().all())
+
+        trade.postmortem_narrative = generate_postmortem_narrative(trade, settlement, forecasts)
+        count += 1
+
+    await db.commit()
+
+    logger.info(
+        "Regenerated post-mortem narratives",
+        extra={"data": {"count": count}},
+    )
+
+    return {"regenerated_count": count}

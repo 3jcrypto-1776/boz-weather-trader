@@ -70,7 +70,7 @@ tests/
 │   ├── test_kelly.py              → Kelly Criterion: sizing, fractional, fees, caps, edge cases (35 tests)
 │   ├── test_scheduler.py          → Celery tasks: trading cycle, expiry, settlement, Kelly params (37 tests)
 │   ├── test_sync.py               → Portfolio sync: ticker parsing, reconciliation, sentinel values, error handling (20 tests)
-│   ├── test_postmortem.py         → Settlement matching, P&L, narratives (13 tests)
+│   ├── test_postmortem.py         → Settlement matching, P&L, rich narratives w/ sections (22 tests)
 │   ├── test_risk_manager.py       → Risk check ordering + enforcement (12 tests)
 │   ├── test_celery_hardening.py   → Task timeout configs (15 tests)
 │   ├── test_performance.py        → Performance analytics: trade stats, P&L tracking (12 tests)
@@ -1134,8 +1134,8 @@ jobs:
 | Job | What It Does | Failure Blocks Merge? |
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
-| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1219 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
-| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 138 tests) | Yes |
+| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1231 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
+| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 150 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 
 **Key design decisions:**

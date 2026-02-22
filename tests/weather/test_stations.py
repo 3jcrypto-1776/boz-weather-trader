@@ -98,6 +98,7 @@ class TestStationConfigs:
             nws_office="TST",
             timezone=ZoneInfo("UTC"),
             standard_utc_offset=0,
+            cli_location="TST",
         )
         assert config.grid is None
 
