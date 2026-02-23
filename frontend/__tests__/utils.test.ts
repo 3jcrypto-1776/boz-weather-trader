@@ -7,6 +7,7 @@ import {
   formatPnL,
   formatProbability,
   parsePostmortemSections,
+  shortBracketLabel,
   statusColor,
   timeRemaining,
   CITY_NAMES,
@@ -196,5 +197,27 @@ describe("parsePostmortemSections", () => {
     expect(sections).toHaveLength(1);
     expect(sections[0].header).toBeNull();
     expect(sections[0].content).toBe("");
+  });
+});
+
+describe("shortBracketLabel", () => {
+  it("formats bottom edge bracket (null lower bound)", () => {
+    expect(shortBracketLabel("52°F or below", null, 52)).toBe("≤52°");
+  });
+
+  it("formats top edge bracket (null upper bound)", () => {
+    expect(shortBracketLabel("58°F or above", 58, null)).toBe("≥58°");
+  });
+
+  it("formats middle bracket with integer bounds", () => {
+    expect(shortBracketLabel("52° to 53°F", 52, 53)).toBe("52-53°");
+  });
+
+  it("floors fractional bounds", () => {
+    expect(shortBracketLabel("52° to 53°F", 52.0, 53.99)).toBe("52-53°");
+  });
+
+  it("falls back to bracket_label when both bounds null", () => {
+    expect(shortBracketLabel("Unknown", null, null)).toBe("Unknown");
   });
 });

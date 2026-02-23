@@ -241,6 +241,35 @@ export function parsePostmortemSections(narrative: string): PostmortemSection[] 
   return sections;
 }
 
+// ─── Bracket Label Utilities ───
+
+/**
+ * Create a compact bracket label from numeric bounds for dashboard display.
+ *
+ * Examples:
+ *   (null, 52)  → "≤52°"
+ *   (52, 53)    → "52-53°"
+ *   (58, null)  → "≥58°"
+ *
+ * Falls back to the original bracket_label if both bounds are null.
+ */
+export function shortBracketLabel(
+  bracketLabel: string,
+  lowerBound: number | null,
+  upperBound: number | null,
+): string {
+  if (lowerBound === null && upperBound !== null) {
+    return `≤${Math.floor(upperBound)}°`;
+  }
+  if (upperBound === null && lowerBound !== null) {
+    return `≥${Math.floor(lowerBound)}°`;
+  }
+  if (lowerBound !== null && upperBound !== null) {
+    return `${Math.floor(lowerBound)}-${Math.floor(upperBound)}°`;
+  }
+  return bracketLabel;
+}
+
 // ─── Settlement Date Utilities ───
 
 const MONTH_MAP: Record<string, number> = {

@@ -158,6 +158,27 @@ describe("DashboardPage", () => {
     expect(screen.getByText("New York")).toBeInTheDocument();
   });
 
+  it("renders prediction horizontal bars with bracket labels", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<DashboardPage />);
+
+    // Abbreviated bracket labels should be visible
+    expect(screen.getByText("≤52°")).toBeInTheDocument();
+    expect(screen.getByText("55-56°")).toBeInTheDocument();
+    expect(screen.getByText("≥61°")).toBeInTheDocument();
+
+    // Peak bracket summary (55-56° at 30%)
+    expect(screen.getByText(/55-56° \(30%\)/)).toBeInTheDocument();
+
+    // Confidence shown in footer
+    expect(screen.getByText("medium confidence")).toBeInTheDocument();
+  });
+
   it("renders W/L record with all-time default", () => {
     mockUseDashboard.mockReturnValue({
       data: MOCK_DASHBOARD,

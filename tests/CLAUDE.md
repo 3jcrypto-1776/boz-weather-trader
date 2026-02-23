@@ -1141,7 +1141,7 @@ jobs:
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
 | `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1324 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
-| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 183 tests) | Yes |
+| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 189 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 
 **Key design decisions:**

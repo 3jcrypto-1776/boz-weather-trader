@@ -17,7 +17,7 @@ import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import { useDashboard, useDashboardStats } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
 import type { DashboardData, DashboardStats, StatsPeriod } from "@/lib/types";
-import { centsToDollars, formatPnL, CITY_NAMES } from "@/lib/utils";
+import { centsToDollars, formatPnL, shortBracketLabel, CITY_NAMES } from "@/lib/utils";
 
 // ─── Period Toggle Helpers ───
 
@@ -154,41 +154,101 @@ function DashboardContent({
             Today&apos;s Predictions
           </h2>
           <div className="space-y-2">
-            {data.predictions.map((pred) => (
-              <div
-                key={pred.city}
-                className="bg-white rounded-lg border border-gray-200 shadow-sm p-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">
-                    {CITY_NAMES[pred.city]}
-                  </span>
-                  <span className="text-xs text-boz-neutral">
-                    {pred.ensemble_mean_f.toFixed(0)}°F ±
-                    {pred.ensemble_std_f.toFixed(1)}
-                  </span>
-                </div>
-                <div className="flex gap-1 mt-2">
-                  {pred.brackets.map((b) => (
-                    <div
-                      key={b.bracket_label}
-                      className="flex-1 text-center"
-                      title={b.bracket_label}
-                    >
-                      <div
-                        className="bg-boz-primary rounded-sm mx-px"
-                        style={{
-                          height: `${Math.max(b.probability * 80, 4)}px`,
-                        }}
-                      />
-                      <span className="text-[9px] text-boz-neutral leading-tight block mt-0.5">
-                        {Math.round(b.probability * 100)}%
+            {data.predictions.map((pred) => {
+              const peakBracket = pred.brackets.reduce((best, b) =>
+                b.probability > best.probability ? b : best,
+              );
+              const peakPct = Math.round(peakBracket.probability * 100);
+              const peakLabel = shortBracketLabel(
+                peakBracket.bracket_label,
+                peakBracket.lower_bound_f,
+                peakBracket.upper_bound_f,
+              );
+              const maxProb = peakBracket.probability;
+
+              return (
+                <div
+                  key={pred.city}
+                  className="bg-white rounded-lg border border-gray-200 shadow-sm p-3"
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">
+                      {CITY_NAMES[pred.city]}
+                    </span>
+                    <span className="text-xs text-boz-neutral">
+                      Peak:{" "}
+                      <span className="text-boz-primary font-semibold">
+                        {peakLabel} ({peakPct}%)
                       </span>
-                    </div>
-                  ))}
+                    </span>
+                  </div>
+
+                  {/* Horizontal bar chart */}
+                  <div className="space-y-1">
+                    {pred.brackets.map((b) => {
+                      const pct = Math.round(b.probability * 100);
+                      const isPeak = b === peakBracket;
+                      const barWidth =
+                        maxProb > 0 ? (b.probability / maxProb) * 100 : 0;
+                      const label = shortBracketLabel(
+                        b.bracket_label,
+                        b.lower_bound_f,
+                        b.upper_bound_f,
+                      );
+
+                      return (
+                        <div
+                          key={b.bracket_label}
+                          className="flex items-center gap-1.5"
+                          title={b.bracket_label}
+                        >
+                          <span
+                            className={`text-[11px] w-[50px] text-right shrink-0 ${
+                              isPeak
+                                ? "font-semibold text-boz-primary"
+                                : "text-boz-neutral"
+                            }`}
+                          >
+                            {label}
+                          </span>
+                          <div className="flex-1 h-3.5 bg-gray-100 rounded-sm overflow-hidden">
+                            <div
+                              className={`h-full rounded-sm ${
+                                isPeak ? "bg-boz-primary" : "bg-blue-200"
+                              }`}
+                              style={{
+                                width: `${Math.max(barWidth, 2)}%`,
+                              }}
+                            />
+                          </div>
+                          <span
+                            className={`text-[11px] w-[30px] shrink-0 ${
+                              isPeak
+                                ? "font-semibold text-boz-primary"
+                                : "text-boz-neutral"
+                            }`}
+                          >
+                            {pct}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer: mean + confidence */}
+                  <div className="flex items-center justify-between mt-1.5 text-[10px] text-boz-neutral">
+                    <span>
+                      Mean {pred.ensemble_mean_f.toFixed(0)}°F ±
+                      {pred.ensemble_std_f.toFixed(1)}
+                    </span>
+                    <span className="capitalize">
+                      {pred.confidence} confidence
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
