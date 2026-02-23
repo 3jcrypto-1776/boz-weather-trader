@@ -269,6 +269,18 @@ export interface VersionInfo {
   release_url: string | null;
 }
 
+export interface UpdateTriggerResponse {
+  status: string;
+  message: string;
+}
+
+export interface UpdateStatus {
+  status: "idle" | "pulling" | "building" | "restarting" | "done" | "error";
+  step: string | null;
+  error: string | null;
+  started_at: string | null;
+}
+
 // ─── Grouped Trades (frontend-only aggregation) ───
 
 /** Trades sharing the same market_ticker+bracket+side+status, aggregated into one card. */

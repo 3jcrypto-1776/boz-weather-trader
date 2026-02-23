@@ -69,6 +69,10 @@ class Settings(BaseSettings):
     vapid_private_key: str | None = None
     vapid_email: str | None = None
 
+    # ─── Self-Update Sidecar ───
+    updater_url: str = "http://updater:9999"
+    updater_secret: str = "changeme"
+
 
 @lru_cache
 def get_settings() -> Settings:

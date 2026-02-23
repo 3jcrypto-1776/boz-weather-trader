@@ -44,7 +44,7 @@ backend/
 │   ├── manager.py       → ConnectionManager singleton (tracks WS connections, broadcasts)
 │   ├── subscriber.py    → redis_subscriber() + log_subscriber() — asyncio tasks bridging Redis pub/sub → WS + DB
 │   └── router.py        → FastAPI WebSocket endpoint at /ws
-└── api/                 → FastAPI route handlers (auth, dashboard, settings, trades, version, etc.)
+└── api/                 → FastAPI route handlers (auth, dashboard, settings, trades, version + self-update, etc.)
 ```
 
 ### Monitoring (sibling directory)
@@ -84,6 +84,9 @@ monitoring/
 - All endpoints return Pydantic models (auto-generates OpenAPI spec)
 - Use dependency injection for database sessions, auth, etc.
 - Meaningful HTTP status codes (don't just return 200 for everything)
+- Version endpoints in `api/version.py`: `GET /api/version` (current + update check), `POST /api/version/update` (triggers updater sidecar), `GET /api/version/update/status` (polls update progress)
+- Update schemas in `api/response_schemas.py`: `UpdateTriggerResponse`, `UpdateStatus`
+- Updater config in `common/config.py`: `updater_url` (sidecar HTTP address), `updater_secret` (shared secret for auth)
 
 ### Async
 - Use `async/await` for all I/O operations (HTTP calls, database, WebSocket)

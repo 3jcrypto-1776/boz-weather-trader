@@ -23,6 +23,8 @@ import type {
   SyncResult,
   TradeRecord,
   TradesPage,
+  UpdateStatus,
+  UpdateTriggerResponse,
   UserSettings,
   VersionInfo,
 } from "./types";
@@ -251,10 +253,20 @@ export async function fetchCurrentWeather(): Promise<CurrentWeatherResponse> {
   return apiFetch<CurrentWeatherResponse>("/api/weather/current");
 }
 
-// ─── Version (1 endpoint) ───
+// ─── Version (3 endpoints) ───
 
 export async function fetchVersion(): Promise<VersionInfo> {
   return apiFetch<VersionInfo>("/api/version");
+}
+
+export async function triggerUpdate(): Promise<UpdateTriggerResponse> {
+  return apiFetch<UpdateTriggerResponse>("/api/version/update", {
+    method: "POST",
+  });
+}
+
+export async function fetchUpdateStatus(): Promise<UpdateStatus> {
+  return apiFetch<UpdateStatus>("/api/version/update/status");
 }
 
 // ─── Calendar (1 endpoint) ───

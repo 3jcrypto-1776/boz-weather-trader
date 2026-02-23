@@ -21,6 +21,7 @@ backend/
   ├── websocket/   → Real-time event push (Redis pub/sub → WebSocket → SWR revalidation)
   └── common/      → Shared schemas, config, database, logging, middleware, metrics
 VERSION              → Single source of truth for app version (semver, read by backend + Docker + pyproject.toml)
+scripts/updater/     → Self-update sidecar (Dockerfile, server.py, update.sh) — Docker socket mount for git pull + rebuild
 monitoring/
   ├── prometheus/  → Prometheus scrape config + alerting rules
   │   ├── prometheus.yml   → Scrape config, rule_files, alertmanager target
@@ -29,17 +30,18 @@ monitoring/
   └── grafana/     → Grafana provisioning + dashboard JSON files
       ├── provisioning/  → Auto-provisioned datasources + dashboard provider
       └── dashboards/    → API Overview (8 panels) + Trading & Weather (10 panels) + Kalshi WS Feed (6 panels)
-tests/                   → 1299 backend + 174 frontend = 1473 tests (all passing)
+tests/                   → 1316 backend + 179 frontend = 1495 tests (all passing)
   ├── common/      → Shared module tests: config, schemas, models, logging, encryption, middleware, metrics (123)
   ├── weather/     → Weather pipeline: NWS, Open-Meteo, normalizer, stations, CLI parser, scheduler (140)
   ├── kalshi/      → Kalshi client: auth, REST, WS, markets, orders, models, cache, market feed (134)
   ├── prediction/  → Prediction engine: ensemble, multi-model ML, brackets, error dist, accuracy, calibration, pipeline (217)
   ├── trading/     → Trading engine: EV calc, Kelly sizing, risk, cooldowns, queue, executor, scheduler, safety, sync (239)
   ├── backtesting/ → Backtesting engine: schemas, risk sim, data loader, engine, metrics, integration (95)
-  ├── api/         → API endpoints: auth, dashboard, health, markets, queue, settings, trades, trades/sync, accuracy, optimization, calendar, version (125)
+  ├── api/         → API endpoints: auth, dashboard, health, markets, queue, settings, trades, trades/sync, accuracy, optimization, calendar, version, update (135)
   ├── websocket/   → WebSocket: events, manager, subscriber, router (40)
   ├── e2e/         → End-to-end smoke tests (35)
   ├── integration/ → Cross-module integration tests (47)
+  ├── updater/     → Updater sidecar server tests (7)
   └── (root)       → Grafana dashboards, alert rules, alertmanager config validation (92)
 ```
 
@@ -49,10 +51,10 @@ tests/                   → 1299 backend + 174 frontend = 1473 tests (all passi
 - **Frontend:** Next.js 14+, React, Tailwind CSS, PWA (Workbox)
 - **ML/Stats:** scipy, numpy, XGBoost, scikit-learn (Gaussian CDF + multi-model ML ensemble: XGBoost + Random Forest + Ridge)
 - **Monitoring:** prometheus-client, Prometheus, Grafana (auto-provisioned dashboards), Alertmanager (webhook alerts)
-- **Containerization:** Docker + Docker Compose (9 services incl. Prometheus, Grafana, Alertmanager) + `docker-compose.prod.yml` production overrides + `docker-compose.cloud.yml` cloud override (no monitoring)
+- **Containerization:** Docker + Docker Compose (10 services incl. Prometheus, Grafana, Alertmanager, updater sidecar) + `docker-compose.prod.yml` production overrides + `docker-compose.cloud.yml` cloud override (no monitoring)
 - **Testing:** pytest (backend), Jest/Vitest (frontend)
 - **CI/CD:** GitHub Actions + GitHub Releases (automated via `.github/workflows/release.yml`)
-- **Versioning:** Single source of truth `VERSION` file, `/api/version` endpoint with GitHub Releases update check
+- **Versioning:** Single source of truth `VERSION` file, `/api/version` endpoint with GitHub Releases update check, self-update via updater sidecar (`POST /api/version/update`)
 - **Linting:** ruff (Python), ESLint + Prettier (TypeScript)
 
 ## Critical Rules (All Agents Must Follow)

@@ -112,6 +112,19 @@ services:
       backend:
         condition: service_healthy
 
+  # ─── Self-Update Sidecar ───
+  updater:
+    build:
+      context: ./scripts/updater
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/project
+    environment:
+      UPDATER_SECRET: ${UPDATER_SECRET:-changeme}
+      COMPOSE_PROJECT_DIR: /project
+    # NO ports exposed — only reachable from internal Docker network
+
   # ─── Alertmanager (Alert Routing & Delivery) ───
   alertmanager:
     image: prom/alertmanager:latest

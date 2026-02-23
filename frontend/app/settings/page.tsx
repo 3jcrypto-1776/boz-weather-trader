@@ -7,9 +7,9 @@ import { mutate } from "swr";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
-import { disconnect, updateSettings } from "@/lib/api";
+import { disconnect, fetchUpdateStatus, triggerUpdate, updateSettings } from "@/lib/api";
 import { useAuthStatus, useSettings, useVersion } from "@/lib/hooks";
-import type { CityCode, SettingsUpdate, TradingMode } from "@/lib/types";
+import type { CityCode, SettingsUpdate, TradingMode, UpdateStatus } from "@/lib/types";
 import { centsToDollars } from "@/lib/utils";
 
 const ALL_CITIES: CityCode[] = ["NYC", "CHI", "MIA", "AUS"];
@@ -33,6 +33,10 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+
+  // Self-update state
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
+  const [updatePolling, setUpdatePolling] = useState(false);
 
   // Sync local state when settings load
   useEffect(() => {
@@ -82,6 +86,50 @@ export default function SettingsPage() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Poll update status while update is in progress
+  useEffect(() => {
+    if (!updatePolling) return;
+    const interval = setInterval(async () => {
+      try {
+        const status = await fetchUpdateStatus();
+        setUpdateStatus(status);
+        if (status.status === "done" || status.status === "error" || status.status === "idle") {
+          setUpdatePolling(false);
+        }
+      } catch {
+        // Backend might be restarting — keep polling
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [updatePolling]);
+
+  const handleUpdate = async () => {
+    if (!confirm("This will pull the latest code, rebuild, and restart all containers. Continue?")) {
+      return;
+    }
+    try {
+      const result = await triggerUpdate();
+      if (result.status === "started" || result.status === "already_running") {
+        setUpdatePolling(true);
+        setUpdateStatus({ status: "pulling", step: "starting", error: null, started_at: null });
+      } else {
+        setUpdateStatus({
+          status: "error",
+          step: null,
+          error: result.message,
+          started_at: null,
+        });
+      }
+    } catch (err) {
+      setUpdateStatus({
+        status: "error",
+        step: null,
+        error: err instanceof Error ? err.message : "Failed to start update",
+        started_at: null,
+      });
     }
   };
 
@@ -378,6 +426,55 @@ export default function SettingsPage() {
                   View Release
                 </a>
               </div>
+              {/* Self-update button */}
+              {(!updateStatus || updateStatus.status === "idle" || updateStatus.status === "error") && (
+                <button
+                  onClick={handleUpdate}
+                  className="mt-3 w-full min-h-[44px] px-4 py-2 bg-boz-primary text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  data-testid="update-button"
+                >
+                  Update &amp; Restart
+                </button>
+              )}
+              {/* Update in progress */}
+              {updateStatus && !["idle", "done", "error"].includes(updateStatus.status) && (
+                <div className="mt-3 flex items-center gap-2" data-testid="update-progress">
+                  <Loader2 size={14} className="animate-spin text-orange-600" />
+                  <span className="text-xs text-orange-700 font-medium">
+                    {updateStatus.status === "pulling" && "Pulling latest code..."}
+                    {updateStatus.status === "building" && "Building Docker images..."}
+                    {updateStatus.status === "restarting" && "Restarting containers..."}
+                  </span>
+                </div>
+              )}
+              {/* Update done */}
+              {updateStatus?.status === "done" && (
+                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-2" data-testid="update-done">
+                  <p className="text-xs text-green-700 font-medium">
+                    Update complete! Reload the page to see the new version.
+                  </p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="mt-1 text-xs text-green-600 underline hover:text-green-800"
+                  >
+                    Reload now
+                  </button>
+                </div>
+              )}
+              {/* Update error */}
+              {updateStatus?.status === "error" && (
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-2" data-testid="update-error">
+                  <p className="text-xs text-red-700 font-medium">
+                    Update failed: {updateStatus.error || "Unknown error"}
+                  </p>
+                  <button
+                    onClick={handleUpdate}
+                    className="mt-1 text-xs text-red-600 underline hover:text-red-800"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
             </div>
           )}
           {versionInfo && !versionInfo.update_available && versionInfo.latest_version && (

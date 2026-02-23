@@ -232,3 +232,19 @@ class VersionInfo(BaseModel):
     latest_version: str | None = None
     update_available: bool = False
     release_url: str | None = None
+
+
+class UpdateTriggerResponse(BaseModel):
+    """Response when triggering a self-update."""
+
+    status: str
+    message: str
+
+
+class UpdateStatus(BaseModel):
+    """Current status of an in-progress self-update."""
+
+    status: str  # idle / pulling / building / restarting / done / error
+    step: str | None = None
+    error: str | None = None
+    started_at: str | None = None

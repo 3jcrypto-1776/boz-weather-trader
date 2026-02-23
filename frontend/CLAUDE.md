@@ -25,8 +25,8 @@ frontend/
 │   ├── trade-card/         → Trade display with post-mortem expandable
 │   └── bracket-view/       → Visual bracket probability display
 ├── lib/                    → Utilities, API client, types
-│   ├── api.ts              → Backend API client (fetch wrapper) + getWsUrl() helper + fetchVersion()
-│   ├── types.ts            → TypeScript types matching backend schemas + VersionInfo
+│   ├── api.ts              → Backend API client (fetch wrapper) + getWsUrl() helper + fetchVersion() + triggerUpdate() + fetchUpdateStatus()
+│   ├── types.ts            → TypeScript types matching backend schemas + VersionInfo + UpdateTriggerResponse + UpdateStatus
 │   ├── hooks.ts            → SWR data fetching hooks + useVersion()
 │   ├── trade-grouping.ts   → Frontend-only trade grouping: groupTrades() + groupByMarket()
 │   ├── websocket-types.ts  → WebSocket event types + EVENT_TO_SWR_KEYS mapping
@@ -1591,6 +1591,7 @@ See "Onboarding Flow Implementation" section above. Six steps:
   - Current version from `/api/version`
   - Update available notification when newer GitHub Release exists
   - Link to GitHub releases page
+  - **Update & Restart button**: triggers self-update via `POST /api/version/update`, shows progress states (idle/updating/success/error) via `GET /api/version/update/status` polling
 - Trading mode toggle (Full Auto / Manual Approval) — use a segmented control
 - Risk controls:
   - Max trade size: slider with label showing dollar value (range: $0.10 to $10.00)
@@ -1676,6 +1677,7 @@ Your tests go in `frontend/__tests__/`:
 - `api.test.ts` — API client error handling, auth token inclusion
 - `hooks.test.ts` — SWR hooks return correct data, handle errors
 - `version-info.test.tsx` — version display, update notification, loading/error states
+- `update-button.test.tsx` — update trigger, progress states, error handling, success display (5 tests)
 - `utils.test.ts` — centsToDollars, formatPnL, formatProbability, date formatting
 
 ### Critical Test Cases

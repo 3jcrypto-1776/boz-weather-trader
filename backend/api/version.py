@@ -1,4 +1,7 @@
-"""Version info endpoint — current version + update-check via GitHub Releases."""
+"""Version info endpoint — current version + update-check via GitHub Releases.
+
+Also provides self-update endpoints that proxy to the updater sidecar container.
+"""
 
 from __future__ import annotations
 
@@ -6,12 +9,14 @@ import contextlib
 import json
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from backend import __version__
-from backend.api.response_schemas import VersionInfo
+from backend.api.deps import get_current_user
+from backend.api.response_schemas import UpdateStatus, UpdateTriggerResponse, VersionInfo
 from backend.common.config import get_settings
 from backend.common.logging import get_logger
+from backend.common.models import User
 
 router = APIRouter()
 logger = get_logger("SYSTEM")
@@ -112,3 +117,70 @@ async def get_version() -> VersionInfo:
         update_available=update_available,
         release_url=release_url,
     )
+
+
+@router.post("/update", response_model=UpdateTriggerResponse, status_code=202)
+async def trigger_update(
+    _user: User = Depends(get_current_user),
+) -> UpdateTriggerResponse:
+    """Trigger a self-update via the updater sidecar container.
+
+    Sends a POST to the updater sidecar which runs git pull, docker compose build,
+    and docker compose up -d. Requires authentication.
+    """
+    settings = get_settings()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{settings.updater_url}/update",
+                headers={"Authorization": f"Bearer {settings.updater_secret}"},
+            )
+            data = resp.json()
+            if resp.status_code == 202:
+                return UpdateTriggerResponse(status="started", message=data.get("message", ""))
+            if resp.status_code == 409:
+                return UpdateTriggerResponse(
+                    status="already_running", message="Update already in progress"
+                )
+            return UpdateTriggerResponse(status="error", message=data.get("error", "Unknown error"))
+    except httpx.ConnectError:
+        logger.warning("Updater sidecar unreachable at %s", settings.updater_url)
+        return UpdateTriggerResponse(
+            status="unavailable",
+            message="Updater sidecar not running. Is the updater container started?",
+        )
+    except Exception as exc:
+        logger.error("Failed to contact updater sidecar: %s", exc)
+        return UpdateTriggerResponse(status="error", message=str(exc))
+
+
+@router.get("/update/status", response_model=UpdateStatus)
+async def get_update_status(
+    _user: User = Depends(get_current_user),
+) -> UpdateStatus:
+    """Get the current status of an in-progress self-update.
+
+    Proxies the status request to the updater sidecar container.
+    Requires authentication.
+    """
+    settings = get_settings()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{settings.updater_url}/status",
+                headers={"Authorization": f"Bearer {settings.updater_secret}"},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                return UpdateStatus(
+                    status=data.get("status", "idle"),
+                    step=data.get("step"),
+                    error=data.get("error"),
+                    started_at=data.get("started_at"),
+                )
+    except httpx.ConnectError:
+        pass  # Sidecar not running — return idle
+    except Exception as exc:
+        logger.debug("Failed to get update status: %s", exc)
+
+    return UpdateStatus(status="idle")

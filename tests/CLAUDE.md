@@ -78,7 +78,7 @@ tests/
 │   ├── test_executor.py           → Order placement + DB recording + market_date setting (9 tests)
 │   ├── test_cooldown.py           → Per-loss + consecutive cooldowns (9 tests)
 │   └── test_notifications.py      → Web push via VAPID (5 tests)
-├── api/                 → API endpoint tests (125 tests)
+├── api/                 → API endpoint tests (135 tests)
 │   ├── conftest.py      → API fixtures (api_engine, client, mock_kalshi, factories)
 │   ├── test_accuracy.py    → Forecast accuracy endpoints: sources, calibration, trends (17 tests)
 │   ├── test_auth.py     → Auth validate + disconnect (5 tests)
@@ -95,6 +95,7 @@ tests/
 │   ├── test_settings.py     → Settings read/update (5 tests)
 │   ├── test_trades.py       → Trade history endpoint + date filter (7 tests)
 │   ├── test_trades_sync.py  → Portfolio sync API endpoint: sync result, auth, WS events (5 tests)
+│   ├── test_update.py       → Self-update trigger + status polling + auth + error handling (10 tests)
 │   └── test_version.py      → Version endpoint: current version, update check, Redis cache (10 tests)
 ├── websocket/           → Unit tests for backend/websocket/ (40 tests)
 │   ├── test_events.py   → Event model, publish_event, publish_event_sync (13 tests)
@@ -109,6 +110,8 @@ tests/
 │   ├── test_engine.py           → Full simulation loop, empty days, partial data, Kelly (13 tests)
 │   ├── test_metrics.py          → Win rate, ROI, Sharpe, drawdown, per-city stats (18 tests)
 │   └── test_integration.py      → End-to-end multi-city backtest, Kelly vs flat, serialization (5 tests)
+├── updater/             → Updater sidecar tests (7 tests)
+│   └── test_server.py      → Updater HTTP server: trigger, auth, status, error handling (7 tests)
 ├── e2e/                 → End-to-end smoke tests (real auth path, real middleware)
 │   ├── conftest.py      → E2E fixtures (e2e_engine, authed_client, bare_client, seed helpers)
 │   └── test_smoke.py    → 35 smoke tests across 11 test classes
@@ -1136,8 +1139,8 @@ jobs:
 | Job | What It Does | Failure Blocks Merge? |
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
-| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1299 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
-| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 174 tests) | Yes |
+| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1316 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
+| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 179 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 
 **Key design decisions:**
