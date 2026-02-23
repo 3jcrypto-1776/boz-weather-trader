@@ -2,22 +2,50 @@
 
 import {
   Activity,
-  Clock,
   DollarSign,
   TrendingDown,
   TrendingUp,
+  Trophy,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import TradeCard from "@/components/trade-card/trade-card";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
-import { useDashboard } from "@/lib/hooks";
+import { useDashboard, useDashboardStats } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
-import type { DashboardData } from "@/lib/types";
-import { centsToDollars, formatDateTime, formatPnL, CITY_NAMES } from "@/lib/utils";
+import type { DashboardData, DashboardStats, StatsPeriod } from "@/lib/types";
+import { centsToDollars, formatPnL, CITY_NAMES } from "@/lib/utils";
+
+// ─── Period Toggle Helpers ───
+
+const PNL_CYCLE: StatsPeriod[] = ["week", "yesterday", "month", "year", "all_time"];
+const WL_CYCLE: StatsPeriod[] = ["all_time", "yesterday", "week", "month", "year"];
+
+const PERIOD_PNL_LABELS: Record<StatsPeriod, string> = {
+  yesterday: "Yesterday P&L",
+  week: "Weekly P&L",
+  month: "Monthly P&L",
+  year: "Yearly P&L",
+  all_time: "All-Time P&L",
+};
+
+const PERIOD_WL_LABELS: Record<StatsPeriod, string> = {
+  yesterday: "Yesterday W/L",
+  week: "Weekly W/L",
+  month: "Monthly W/L",
+  year: "Yearly W/L",
+  all_time: "All-Time W/L",
+};
+
+function nextPeriod(current: StatsPeriod, cycle: StatsPeriod[]): StatsPeriod {
+  const idx = cycle.indexOf(current);
+  return cycle[(idx + 1) % cycle.length];
+}
+
+// ─── Stat Cards ───
 
 function StatCard({
   label,
@@ -47,11 +75,38 @@ function StatCard({
   );
 }
 
-function DashboardContent({ data }: { data: DashboardData }) {
+// ─── Dashboard Content ───
+
+function DashboardContent({
+  data,
+  stats,
+}: {
+  data: DashboardData;
+  stats: DashboardStats | undefined;
+}) {
   const router = useRouter();
-  const pnlColor =
-    data.today_pnl_cents >= 0 ? "text-boz-success" : "text-boz-danger";
-  const PnlIcon = data.today_pnl_cents >= 0 ? TrendingUp : TrendingDown;
+
+  // P/L period toggle (defaults to "week")
+  const [pnlPeriod, setPnlPeriod] = useState<StatsPeriod>("week");
+  const handlePnlClick = useCallback(() => {
+    setPnlPeriod((p) => nextPeriod(p, PNL_CYCLE));
+  }, []);
+
+  // W/L period toggle (defaults to "all_time")
+  const [wlPeriod, setWlPeriod] = useState<StatsPeriod>("all_time");
+  const handleWlClick = useCallback(() => {
+    setWlPeriod((p) => nextPeriod(p, WL_CYCLE));
+  }, []);
+
+  // Compute P/L value and color from stats
+  const pnlCents = stats ? stats[pnlPeriod].pnl_cents : data.today_pnl_cents;
+  const pnlColor = pnlCents >= 0 ? "text-boz-success" : "text-boz-danger";
+  const PnlIcon = pnlCents >= 0 ? TrendingUp : TrendingDown;
+
+  // Compute W/L record from stats
+  const wlWins = stats ? stats[wlPeriod].wins : 0;
+  const wlLosses = stats ? stats[wlPeriod].losses : 0;
+  const wlValue = stats ? `${wlWins}W / ${wlLosses}L` : "—";
 
   const positionMarkets = useMemo(
     () => groupByMarket(data.active_positions),
@@ -72,10 +127,11 @@ function DashboardContent({ data }: { data: DashboardData }) {
           icon={DollarSign}
         />
         <StatCard
-          label="Today P&L"
-          value={formatPnL(data.today_pnl_cents)}
+          label={PERIOD_PNL_LABELS[pnlPeriod]}
+          value={formatPnL(pnlCents)}
           icon={PnlIcon}
           color={pnlColor}
+          onClick={handlePnlClick}
         />
         <StatCard
           label="Open Positions"
@@ -84,9 +140,10 @@ function DashboardContent({ data }: { data: DashboardData }) {
           onClick={() => router.push("/trades")}
         />
         <StatCard
-          label="Next Launch"
-          value={data.next_market_launch ? formatDateTime(data.next_market_launch) : "—"}
-          icon={Clock}
+          label={PERIOD_WL_LABELS[wlPeriod]}
+          value={wlValue}
+          icon={Trophy}
+          onClick={handleWlClick}
         />
       </div>
 
@@ -205,6 +262,7 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const { data, error, isLoading } = useDashboard();
+  const { data: stats } = useDashboardStats();
 
   return (
     <ErrorBoundary>
@@ -219,7 +277,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {data && <DashboardContent data={data} />}
+      {data && <DashboardContent data={data} stats={stats} />}
     </ErrorBoundary>
   );
 }

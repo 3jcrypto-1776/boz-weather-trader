@@ -18,6 +18,7 @@ import {
   fetchCalibration,
   fetchCurrentWeather,
   fetchDashboard,
+  fetchDashboardStats,
   fetchLogs,
   fetchMarkets,
   fetchPendingTrades,
@@ -35,6 +36,7 @@ import type {
   CityCode,
   CurrentWeatherResponse,
   DashboardData,
+  DashboardStats,
   LogEntry,
   PendingTrade,
   PerformanceData,
@@ -63,6 +65,17 @@ export function useDashboard(config?: SWRConfiguration) {
   return useSWR<DashboardData>(
     "/api/dashboard",
     () => fetchDashboard(),
+    {
+      refreshInterval: 30_000,
+      ...config,
+    }
+  );
+}
+
+export function useDashboardStats(config?: SWRConfiguration) {
+  return useSWR<DashboardStats>(
+    "/api/dashboard/stats",
+    () => fetchDashboardStats(),
     {
       refreshInterval: 30_000,
       ...config,

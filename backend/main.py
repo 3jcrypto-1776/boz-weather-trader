@@ -24,6 +24,7 @@ from backend.api.auth import router as auth_router
 from backend.api.backtest import router as backtest_router
 from backend.api.calendar import router as calendar_router
 from backend.api.dashboard import router as dashboard_router
+from backend.api.dashboard_stats import router as dashboard_stats_router
 from backend.api.logs import router as logs_router
 from backend.api.markets import router as markets_router
 from backend.api.notifications import router as notifications_router
@@ -263,6 +264,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
     app.include_router(dashboard_router, prefix="/api/dashboard", tags=["dashboard"])
+    app.include_router(dashboard_stats_router, prefix="/api/dashboard/stats", tags=["dashboard"])
     app.include_router(markets_router, prefix="/api/markets", tags=["markets"])
     app.include_router(trades_router, prefix="/api/trades", tags=["trades"])
     app.include_router(queue_router, prefix="/api/queue", tags=["queue"])

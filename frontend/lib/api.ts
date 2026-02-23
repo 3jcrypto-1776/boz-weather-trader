@@ -14,6 +14,7 @@ import type {
   CityCode,
   CurrentWeatherResponse,
   DashboardData,
+  DashboardStats,
   LogEntry,
   PendingTrade,
   PerformanceData,
@@ -124,10 +125,14 @@ export async function disconnect(): Promise<void> {
   });
 }
 
-// ─── Dashboard (1 endpoint) ───
+// ─── Dashboard (2 endpoints) ───
 
 export async function fetchDashboard(): Promise<DashboardData> {
   return apiFetch<DashboardData>("/api/dashboard");
+}
+
+export async function fetchDashboardStats(): Promise<DashboardStats> {
+  return apiFetch<DashboardStats>("/api/dashboard/stats");
 }
 
 // ─── Markets (1 endpoint) ───

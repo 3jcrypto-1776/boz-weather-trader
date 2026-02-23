@@ -30,14 +30,14 @@ monitoring/
   └── grafana/     → Grafana provisioning + dashboard JSON files
       ├── provisioning/  → Auto-provisioned datasources + dashboard provider
       └── dashboards/    → API Overview (8 panels) + Trading & Weather (10 panels) + Kalshi WS Feed (6 panels)
-tests/                   → 1316 backend + 179 frontend = 1495 tests (all passing)
+tests/                   → 1324 backend + 183 frontend = 1507 tests (all passing)
   ├── common/      → Shared module tests: config, schemas, models, logging, encryption, middleware, metrics (123)
   ├── weather/     → Weather pipeline: NWS, Open-Meteo, normalizer, stations, CLI parser, scheduler (140)
   ├── kalshi/      → Kalshi client: auth, REST, WS, markets, orders, models, cache, market feed (134)
   ├── prediction/  → Prediction engine: ensemble, multi-model ML, brackets, error dist, accuracy, calibration, pipeline (217)
   ├── trading/     → Trading engine: EV calc, Kelly sizing, risk, cooldowns, queue, executor, scheduler, safety, sync (239)
   ├── backtesting/ → Backtesting engine: schemas, risk sim, data loader, engine, metrics, integration (95)
-  ├── api/         → API endpoints: auth, dashboard, health, markets, queue, settings, trades, trades/sync, accuracy, optimization, calendar, version, update (135)
+  ├── api/         → API endpoints: auth, dashboard, dashboard stats, health, markets, queue, settings, trades, trades/sync, accuracy, optimization, calendar, version, update (143)
   ├── websocket/   → WebSocket: events, manager, subscriber, router (40)
   ├── e2e/         → End-to-end smoke tests (35)
   ├── integration/ → Cross-module integration tests (47)

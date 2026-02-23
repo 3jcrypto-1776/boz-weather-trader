@@ -1,12 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DashboardData } from "@/lib/types";
+import type { DashboardData, DashboardStats } from "@/lib/types";
 
 // Mock hooks
 const mockUseDashboard = vi.fn();
+const mockUseDashboardStats = vi.fn();
 vi.mock("@/lib/hooks", () => ({
   useDashboard: () => mockUseDashboard(),
+  useDashboardStats: () => mockUseDashboardStats(),
   useCurrentWeather: () => ({ data: undefined, error: undefined }),
 }));
 
@@ -18,6 +20,14 @@ vi.mock("next/navigation", () => ({
 }));
 
 import DashboardPage from "@/app/page";
+
+const MOCK_STATS: DashboardStats = {
+  yesterday: { pnl_cents: 100, wins: 1, losses: 0 },
+  week: { pnl_cents: 350, wins: 3, losses: 1 },
+  month: { pnl_cents: 1200, wins: 10, losses: 5 },
+  year: { pnl_cents: 5000, wins: 40, losses: 20 },
+  all_time: { pnl_cents: 8000, wins: 60, losses: 30 },
+};
 
 const MOCK_DASHBOARD: DashboardData = {
   balance_cents: 50000,
@@ -100,6 +110,7 @@ const MOCK_DASHBOARD: DashboardData = {
 describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseDashboardStats.mockReturnValue({ data: undefined, error: undefined });
   });
 
   it("shows loading skeletons", () => {
@@ -127,22 +138,108 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Server down")).toBeInTheDocument();
   });
 
-  it("renders dashboard data", () => {
+  it("renders dashboard data with weekly P/L default", () => {
     mockUseDashboard.mockReturnValue({
       data: MOCK_DASHBOARD,
       error: undefined,
       isLoading: false,
     });
+    mockUseDashboardStats.mockReturnValue({ data: MOCK_STATS, error: undefined });
 
     render(<DashboardPage />);
 
     // Balance
     expect(screen.getByText("$500.00")).toBeInTheDocument();
-    // Today P&L
+    // Weekly P&L (default period)
+    expect(screen.getByText("Weekly P&L")).toBeInTheDocument();
     expect(screen.getByText("+$3.50")).toBeInTheDocument();
     // Predictions section
     expect(screen.getByText("Today's Predictions")).toBeInTheDocument();
     expect(screen.getByText("New York")).toBeInTheDocument();
+  });
+
+  it("renders W/L record with all-time default", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+    mockUseDashboardStats.mockReturnValue({ data: MOCK_STATS, error: undefined });
+
+    render(<DashboardPage />);
+
+    // All-time W/L (default)
+    expect(screen.getByText("All-Time W/L")).toBeInTheDocument();
+    expect(screen.getByText("60W / 30L")).toBeInTheDocument();
+  });
+
+  it("cycles P/L period on click", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+    mockUseDashboardStats.mockReturnValue({ data: MOCK_STATS, error: undefined });
+
+    render(<DashboardPage />);
+
+    // Default: Weekly P&L (+$3.50)
+    expect(screen.getByText("Weekly P&L")).toBeInTheDocument();
+
+    // Click to cycle: week → yesterday
+    const pnlCard = screen.getByText("Weekly P&L").closest("button");
+    expect(pnlCard).toBeInTheDocument();
+    fireEvent.click(pnlCard!);
+    expect(screen.getByText("Yesterday P&L")).toBeInTheDocument();
+    expect(screen.getByText("+$1.00")).toBeInTheDocument();
+
+    // Click again: yesterday → month
+    fireEvent.click(pnlCard!);
+    expect(screen.getByText("Monthly P&L")).toBeInTheDocument();
+    expect(screen.getByText("+$12.00")).toBeInTheDocument();
+  });
+
+  it("cycles W/L period on click", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+    mockUseDashboardStats.mockReturnValue({ data: MOCK_STATS, error: undefined });
+
+    render(<DashboardPage />);
+
+    // Default: All-Time W/L
+    expect(screen.getByText("All-Time W/L")).toBeInTheDocument();
+    expect(screen.getByText("60W / 30L")).toBeInTheDocument();
+
+    // Click to cycle: all_time → yesterday
+    const wlCard = screen.getByText("All-Time W/L").closest("button");
+    expect(wlCard).toBeInTheDocument();
+    fireEvent.click(wlCard!);
+    expect(screen.getByText("Yesterday W/L")).toBeInTheDocument();
+    expect(screen.getByText("1W / 0L")).toBeInTheDocument();
+
+    // Click again: yesterday → week
+    fireEvent.click(wlCard!);
+    expect(screen.getByText("Weekly W/L")).toBeInTheDocument();
+    expect(screen.getByText("3W / 1L")).toBeInTheDocument();
+  });
+
+  it("falls back to today_pnl_cents when stats not loaded", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+    // No stats loaded
+    mockUseDashboardStats.mockReturnValue({ data: undefined, error: undefined });
+
+    render(<DashboardPage />);
+    // Falls back to today_pnl_cents from dashboard data
+    expect(screen.getByText("+$3.50")).toBeInTheDocument();
+    // W/L shows dash when no stats
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("renders recent trades", () => {

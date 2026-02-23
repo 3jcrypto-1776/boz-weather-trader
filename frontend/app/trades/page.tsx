@@ -19,15 +19,16 @@ import Skeleton from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { syncTrades } from "@/lib/api";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
-import { useCalendar, useTrades } from "@/lib/hooks";
+import { useCalendar, useDashboardStats, useTrades } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
-import type { CityCode, SyncResult, TradeStatus } from "@/lib/types";
+import type { CityCode, StatsPeriod, SyncResult, TradeStatus } from "@/lib/types";
 import { formatPnL, formatProbability } from "@/lib/utils";
 
 type ViewTab = "calendar" | "history";
 
 const CITY_OPTIONS: (CityCode | "ALL")[] = ["ALL", "NYC", "CHI", "MIA", "AUS"];
-const STATUS_OPTIONS: (TradeStatus | "ALL")[] = [
+const STATUS_OPTIONS: (TradeStatus | "ALL" | "SETTLED")[] = [
+  "SETTLED",
   "ALL",
   "OPEN",
   "WON",
@@ -39,6 +40,70 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+// ─── Period Toggle Helpers ───
+
+const PERIOD_CYCLE: StatsPeriod[] = ["week", "yesterday", "month", "year", "all_time"];
+
+const PERIOD_PNL_LABELS: Record<StatsPeriod, string> = {
+  yesterday: "Yesterday P&L",
+  week: "Weekly P&L",
+  month: "Monthly P&L",
+  year: "Yearly P&L",
+  all_time: "All-Time P&L",
+};
+
+function nextPeriod(current: StatsPeriod, cycle: StatsPeriod[]): StatsPeriod {
+  const idx = cycle.indexOf(current);
+  return cycle[(idx + 1) % cycle.length];
+}
+
+// ─── Open Positions Section ───
+
+function OpenPositionsSection() {
+  const { data, isLoading } = useTrades(1, undefined, "OPEN");
+  const markets = useMemo(() => groupByMarket(data?.trades ?? []), [data]);
+
+  if (isLoading) {
+    return (
+      <div className="mt-4">
+        <Skeleton className="h-6 w-48 mb-2" />
+        <Skeleton className="h-20" />
+      </div>
+    );
+  }
+
+  if (!data || data.trades.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="mt-4">
+      <div className="flex items-center gap-2 mb-3">
+        <h2 className="text-sm font-semibold text-gray-900">
+          Open Positions
+        </h2>
+        <span className="bg-boz-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+          {data.total}
+        </span>
+      </div>
+      <div className="space-y-4">
+        {markets.map((market) => (
+          <div key={market.marketKey}>
+            <h3 className="text-xs font-medium text-boz-neutral mb-2">
+              {market.label}
+            </h3>
+            <div className="space-y-2">
+              {market.groups.map((group) => (
+                <TradeCard key={group.groupKey} group={group} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 // ─── Calendar Tab ───
 
@@ -197,6 +262,9 @@ function CalendarView() {
         </div>
       )}
 
+      {/* Open Positions */}
+      <OpenPositionsSection />
+
       {/* Day Detail Panel */}
       {selectedDate && selectedDayStats && (
         <DayDetailPanel
@@ -209,13 +277,19 @@ function CalendarView() {
   );
 }
 
-// ─── History Tab (existing trade list) ───
+// ─── History Tab (settled trade list) ───
 
 function HistoryView() {
   const [page, setPage] = useState(1);
   const [cityFilter, setCityFilter] = useState<CityCode | "ALL">("ALL");
-  const [statusFilter, setStatusFilter] = useState<TradeStatus | "ALL">("ALL");
+  const [statusFilter, setStatusFilter] = useState<TradeStatus | "ALL" | "SETTLED">("SETTLED");
   const [syncing, setSyncing] = useState(false);
+
+  // P/L period toggle
+  const [pnlPeriod, setPnlPeriod] = useState<StatsPeriod>("week");
+  const handlePnlClick = useCallback(() => {
+    setPnlPeriod((p) => nextPeriod(p, PERIOD_CYCLE));
+  }, []);
 
   const city = cityFilter === "ALL" ? undefined : cityFilter;
   const status = statusFilter === "ALL" ? undefined : statusFilter;
@@ -225,6 +299,7 @@ function HistoryView() {
     isLoading,
     mutate: mutateTrades,
   } = useTrades(page, city, status);
+  const { data: stats } = useDashboardStats();
   const { showToast } = useToast();
 
   const totalPages = data ? Math.ceil(data.total / 20) : 0;
@@ -232,12 +307,11 @@ function HistoryView() {
   const trades = data?.trades;
   const markets = useMemo(() => groupByMarket(trades ?? []), [trades]);
 
-  const totalPnl = (trades ?? []).reduce(
-    (sum, t) => sum + (t.pnl_cents ?? 0),
-    0
-  );
   const wonCount = (trades ?? []).filter((t) => t.status === "WON").length;
   const lostCount = (trades ?? []).filter((t) => t.status === "LOST").length;
+
+  // Period P/L from dashboard stats
+  const periodPnlCents = stats ? stats[pnlPeriod].pnl_cents : 0;
 
   const handleSync = useCallback(async () => {
     setSyncing(true);
@@ -317,7 +391,7 @@ function HistoryView() {
                   : "bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50"
               }`}
             >
-              {s === "ALL" ? "All" : s}
+              {s === "SETTLED" ? "Settled" : s === "ALL" ? "All" : s}
             </button>
           ))}
         </div>
@@ -335,13 +409,14 @@ function HistoryView() {
               {lostCount} lost
             </span>
           )}
-          <span
-            className={`font-medium ${
-              totalPnl >= 0 ? "text-boz-success" : "text-boz-danger"
+          <button
+            onClick={handlePnlClick}
+            className={`font-medium cursor-pointer hover:underline ${
+              periodPnlCents >= 0 ? "text-boz-success" : "text-boz-danger"
             }`}
           >
-            Page P&L: {formatPnL(totalPnl)}
-          </span>
+            {PERIOD_PNL_LABELS[pnlPeriod]}: {formatPnL(periodPnlCents)}
+          </button>
         </div>
       )}
 

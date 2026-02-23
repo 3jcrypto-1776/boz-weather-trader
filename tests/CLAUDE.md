@@ -78,13 +78,14 @@ tests/
 │   ├── test_executor.py           → Order placement + DB recording + market_date setting (9 tests)
 │   ├── test_cooldown.py           → Per-loss + consecutive cooldowns (9 tests)
 │   └── test_notifications.py      → Web push via VAPID (5 tests)
-├── api/                 → API endpoint tests (135 tests)
+├── api/                 → API endpoint tests (143 tests)
 │   ├── conftest.py      → API fixtures (api_engine, client, mock_kalshi, factories)
 │   ├── test_accuracy.py    → Forecast accuracy endpoints: sources, calibration, trends (17 tests)
 │   ├── test_auth.py     → Auth validate + disconnect (5 tests)
 │   ├── test_auth_status.py → Auth status, demo mode, onboarding flow (17 tests)
 │   ├── test_calendar.py    → Calendar endpoint: daily/weekly/monthly stats, date filters (10 tests)
 │   ├── test_dashboard.py   → Dashboard aggregate endpoint (4 tests)
+│   ├── test_dashboard_stats.py → Dashboard stats endpoint: multi-period P/L and W/L (7 tests)
 │   ├── test_health.py      → /health + /ready probes (7 tests)
 │   ├── test_logs.py         → Log viewer endpoint + module tag mapping (10 tests)
 │   ├── test_markets.py      → Markets endpoint (5 tests)
@@ -93,7 +94,7 @@ tests/
 │   ├── test_performance.py  → Performance analytics endpoint + cost_by_city (7 tests)
 │   ├── test_queue.py        → Trade queue approve/reject/list (8 tests)
 │   ├── test_settings.py     → Settings read/update (5 tests)
-│   ├── test_trades.py       → Trade history endpoint + date filter (7 tests)
+│   ├── test_trades.py       → Trade history endpoint + date filter + SETTLED pseudo-filter (8 tests)
 │   ├── test_trades_sync.py  → Portfolio sync API endpoint: sync result, auth, WS events (5 tests)
 │   ├── test_update.py       → Self-update trigger + status polling + auth + error handling (10 tests)
 │   └── test_version.py      → Version endpoint: current version, update check, Redis cache (10 tests)
@@ -1139,8 +1140,8 @@ jobs:
 | Job | What It Does | Failure Blocks Merge? |
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
-| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1316 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
-| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 179 tests) | Yes |
+| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1324 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
+| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 183 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 
 **Key design decisions:**

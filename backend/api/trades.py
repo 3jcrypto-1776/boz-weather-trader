@@ -17,7 +17,7 @@ from backend.api.deps import get_current_user, get_kalshi_client, trade_to_recor
 from backend.api.response_schemas import TradesPage
 from backend.common.database import get_db
 from backend.common.logging import get_logger
-from backend.common.models import Trade, User
+from backend.common.models import Trade, TradeStatus, User
 from backend.common.schemas import CityCode, SyncResult
 from backend.websocket.events import publish_event
 
@@ -60,8 +60,14 @@ async def get_trades(
         count_query = count_query.where(Trade.city == city)
 
     if status is not None:
-        base_query = base_query.where(Trade.status == status)
-        count_query = count_query.where(Trade.status == status)
+        if status.upper() == "SETTLED":
+            # Pseudo-filter: all settled trades (WON + LOST + CANCELED)
+            settled = [TradeStatus.WON, TradeStatus.LOST, TradeStatus.CANCELED]
+            base_query = base_query.where(Trade.status.in_(settled))
+            count_query = count_query.where(Trade.status.in_(settled))
+        else:
+            base_query = base_query.where(Trade.status == status)
+            count_query = count_query.where(Trade.status == status)
 
     if trade_date is not None:
         base_query = base_query.where(func.date(Trade.trade_date) == trade_date)

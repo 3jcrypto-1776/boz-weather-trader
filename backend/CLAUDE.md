@@ -44,7 +44,7 @@ backend/
 │   ├── manager.py       → ConnectionManager singleton (tracks WS connections, broadcasts)
 │   ├── subscriber.py    → redis_subscriber() + log_subscriber() — asyncio tasks bridging Redis pub/sub → WS + DB
 │   └── router.py        → FastAPI WebSocket endpoint at /ws
-└── api/                 → FastAPI route handlers (auth, dashboard, settings, trades, version + self-update, etc.)
+└── api/                 → FastAPI route handlers (auth, dashboard, dashboard_stats, settings, trades, version + self-update, etc.)
 ```
 
 ### Monitoring (sibling directory)

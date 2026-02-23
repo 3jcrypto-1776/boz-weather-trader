@@ -281,6 +281,24 @@ export interface UpdateStatus {
   started_at: string | null;
 }
 
+// ─── Dashboard Stats (time-period P&L and W/L) ───
+
+export interface PeriodStats {
+  pnl_cents: number;
+  wins: number;
+  losses: number;
+}
+
+export interface DashboardStats {
+  yesterday: PeriodStats;
+  week: PeriodStats;
+  month: PeriodStats;
+  year: PeriodStats;
+  all_time: PeriodStats;
+}
+
+export type StatsPeriod = "yesterday" | "week" | "month" | "year" | "all_time";
+
 // ─── Grouped Trades (frontend-only aggregation) ───
 
 /** Trades sharing the same market_ticker+bracket+side+status, aggregated into one card. */

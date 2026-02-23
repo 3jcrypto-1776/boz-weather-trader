@@ -99,6 +99,24 @@ class PerformanceData(BaseModel):
     accuracy_over_time: list[AccuracyPoint]
 
 
+class PeriodStats(BaseModel):
+    """P&L and win/loss stats for a single time period."""
+
+    pnl_cents: int
+    wins: int
+    losses: int
+
+
+class DashboardStats(BaseModel):
+    """P&L and W/L stats across multiple time periods for the dashboard."""
+
+    yesterday: PeriodStats
+    week: PeriodStats
+    month: PeriodStats
+    year: PeriodStats
+    all_time: PeriodStats
+
+
 class CalibrationBucket(BaseModel):
     """A single calibration bucket — predicted probability bin vs actual outcome rate."""
 
