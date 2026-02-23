@@ -48,7 +48,12 @@ def _run_update() -> None:
             timeout=600,  # 10 minute timeout
         )
         if result.returncode != 0:
-            logger.error("Update failed: %s", result.stderr)
+            logger.error(
+                "Update failed (exit %d)\nstdout: %s\nstderr: %s",
+                result.returncode,
+                result.stdout[-1000:] if result.stdout else "(empty)",
+                result.stderr[-1000:] if result.stderr else "(empty)",
+            )
         else:
             logger.info("Update completed successfully")
             logger.info("stdout: %s", result.stdout[-500:] if result.stdout else "")

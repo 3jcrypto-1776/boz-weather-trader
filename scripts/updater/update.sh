@@ -26,25 +26,27 @@ cd "$PROJECT_DIR"
 # Step 1: Git pull
 echo "=== Step 1/3: Pulling latest code ==="
 write_status "pulling" "git pull"
-if ! git pull origin master 2>&1; then
-    write_status "error" "git pull" "\"git pull failed\""
+if ! git pull origin master; then
+    write_status "error" "git pull" "\"git pull failed — check remote connectivity and branch status\""
     exit 1
 fi
 
 # Step 2: Docker build
 echo "=== Step 2/3: Building Docker images ==="
 write_status "building" "docker compose build"
-if ! docker compose build --no-cache 2>&1; then
-    write_status "error" "docker compose build" "\"docker compose build failed\""
+if ! docker compose build --no-cache; then
+    write_status "error" "docker compose build" "\"docker compose build failed — check Dockerfiles and build context\""
     exit 1
 fi
 
-# Step 3: Restart containers
+# Step 3: Restart containers (all EXCEPT the updater itself)
 echo "=== Step 3/3: Restarting containers ==="
 write_status "restarting" "docker compose restart"
-# Use up -d --force-recreate instead of down+up to avoid killing the updater itself
-if ! docker compose up -d --force-recreate 2>&1; then
-    write_status "error" "docker compose up" "\"docker compose restart failed\""
+# Collect all services except the updater sidecar — we can't recreate ourselves
+SERVICES=$(docker compose config --services | grep -v '^updater$' | tr '\n' ' ')
+echo "Recreating services: $SERVICES"
+if ! docker compose up -d --force-recreate $SERVICES; then
+    write_status "error" "docker compose up" "\"docker compose restart failed — check container logs\""
     exit 1
 fi
 
