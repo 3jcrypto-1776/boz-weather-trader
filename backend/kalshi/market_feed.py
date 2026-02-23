@@ -72,6 +72,7 @@ class MarketFeedConsumer:
         self._ws = None
         self._subscribed_tickers: set[str] = set()
         self._ticker_to_bracket: dict[str, dict] = {}
+        self._private_key_pem: str | None = None
 
     async def start(self) -> None:
         """Main loop: connect, subscribe, process messages, handle reconnects."""
@@ -180,6 +181,7 @@ class MarketFeedConsumer:
                     return None
 
                 private_key_pem = decrypt_api_key(user.encrypted_private_key)
+                self._private_key_pem = private_key_pem
                 return KalshiAuth(
                     api_key_id=user.kalshi_key_id,
                     private_key_pem=private_key_pem,
@@ -261,13 +263,13 @@ class MarketFeedConsumer:
 
         # Get auth for REST bootstrap
         auth = await self._get_auth()
-        if auth is None:
+        if auth is None or self._private_key_pem is None:
             return tickers
 
         demo = await self._is_demo_mode()
         client = KalshiClient(
             api_key_id=auth.api_key_id,
-            private_key_pem="",  # Auth object already has the loaded key
+            private_key_pem=self._private_key_pem,
             demo=demo,
         )
 
