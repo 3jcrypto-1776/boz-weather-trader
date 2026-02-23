@@ -12,9 +12,24 @@ RULES:
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PlainSerializer, field_validator
+
+
+def _serialize_utc(v: datetime) -> str:
+    """Serialize naive datetimes as UTC ISO 8601 strings with Z suffix.
+
+    The database stores all timestamps as timezone-naive UTC. This serializer
+    makes the API contract explicit by appending "Z" so the frontend knows
+    the value is UTC without guessing.
+    """
+    if v.tzinfo is None:
+        return v.isoformat() + "Z"
+    return v.isoformat()
+
+
+UTCDatetime = Annotated[datetime, PlainSerializer(_serialize_utc, return_type=str)]
 
 # ─── City Type ───
 
@@ -51,10 +66,10 @@ class WeatherData(BaseModel):
     date: date
     forecast_high_f: float
     source: str  # "NWS", "Open-Meteo:GFS", "Open-Meteo:ECMWF", etc.
-    model_run_timestamp: datetime
+    model_run_timestamp: UTCDatetime
     variables: WeatherVariables
     raw_data: dict  # Full raw API response for debugging
-    fetched_at: datetime
+    fetched_at: UTCDatetime
 
 
 # ─── Prediction Schemas (Agent 3 → Agent 4) ───
@@ -82,7 +97,7 @@ class BracketPrediction(BaseModel):
     ensemble_std_f: float  # Standard deviation of ensemble spread
     confidence: ConfidenceLevel
     model_sources: list[str]  # ["NWS", "GFS", "ECMWF", "ICON", ...]
-    generated_at: datetime
+    generated_at: UTCDatetime
 
     @field_validator("brackets")
     @classmethod
@@ -147,8 +162,8 @@ class TradeRecord(BaseModel):
     pnl_cents: int | None = None  # Profit/loss in cents after fees
     fees_cents: int | None = None  # Fees in cents
     postmortem_narrative: str | None = None
-    created_at: datetime
-    settled_at: datetime | None = None
+    created_at: UTCDatetime
+    settled_at: UTCDatetime | None = None
 
 
 class PostMortem(BaseModel):
@@ -179,9 +194,9 @@ class PendingTrade(BaseModel):
     confidence: ConfidenceLevel
     reasoning: str
     status: PendingTradeStatusType = "PENDING"
-    created_at: datetime
-    expires_at: datetime
-    acted_at: datetime | None = None
+    created_at: UTCDatetime
+    expires_at: UTCDatetime
+    acted_at: UTCDatetime | None = None
 
 
 # ─── User Settings ───
@@ -218,4 +233,4 @@ class SyncResult(BaseModel):
     skipped_count: int = 0
     failed_count: int = 0
     errors: list[str] = Field(default_factory=list)
-    synced_at: datetime
+    synced_at: UTCDatetime

@@ -67,14 +67,36 @@ export function formatDate(dateStr: string | Date): string {
 }
 
 /**
+ * Format an ISO date string or Date object for long display.
+ * Returns "Sunday, February 23, 2026" style format.
+ *
+ * Uses the same noon-parsing trick as formatDate() to avoid timezone day shift.
+ */
+export function formatDateLong(dateStr: string | Date): string {
+  let d: Date;
+  if (typeof dateStr === "string") {
+    d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+      ? new Date(dateStr + "T12:00:00")
+      : new Date(dateStr);
+  } else {
+    d = dateStr;
+  }
+  return d.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/**
  * Format an ISO datetime string for display with time in local timezone.
- * Backend stores UTC without "Z" suffix, so we append it to ensure
- * JavaScript properly converts to the user's local time.
- * Returns "Feb 18, 2:30 PM" style format.
+ * Backend returns UTC datetimes with "Z" suffix. If missing (legacy),
+ * we append "Z" as a defensive fallback.
+ * Returns "Feb 18, 2:30 PM CST" style format with timezone indicator.
  */
 export function formatDateTime(dateStr: string): string {
-  // If no timezone info, treat as UTC (backend stores naive UTC datetimes).
-  // Check for "Z", "+", or trailing "-HH:MM" offset (but not the date hyphen).
+  // If no timezone info, treat as UTC (defensive fallback for legacy data).
   const hasTimezone =
     dateStr.endsWith("Z") || dateStr.includes("+") || /[+-]\d{2}:\d{2}$/.test(dateStr);
   const normalized = hasTimezone ? dateStr : dateStr + "Z";
@@ -84,18 +106,18 @@ export function formatDateTime(dateStr: string): string {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZoneName: "short",
   });
 }
 
 /**
  * Format an ISO datetime string to show just the time in local timezone.
- * Backend stores UTC without "Z" suffix, so we append it to ensure
- * JavaScript properly converts to the user's local time.
- * Returns "3:06 PM" style format.
+ * Backend returns UTC datetimes with "Z" suffix. If missing (legacy),
+ * we append "Z" as a defensive fallback.
+ * Returns "3:06 PM CST" style format with timezone indicator.
  */
 export function formatTime(dateStr: string): string {
-  // If no timezone info, treat as UTC (backend stores naive UTC datetimes).
-  // Check for "Z", "+", or trailing "-HH:MM" offset (but not the date hyphen).
+  // If no timezone info, treat as UTC (defensive fallback for legacy data).
   const hasTimezone =
     dateStr.endsWith("Z") || dateStr.includes("+") || /[+-]\d{2}:\d{2}$/.test(dateStr);
   const normalized = hasTimezone ? dateStr : dateStr + "Z";
@@ -103,6 +125,7 @@ export function formatTime(dateStr: string): string {
   return d.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
+    timeZoneName: "short",
   });
 }
 

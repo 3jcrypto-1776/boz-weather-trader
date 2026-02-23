@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel
@@ -11,6 +10,7 @@ from backend.common.schemas import (
     BracketPrediction,
     CityCode,
     TradeRecord,
+    UTCDatetime,
 )
 
 
@@ -62,7 +62,7 @@ class LogEntryResponse(BaseModel):
     """A single structured log entry for the log viewer."""
 
     id: int
-    timestamp: datetime
+    timestamp: UTCDatetime
     level: str
     module: str
     message: str

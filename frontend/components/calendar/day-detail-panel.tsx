@@ -7,7 +7,7 @@ import Skeleton from "@/components/ui/skeleton";
 import { useTrades } from "@/lib/hooks";
 import { groupByMarket, groupTrades } from "@/lib/trade-grouping";
 import type { CalendarDay } from "@/lib/types";
-import { formatPnL, formatProbability } from "@/lib/utils";
+import { formatDateLong, formatPnL, formatProbability } from "@/lib/utils";
 
 interface DayDetailPanelProps {
   date: string; // YYYY-MM-DD
@@ -31,16 +31,8 @@ export default function DayDetailPanel({
     date
   );
 
-  // Format the display date
-  const displayDate = new Date(date + "T12:00:00").toLocaleDateString(
-    "en-US",
-    {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    }
-  );
+  // Format the display date using centralized formatter
+  const displayDate = formatDateLong(date);
 
   const marketGroups = data
     ? groupByMarket(data.trades)
