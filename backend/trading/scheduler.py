@@ -380,7 +380,23 @@ async def _run_trading_cycle() -> None:
                     continue
 
                 if user_settings.trading_mode == "auto":
-                    await execute_trade(signal, kalshi_client, session, user_id)
+                    try:
+                        await execute_trade(signal, kalshi_client, session, user_id)
+                    except Exception as trade_exc:
+                        # Log and skip — don't let one failed trade roll back
+                        # previously successful trades in this cycle.
+                        logger.warning(
+                            "Trade execution failed, skipping",
+                            extra={
+                                "data": {
+                                    "city": signal.city,
+                                    "bracket": signal.bracket,
+                                    "side": signal.side,
+                                    "error": str(trade_exc),
+                                }
+                            },
+                        )
+                        continue
                     TRADES_EXECUTED_TOTAL.labels(mode="auto", city=signal.city).inc()
                     publish_event_sync(
                         "trade.executed",

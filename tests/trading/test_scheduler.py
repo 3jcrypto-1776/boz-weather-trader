@@ -506,6 +506,64 @@ class TestRunTradingCycle:
         mock_session.commit.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_auto_mode_failed_trade_does_not_rollback_others(self) -> None:
+        """If one execute_trade fails, other successful trades still commit."""
+        from backend.common.exceptions import InvalidOrderError
+        from backend.trading.scheduler import _run_trading_cycle
+
+        mock_session = _make_mock_db_session()
+        settings = _make_user_settings(trading_mode="auto")
+        prediction = _make_prediction()
+        signal_ok = _make_signal()
+        signal_fail = _make_signal(city="CHI")
+
+        mock_risk_mgr = MagicMock()
+        mock_risk_mgr.handle_daily_reset = AsyncMock()
+        mock_risk_mgr.check_trade = AsyncMock(return_value=(True, ""))
+
+        mock_cm = MagicMock()
+        mock_cm.is_cooldown_active = AsyncMock(return_value=(False, ""))
+
+        # First call succeeds, second raises InvalidOrderError
+        mock_execute = AsyncMock(side_effect=[None, InvalidOrderError("No liquidity")])
+
+        with (
+            patch("backend.trading.scheduler._are_markets_open", return_value=True),
+            patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
+            patch("backend.trading.scheduler._load_user_settings", return_value=settings),
+            patch("backend.trading.scheduler._get_user_id", return_value="user-1"),
+            patch("backend.trading.risk_manager.RiskManager", return_value=mock_risk_mgr),
+            patch("backend.trading.cooldown.CooldownManager", return_value=mock_cm),
+            patch("backend.trading.scheduler._get_kalshi_client", return_value=MagicMock()),
+            patch(
+                "backend.trading.scheduler._fetch_latest_predictions",
+                return_value=[prediction],
+            ),
+            patch("backend.trading.ev_calculator.validate_predictions", return_value=True),
+            patch(
+                "backend.trading.scheduler._fetch_market_prices",
+                return_value={"55-56°F": 22},
+            ),
+            patch("backend.trading.ev_calculator.validate_market_prices", return_value=True),
+            patch(
+                "backend.trading.scheduler._fetch_market_tickers",
+                return_value={"55-56°F": "KXHIGHNY-B3"},
+            ),
+            patch(
+                "backend.trading.ev_calculator.scan_all_brackets",
+                return_value=[signal_ok, signal_fail],
+            ),
+            patch("backend.trading.executor.execute_trade", mock_execute),
+        ):
+            await _run_trading_cycle()
+
+        # Both signals attempted
+        assert mock_execute.await_count == 2
+        # Session was committed (not rolled back) — successful trade preserved
+        mock_session.commit.assert_awaited_once()
+        mock_session.rollback.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_manual_mode_calls_queue_trade(self) -> None:
         """In manual mode, queue_trade is called instead of execute_trade."""
         from backend.trading.scheduler import _run_trading_cycle
