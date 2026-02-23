@@ -83,7 +83,7 @@ class KalshiWebSocket:
         try:
             self.ws = await websockets.connect(
                 self._url,
-                extra_headers=headers,
+                additional_headers=headers,
             )
         except Exception as exc:
             raise KalshiConnectionError(

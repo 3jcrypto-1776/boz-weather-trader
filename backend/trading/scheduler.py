@@ -25,7 +25,7 @@ from asgiref.sync import async_to_sync
 from celery import shared_task
 from celery.exceptions import SoftTimeLimitExceeded
 
-from backend.common.database import get_task_session
+from backend.common.database import get_task_session, reset_engine
 from backend.common.logging import get_logger
 from backend.common.metrics import (
     TRADES_EXECUTED_TOTAL,
@@ -194,6 +194,12 @@ async def _run_trading_cycle() -> None:
     from backend.trading.executor import execute_trade
     from backend.trading.risk_manager import RiskManager, get_trading_day
     from backend.trading.trade_queue import has_pending_duplicate, queue_trade
+
+    # Reset the async engine so it is recreated in THIS event loop.
+    # async_to_sync creates a fresh loop per Celery task invocation; the
+    # singleton engine from a previous loop causes "Future attached to a
+    # different loop" errors.
+    reset_engine()
 
     # Step 2: Market hours check (before DB work)
     if not _are_markets_open():
@@ -469,6 +475,7 @@ async def _expire_pending_trades() -> int:
     """
     from backend.trading.trade_queue import expire_stale_trades
 
+    reset_engine()
     session = await get_task_session()
     try:
         count = await expire_stale_trades(session)
@@ -487,6 +494,8 @@ async def _settle_and_postmortem() -> None:
     Finds all OPEN trades that have matching settlement data and
     settles them with P&L and narrative generation.
     """
+    reset_engine()
+
     from sqlalchemy import func, select
 
     from backend.common.models import Settlement, Trade, TradeStatus

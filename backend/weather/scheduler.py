@@ -17,7 +17,7 @@ from asgiref.sync import async_to_sync
 from celery import shared_task
 from sqlalchemy import select
 
-from backend.common.database import get_task_session
+from backend.common.database import get_task_session, reset_engine
 from backend.common.logging import get_logger
 from backend.common.metrics import WEATHER_FETCHES_TOTAL
 from backend.common.models import CityEnum, Settlement, WeatherForecast
@@ -104,6 +104,7 @@ async def _fetch_all_forecasts_async() -> None:
     not fail the entire operation. This ensures partial data is still
     available even if one source is down.
     """
+    reset_engine()
     all_forecasts: list[WeatherData] = []
 
     for city in VALID_CITIES:
@@ -213,6 +214,7 @@ async def _fetch_cli_reports_async() -> None:
     Errors for individual cities are logged but do not fail the entire
     operation, ensuring partial data is still captured.
     """
+    reset_engine()
     for city in VALID_CITIES:
         try:
             # 1. Fetch raw CLI text from NWS
