@@ -49,7 +49,7 @@ from backend.kalshi.exceptions import (
 from backend.kalshi.market_feed import market_feed_consumer
 from backend.websocket.manager import manager as ws_manager
 from backend.websocket.router import router as ws_router
-from backend.websocket.subscriber import redis_subscriber
+from backend.websocket.subscriber import log_subscriber, redis_subscriber
 
 logger = get_logger("SYSTEM")
 
@@ -61,17 +61,26 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     subscriber_task = asyncio.create_task(redis_subscriber(ws_manager))
     logger.info("WebSocket Redis subscriber started")
 
+    # Start the Redis → DB log persistence subscriber
+    log_sub_task = asyncio.create_task(log_subscriber())
+    logger.info("Log subscriber started")
+
     # Start the Kalshi WebSocket market data feed
     feed_task = asyncio.create_task(market_feed_consumer())
     logger.info("Kalshi market feed consumer started")
 
     yield
 
-    # Shutdown: cancel both background tasks
+    # Shutdown: cancel all background tasks
     feed_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await feed_task
     logger.info("Kalshi market feed consumer stopped")
+
+    log_sub_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await log_sub_task
+    logger.info("Log subscriber stopped")
 
     subscriber_task.cancel()
     with contextlib.suppress(asyncio.CancelledError):

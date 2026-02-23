@@ -313,13 +313,15 @@ class TestLogs:
     async def test_logs_filter_by_module(
         self, authed_client: AsyncClient, e2e_db, e2e_user
     ) -> None:
-        """GET /api/logs?module=TRADING returns only TRADING entries."""
+        """GET /api/logs?module=TRADING returns TRADING-group entries."""
         await seed_logs(e2e_db)
         resp = await authed_client.get("/api/logs", params={"module": "TRADING"})
         assert resp.status_code == 200
         body = resp.json()
+        # TRADING filter includes related tags: TRADING, ORDER, RISK, etc.
+        trading_tags = {"TRADING", "ORDER", "RISK", "COOLDOWN", "SETTLE", "POSTMORTEM"}
         for entry in body:
-            assert entry["module"] == "TRADING"
+            assert entry["module"] in trading_tags
 
     async def test_logs_filter_by_level(self, authed_client: AsyncClient, e2e_db, e2e_user) -> None:
         """GET /api/logs?level=ERROR returns only ERROR entries."""

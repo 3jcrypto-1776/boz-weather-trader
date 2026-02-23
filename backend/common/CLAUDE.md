@@ -12,7 +12,7 @@ backend/common/
 ├── schemas.py        -> Pydantic models for ALL cross-module data (THE interface contracts)
 ├── database.py       -> SQLAlchemy async engine, session factory, dependency injection
 ├── models.py         -> SQLAlchemy ORM models (all database tables)
-├── logging.py        -> Structured logging setup with module tags + secret redaction
+├── logging.py        -> Structured logging setup with module tags, secret redaction + Redis log persistence
 ├── config.py         -> App settings via pydantic-settings (reads .env)
 ├── encryption.py     -> AES-256 encryption helpers for API key storage
 ├── exceptions.py     -> Base exception classes shared across modules
@@ -559,6 +559,16 @@ logger.error("API call failed", extra={"data": {"url": "https://api.weather.gov/
 | SETTLE     | Settlement data and resolution           |
 | POSTMORTEM | Trade post-mortem narrative generation   |
 | SYSTEM     | General system operations                |
+| API        | API endpoint operations                  |
+
+### Log Persistence (DatabaseLogHandler)
+
+INFO+ log entries are automatically published to Redis (`boz:log_entries` channel) via a `DatabaseLogHandler` attached to every logger. The `log_subscriber` asyncio task in the FastAPI process picks these up and writes them to the `log_entries` database table, powering the `/logs` frontend viewer.
+
+- **Sync Redis client** (`_get_sync_redis()`): Lazy-initialized with 200ms timeout, caches connection failure
+- **Secret redaction**: Applied to both message text and structured data before publishing
+- **Graceful failure**: Redis errors are silently caught — log persistence never crashes the app
+- **`reset_loggers()`**: Resets cached loggers and Redis state — used in tests
 
 ---
 

@@ -42,7 +42,7 @@ backend/
 ├── websocket/           → Real-time event streaming (Redis pub/sub → WebSocket → browser)
 │   ├── events.py        → WebSocketEvent model, publish_event() async + publish_event_sync() wrapper
 │   ├── manager.py       → ConnectionManager singleton (tracks WS connections, broadcasts)
-│   ├── subscriber.py    → redis_subscriber() — asyncio task bridging Redis pub/sub → manager
+│   ├── subscriber.py    → redis_subscriber() + log_subscriber() — asyncio tasks bridging Redis pub/sub → WS + DB
 │   └── router.py        → FastAPI WebSocket endpoint at /ws
 └── api/                 → FastAPI route handlers (auth, dashboard, settings, trades, etc.)
 ```

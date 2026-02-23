@@ -32,6 +32,9 @@ logger = get_logger("SYSTEM")
 # Redis channel name for WebSocket events
 EVENTS_CHANNEL = "boz:events"
 
+# Redis channel name for log entry persistence
+LOG_ENTRIES_CHANNEL = "boz:log_entries"
+
 
 class WebSocketEvent(BaseModel):
     """A real-time event pushed to connected WebSocket clients.

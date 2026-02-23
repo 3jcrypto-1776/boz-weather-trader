@@ -1,4 +1,4 @@
-"""Tests for the Redis pub/sub subscriber."""
+"""Tests for the Redis pub/sub subscribers (events + log persistence)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.websocket.subscriber import redis_subscriber
+from backend.websocket.subscriber import log_subscriber, redis_subscriber
 
 
 class FakeAsyncIter:
@@ -155,3 +155,150 @@ class TestRedisSubscriber:
             await redis_subscriber(mock_manager)
 
         mock_manager.broadcast.assert_called_once_with("not-valid-json")
+
+
+class TestLogSubscriber:
+    """Tests for the log_subscriber that persists log entries to the DB.
+
+    Uses the same FakeAsyncIter and _make_redis_mock helpers as the
+    redis_subscriber tests.
+    """
+
+    @pytest.mark.asyncio
+    async def test_persists_log_entry_to_db(self):
+        """Log subscriber writes log entries to the database."""
+        entry_json = json.dumps(
+            {
+                "level": "INFO",
+                "module_tag": "TRADING",
+                "message": "Trade executed",
+                "data": {"city": "NYC"},
+            }
+        )
+        messages = [
+            {"type": "subscribe", "data": None},
+            {"type": "message", "data": entry_json.encode()},
+        ]
+        mock_redis = _make_redis_mock(messages)
+
+        # Mock the DB session
+        mock_session = AsyncMock()
+        mock_session.close = AsyncMock()
+
+        with (
+            patch("backend.websocket.subscriber.aioredis.from_url", return_value=mock_redis),
+            patch(
+                "backend.common.database.get_task_session",
+                return_value=mock_session,
+            ),
+        ):
+            await log_subscriber()
+
+        # Verify DB add + commit was called
+        mock_session.add.assert_called_once()
+        log_entry = mock_session.add.call_args[0][0]
+        assert log_entry.level == "INFO"
+        assert log_entry.module_tag == "TRADING"
+        assert log_entry.message == "Trade executed"
+        mock_session.commit.assert_called_once()
+        mock_session.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_ignores_non_message_types(self):
+        """Log subscriber skips non-message types."""
+        messages = [
+            {"type": "subscribe", "data": None},
+        ]
+        mock_redis = _make_redis_mock(messages)
+        mock_session = AsyncMock()
+
+        with (
+            patch("backend.websocket.subscriber.aioredis.from_url", return_value=mock_redis),
+            patch(
+                "backend.common.database.get_task_session",
+                return_value=mock_session,
+            ),
+        ):
+            await log_subscriber()
+
+        mock_session.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_handles_malformed_json(self):
+        """Log subscriber gracefully handles malformed JSON entries."""
+        messages = [
+            {"type": "message", "data": b"not-json"},
+        ]
+        mock_redis = _make_redis_mock(messages)
+        mock_session = AsyncMock()
+
+        with (
+            patch("backend.websocket.subscriber.aioredis.from_url", return_value=mock_redis),
+            patch(
+                "backend.common.database.get_task_session",
+                return_value=mock_session,
+            ),
+        ):
+            # Should not raise
+            await log_subscriber()
+
+        mock_session.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_handles_db_error_gracefully(self):
+        """Log subscriber continues after a database error."""
+        entry_json = json.dumps(
+            {
+                "level": "ERROR",
+                "module_tag": "RISK",
+                "message": "Risk check failed",
+            }
+        )
+        messages = [
+            {"type": "message", "data": entry_json.encode()},
+        ]
+        mock_redis = _make_redis_mock(messages)
+
+        mock_session = AsyncMock()
+        mock_session.commit.side_effect = Exception("DB write failed")
+
+        with (
+            patch("backend.websocket.subscriber.aioredis.from_url", return_value=mock_redis),
+            patch(
+                "backend.common.database.get_task_session",
+                return_value=mock_session,
+            ),
+        ):
+            # Should not raise
+            await log_subscriber()
+
+    @pytest.mark.asyncio
+    async def test_decodes_bytes_to_string(self):
+        """Log subscriber decodes bytes data to UTF-8."""
+        entry_json = json.dumps(
+            {
+                "level": "WARNING",
+                "module_tag": "WEATHER",
+                "message": "NWS timeout",
+            }
+        )
+        messages = [
+            {"type": "message", "data": entry_json.encode("utf-8")},
+        ]
+        mock_redis = _make_redis_mock(messages)
+        mock_session = AsyncMock()
+        mock_session.close = AsyncMock()
+
+        with (
+            patch("backend.websocket.subscriber.aioredis.from_url", return_value=mock_redis),
+            patch(
+                "backend.common.database.get_task_session",
+                return_value=mock_session,
+            ),
+        ):
+            await log_subscriber()
+
+        log_entry = mock_session.add.call_args[0][0]
+        assert log_entry.level == "WARNING"
+        assert log_entry.module_tag == "WEATHER"
+        assert log_entry.message == "NWS timeout"
