@@ -79,14 +79,17 @@ describe("WeatherTicker", () => {
 
     render(<WeatherTicker />);
 
-    // NYC: H:58 L:40 (rounded)
-    expect(screen.getByText("H:58 L:40")).toBeInTheDocument();
-    // CHI: H:40 L:29
-    expect(screen.getByText("H:40 L:29")).toBeInTheDocument();
-    // MIA: H:82 L:68
-    expect(screen.getByText("H:82 L:68")).toBeInTheDocument();
-    // AUS: H:72 L:50
-    expect(screen.getByText("H:72 L:50")).toBeInTheDocument();
+    // High temps (red-colored, separate spans)
+    expect(screen.getByTestId("high-NYC")).toHaveTextContent("H:58");
+    expect(screen.getByTestId("high-CHI")).toHaveTextContent("H:40");
+    expect(screen.getByTestId("high-MIA")).toHaveTextContent("H:82");
+    expect(screen.getByTestId("high-AUS")).toHaveTextContent("H:72");
+
+    // Low temps (blue-colored, separate spans)
+    expect(screen.getByTestId("low-NYC")).toHaveTextContent("L:40");
+    expect(screen.getByTestId("low-CHI")).toHaveTextContent("L:29");
+    expect(screen.getByTestId("low-MIA")).toHaveTextContent("L:68");
+    expect(screen.getByTestId("low-AUS")).toHaveTextContent("L:50");
   });
 
   it("renders nothing when data is still loading", () => {
