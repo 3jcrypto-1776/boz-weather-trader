@@ -12,6 +12,7 @@ import EmptyState from "@/components/ui/empty-state";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
+import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import { approveTrade, rejectTrade } from "@/lib/api";
 import { usePendingTrades, useSettings } from "@/lib/hooks";
 import type { ConfidenceLevel, PendingTrade } from "@/lib/types";
@@ -194,6 +195,7 @@ export default function QueuePage() {
   return (
     <ErrorBoundary>
       <h1 className="text-xl font-bold mb-4">Trade Queue</h1>
+      <WeatherTicker />
 
       {isAutoMode && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-boz-primary">

@@ -9,6 +9,7 @@ const mockUseSettings = vi.fn();
 vi.mock("@/lib/hooks", () => ({
   usePendingTrades: () => mockUsePendingTrades(),
   useSettings: () => mockUseSettings(),
+  useCurrentWeather: () => ({ data: undefined, error: undefined }),
 }));
 
 // Mock API

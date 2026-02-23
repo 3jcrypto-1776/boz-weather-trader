@@ -6,6 +6,7 @@ import { mutate } from "swr";
 
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
+import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import { disconnect, updateSettings } from "@/lib/api";
 import { useAuthStatus, useSettings } from "@/lib/hooks";
 import type { CityCode, SettingsUpdate, TradingMode } from "@/lib/types";
@@ -101,6 +102,7 @@ export default function SettingsPage() {
     return (
       <div>
         <h1 className="text-xl font-bold mb-4">Settings</h1>
+        <WeatherTicker />
         <div className="space-y-4">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-16" />
@@ -114,6 +116,7 @@ export default function SettingsPage() {
     return (
       <div>
         <h1 className="text-xl font-bold mb-4">Settings</h1>
+        <WeatherTicker />
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-boz-danger">
           {error.message || "Unable to load settings"}
         </div>
@@ -124,6 +127,7 @@ export default function SettingsPage() {
   return (
     <ErrorBoundary>
       <h1 className="text-xl font-bold mb-4">Settings</h1>
+      <WeatherTicker />
 
       <div className="space-y-6">
         {/* Connection Status */}

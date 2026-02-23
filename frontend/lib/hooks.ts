@@ -16,6 +16,7 @@ import {
   fetchAuthStatus,
   fetchCalendar,
   fetchCalibration,
+  fetchCurrentWeather,
   fetchDashboard,
   fetchLogs,
   fetchMarkets,
@@ -31,6 +32,7 @@ import type {
   CalendarMonth,
   CalibrationReport,
   CityCode,
+  CurrentWeatherResponse,
   DashboardData,
   LogEntry,
   PendingTrade,
@@ -187,6 +189,19 @@ export function useSourceAccuracy(
     `/api/accuracy/sources?city=${cityParam}`,
     () => fetchSourceAccuracy(cityParam),
     { refreshInterval: 0, ...config }
+  );
+}
+
+// ─── Current Weather ───
+
+export function useCurrentWeather(config?: SWRConfiguration) {
+  return useSWR<CurrentWeatherResponse>(
+    "/api/weather/current",
+    () => fetchCurrentWeather(),
+    {
+      refreshInterval: 300_000, // 5 minutes — matches backend cache TTL
+      ...config,
+    }
   );
 }
 

@@ -7,6 +7,7 @@ import type { DashboardData } from "@/lib/types";
 const mockUseDashboard = vi.fn();
 vi.mock("@/lib/hooks", () => ({
   useDashboard: () => mockUseDashboard(),
+  useCurrentWeather: () => ({ data: undefined, error: undefined }),
 }));
 
 // Mock next/navigation for BottomNav + useRouter

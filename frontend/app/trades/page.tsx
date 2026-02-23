@@ -18,6 +18,7 @@ import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { syncTrades } from "@/lib/api";
+import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import { useCalendar, useTrades } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
 import type { CityCode, SyncResult, TradeStatus } from "@/lib/types";
@@ -449,6 +450,7 @@ export default function TradesPage() {
           </button>
         </div>
       </div>
+      <WeatherTicker />
 
       {/* Tab content */}
       {activeTab === "calendar" ? <CalendarView /> : <HistoryView />}

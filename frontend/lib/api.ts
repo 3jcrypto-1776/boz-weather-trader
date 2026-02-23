@@ -12,6 +12,7 @@ import type {
   CalibrationReport,
   CalendarMonth,
   CityCode,
+  CurrentWeatherResponse,
   DashboardData,
   LogEntry,
   PendingTrade,
@@ -241,6 +242,12 @@ export async function fetchSourceAccuracy(
   return apiFetch<SourceAccuracy[]>(
     `/api/accuracy/sources?city=${city}&lookback_days=${lookbackDays}`
   );
+}
+
+// ─── Weather (1 endpoint) ───
+
+export async function fetchCurrentWeather(): Promise<CurrentWeatherResponse> {
+  return apiFetch<CurrentWeatherResponse>("/api/weather/current");
 }
 
 // ─── Calendar (1 endpoint) ───

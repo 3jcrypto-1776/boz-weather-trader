@@ -9,6 +9,7 @@ const mockUseAuthStatus = vi.fn();
 vi.mock("@/lib/hooks", () => ({
   useSettings: () => mockUseSettings(),
   useAuthStatus: () => mockUseAuthStatus(),
+  useCurrentWeather: () => ({ data: undefined, error: undefined }),
 }));
 
 // Mock API

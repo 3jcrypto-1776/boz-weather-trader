@@ -245,6 +245,21 @@ export interface CalendarMonth {
   trading_days: number;
 }
 
+// ─── Current Weather (Ticker) ───
+
+export interface CityCurrentWeather {
+  city: CityCode;
+  city_name: string;
+  current_temp_f: number;
+  today_high_f: number;
+  today_low_f: number;
+}
+
+export interface CurrentWeatherResponse {
+  cities: CityCurrentWeather[];
+  fetched_at: string; // ISO datetime with Z suffix
+}
+
 // ─── Grouped Trades (frontend-only aggregation) ───
 
 /** Trades sharing the same market_ticker+bracket+side+status, aggregated into one card. */

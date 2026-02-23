@@ -7,6 +7,7 @@ import BracketView from "@/components/bracket-view/bracket-view";
 import EmptyState from "@/components/ui/empty-state";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
+import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import { useMarkets } from "@/lib/hooks";
 import type { CityCode } from "@/lib/types";
 
@@ -20,6 +21,7 @@ export default function MarketsPage() {
   return (
     <ErrorBoundary>
       <h1 className="text-xl font-bold mb-4">Markets</h1>
+      <WeatherTicker />
 
       {/* City filter tabs */}
       <div className="flex gap-1 mb-4 overflow-x-auto">

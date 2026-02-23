@@ -200,3 +200,23 @@ class SettingsUpdate(BaseModel):
     active_cities: list[CityCode] | None = None
     notifications_enabled: bool | None = None
     demo_mode: bool | None = None
+
+
+# ─── Current Weather (Ticker) ───
+
+
+class CityCurrentWeather(BaseModel):
+    """Current weather observation for a single city."""
+
+    city: CityCode
+    city_name: str
+    current_temp_f: float
+    today_high_f: float
+    today_low_f: float
+
+
+class CurrentWeatherResponse(BaseModel):
+    """Current weather for all active cities."""
+
+    cities: list[CityCurrentWeather]
+    fetched_at: UTCDatetime

@@ -10,6 +10,7 @@ import SourceAccuracyChart from "@/components/charts/source-accuracy-chart";
 import EmptyState from "@/components/ui/empty-state";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
+import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import {
   useCalibration,
   usePerformance,
@@ -30,6 +31,7 @@ export default function PerformancePage() {
     return (
       <div>
         <h1 className="text-xl font-bold mb-4">Performance</h1>
+        <WeatherTicker />
         <div className="space-y-4">
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             {[...Array(5)].map((_, i) => (
@@ -47,6 +49,7 @@ export default function PerformancePage() {
     return (
       <div>
         <h1 className="text-xl font-bold mb-4">Performance</h1>
+        <WeatherTicker />
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-boz-danger">
           {error.message || "Unable to load performance data"}
         </div>
@@ -58,6 +61,7 @@ export default function PerformancePage() {
     return (
       <div>
         <h1 className="text-xl font-bold mb-4">Performance</h1>
+        <WeatherTicker />
         <EmptyState
           icon={BarChart3}
           title="No Performance Data"
@@ -81,6 +85,7 @@ export default function PerformancePage() {
   return (
     <ErrorBoundary>
       <h1 className="text-xl font-bold mb-4">Performance</h1>
+      <WeatherTicker />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">

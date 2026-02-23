@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import TradeCard from "@/components/trade-card/trade-card";
+import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import { useDashboard } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
 import type { DashboardData } from "@/lib/types";
@@ -208,6 +209,7 @@ export default function DashboardPage() {
   return (
     <ErrorBoundary>
       <h1 className="text-xl font-bold mb-4">Dashboard</h1>
+      <WeatherTicker />
 
       {isLoading && <DashboardSkeleton />}
 
