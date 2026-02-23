@@ -48,8 +48,8 @@ services:
       redis:
         condition: service_healthy
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - ./backend:/app/backend  # Hot reload in dev
+    # Dev bind mount (./backend:/app/backend) lives in docker-compose.override.yml
+    # so it's auto-loaded for dev but NOT used by the updater sidecar.
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 15s
