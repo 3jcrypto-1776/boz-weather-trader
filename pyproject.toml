@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "boz-weather-trader"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Automated weather prediction market trading bot for Kalshi"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -42,6 +42,9 @@ dev = [
     "pytest-cov>=4.1.0",
     "ruff>=0.1.8",
 ]
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
 
 [tool.setuptools.packages.find]
 include = ["backend*"]

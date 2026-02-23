@@ -43,7 +43,7 @@ class TestAppInfo:
 
     def test_set_app_info_includes_both_labels(self):
         """Both version and environment should be present in the metric."""
-        set_app_info(version="0.1.0", environment="production")
+        set_app_info(version="1.0.0", environment="production")
         sample = APP_INFO.collect()[0].samples[0]
         assert "version" in sample.labels
         assert "environment" in sample.labels

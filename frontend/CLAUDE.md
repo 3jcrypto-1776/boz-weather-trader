@@ -25,9 +25,9 @@ frontend/
 │   ├── trade-card/         → Trade display with post-mortem expandable
 │   └── bracket-view/       → Visual bracket probability display
 ├── lib/                    → Utilities, API client, types
-│   ├── api.ts              → Backend API client (fetch wrapper) + getWsUrl() helper
-│   ├── types.ts            → TypeScript types matching backend schemas
-│   ├── hooks.ts            → SWR data fetching hooks
+│   ├── api.ts              → Backend API client (fetch wrapper) + getWsUrl() helper + fetchVersion()
+│   ├── types.ts            → TypeScript types matching backend schemas + VersionInfo
+│   ├── hooks.ts            → SWR data fetching hooks + useVersion()
 │   ├── trade-grouping.ts   → Frontend-only trade grouping: groupTrades() + groupByMarket()
 │   ├── websocket-types.ts  → WebSocket event types + EVENT_TO_SWR_KEYS mapping
 │   ├── websocket.ts        → useWebSocket() hook, WebSocketProvider, exponential backoff reconnection
@@ -726,7 +726,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ### Bottom Navigation Component
 
-Mobile: fixed bottom tab bar (like native apps). Desktop (lg:): fixed left sidebar.
+Mobile: fixed bottom tab bar (like native apps). Desktop (lg:): fixed left sidebar with version label at bottom.
 
 ```tsx
 // components/ui/bottom-nav.tsx
@@ -1587,6 +1587,10 @@ See "Onboarding Flow Implementation" section above. Six steps:
   - Green dot + "Connected" status
   - DEMO/LIVE badge (orange for demo, green for live)
   - Truncated key ID prefix from `/api/auth/status`
+- **About section** (uses `useVersion()` hook):
+  - Current version from `/api/version`
+  - Update available notification when newer GitHub Release exists
+  - Link to GitHub releases page
 - Trading mode toggle (Full Auto / Manual Approval) — use a segmented control
 - Risk controls:
   - Max trade size: slider with label showing dollar value (range: $0.10 to $10.00)
@@ -1671,6 +1675,7 @@ Your tests go in `frontend/__tests__/`:
 - `settings.test.tsx` — form validation, range limits on inputs
 - `api.test.ts` — API client error handling, auth token inclusion
 - `hooks.test.ts` — SWR hooks return correct data, handle errors
+- `version-info.test.tsx` — version display, update notification, loading/error states
 - `utils.test.ts` — centsToDollars, formatPnL, formatProbability, date formatting
 
 ### Critical Test Cases

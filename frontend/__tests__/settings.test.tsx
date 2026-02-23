@@ -6,10 +6,12 @@ import type { UserSettings } from "@/lib/types";
 // Mock hooks
 const mockUseSettings = vi.fn();
 const mockUseAuthStatus = vi.fn();
+const mockUseVersion = vi.fn();
 vi.mock("@/lib/hooks", () => ({
   useSettings: () => mockUseSettings(),
   useAuthStatus: () => mockUseAuthStatus(),
   useCurrentWeather: () => ({ data: undefined, error: undefined }),
+  useVersion: () => mockUseVersion(),
 }));
 
 // Mock API
@@ -50,6 +52,16 @@ describe("SettingsPage", () => {
     vi.clearAllMocks();
     // Suppress confirm dialog
     vi.spyOn(window, "confirm").mockReturnValue(false);
+    // Default version mock
+    mockUseVersion.mockReturnValue({
+      data: {
+        current_version: "1.0.0",
+        latest_version: "1.0.0",
+        update_available: false,
+        release_url: null,
+      },
+      error: undefined,
+    });
     // Default auth status mock
     mockUseAuthStatus.mockReturnValue({
       data: {

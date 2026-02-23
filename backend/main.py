@@ -18,6 +18,7 @@ from prometheus_client import make_asgi_app as make_metrics_app
 from sqlalchemy import text
 from starlette.middleware.gzip import GZipMiddleware
 
+from backend import __version__
 from backend.api.accuracy import router as accuracy_router
 from backend.api.auth import router as auth_router
 from backend.api.backtest import router as backtest_router
@@ -30,6 +31,7 @@ from backend.api.performance import router as performance_router
 from backend.api.queue import router as queue_router
 from backend.api.settings import router as settings_router
 from backend.api.trades import router as trades_router
+from backend.api.version import router as version_router
 from backend.api.weather import router as weather_router
 from backend.common.config import get_settings
 from backend.common.exceptions import BozBaseException
@@ -93,7 +95,7 @@ def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
         title="Boz Weather Trader",
-        version="0.1.0",
+        version=__version__,
         description="Automated weather prediction market trading bot for Kalshi",
         lifespan=lifespan,
     )
@@ -209,7 +211,7 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health_check() -> dict:
         """Liveness probe — confirms the process is running."""
-        return {"status": "ok", "version": "0.1.0"}
+        return {"status": "ok", "version": __version__}
 
     @app.get("/ready")
     async def readiness_check() -> JSONResponse:
@@ -246,7 +248,7 @@ def create_app() -> FastAPI:
             status_code=200 if all_ok else 503,
             content={
                 "status": "ok" if all_ok else "degraded",
-                "version": "0.1.0",
+                "version": __version__,
                 "checks": checks,
             },
         )
@@ -255,7 +257,7 @@ def create_app() -> FastAPI:
 
     metrics_app = make_metrics_app()
     app.mount("/metrics", metrics_app)
-    set_app_info(version="0.1.0", environment=get_settings().environment)
+    set_app_info(version=__version__, environment=get_settings().environment)
 
     # ─── Router Mounting ───
 
@@ -271,10 +273,11 @@ def create_app() -> FastAPI:
     app.include_router(backtest_router, prefix="/api/backtest", tags=["backtest"])
     app.include_router(accuracy_router, prefix="/api/accuracy", tags=["accuracy"])
     app.include_router(weather_router, prefix="/api/weather", tags=["weather"])
+    app.include_router(version_router, prefix="/api/version", tags=["version"])
     app.include_router(calendar_router, prefix="/api/trades/calendar", tags=["calendar"])
     app.include_router(ws_router, tags=["websocket"])
 
-    logger.info("App started", extra={"data": {"version": "0.1.0"}})
+    logger.info("App started", extra={"data": {"version": __version__}})
 
     return app
 

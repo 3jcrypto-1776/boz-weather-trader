@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useVersion } from "@/lib/hooks";
 import { useWebSocketStatus } from "@/lib/websocket";
 
 const NAV_ITEMS = [
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
 export default function BottomNav() {
   const pathname = usePathname();
   const { isConnected } = useWebSocketStatus();
+  const { data: versionInfo } = useVersion();
 
   // Hide nav on onboarding page
   if (pathname === "/onboarding") return null;
@@ -97,6 +99,17 @@ export default function BottomNav() {
           })}
 
         </nav>
+        {/* Version label */}
+        <div className="px-4 py-3 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-gray-400" data-testid="sidebar-version">
+              v{versionInfo?.current_version ?? "..."}
+            </span>
+            {versionInfo?.update_available && (
+              <span className="h-2 w-2 rounded-full bg-orange-500" title="Update available" />
+            )}
+          </div>
+        </div>
       </aside>
     </>
   );

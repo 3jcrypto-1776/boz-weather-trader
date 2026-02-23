@@ -20,6 +20,7 @@ backend/
   ├── backtesting/ → Backtesting engine: day-by-day simulation, synthetic prices, metrics
   ├── websocket/   → Real-time event push (Redis pub/sub → WebSocket → SWR revalidation)
   └── common/      → Shared schemas, config, database, logging, middleware, metrics
+VERSION              → Single source of truth for app version (semver, read by backend + Docker + pyproject.toml)
 monitoring/
   ├── prometheus/  → Prometheus scrape config + alerting rules
   │   ├── prometheus.yml   → Scrape config, rule_files, alertmanager target
@@ -28,14 +29,14 @@ monitoring/
   └── grafana/     → Grafana provisioning + dashboard JSON files
       ├── provisioning/  → Auto-provisioned datasources + dashboard provider
       └── dashboards/    → API Overview (8 panels) + Trading & Weather (10 panels) + Kalshi WS Feed (6 panels)
-tests/                   → 1280 backend + 163 frontend = 1443 tests (all passing)
+tests/                   → 1299 backend + 174 frontend = 1473 tests (all passing)
   ├── common/      → Shared module tests: config, schemas, models, logging, encryption, middleware, metrics (123)
   ├── weather/     → Weather pipeline: NWS, Open-Meteo, normalizer, stations, CLI parser, scheduler (140)
   ├── kalshi/      → Kalshi client: auth, REST, WS, markets, orders, models, cache, market feed (134)
   ├── prediction/  → Prediction engine: ensemble, multi-model ML, brackets, error dist, accuracy, calibration, pipeline (217)
   ├── trading/     → Trading engine: EV calc, Kelly sizing, risk, cooldowns, queue, executor, scheduler, safety, sync (239)
   ├── backtesting/ → Backtesting engine: schemas, risk sim, data loader, engine, metrics, integration (95)
-  ├── api/         → API endpoints: auth, dashboard, health, markets, queue, settings, trades, trades/sync, accuracy, optimization, calendar (115)
+  ├── api/         → API endpoints: auth, dashboard, health, markets, queue, settings, trades, trades/sync, accuracy, optimization, calendar, version (125)
   ├── websocket/   → WebSocket: events, manager, subscriber, router (40)
   ├── e2e/         → End-to-end smoke tests (35)
   ├── integration/ → Cross-module integration tests (47)
@@ -50,7 +51,8 @@ tests/                   → 1280 backend + 163 frontend = 1443 tests (all passi
 - **Monitoring:** prometheus-client, Prometheus, Grafana (auto-provisioned dashboards), Alertmanager (webhook alerts)
 - **Containerization:** Docker + Docker Compose (9 services incl. Prometheus, Grafana, Alertmanager) + `docker-compose.prod.yml` production overrides + `docker-compose.cloud.yml` cloud override (no monitoring)
 - **Testing:** pytest (backend), Jest/Vitest (frontend)
-- **CI/CD:** GitHub Actions
+- **CI/CD:** GitHub Actions + GitHub Releases (automated via `.github/workflows/release.yml`)
+- **Versioning:** Single source of truth `VERSION` file, `/api/version` endpoint with GitHub Releases update check
 - **Linting:** ruff (Python), ESLint + Prettier (TypeScript)
 
 ## Critical Rules (All Agents Must Follow)

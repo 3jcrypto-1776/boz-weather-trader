@@ -8,7 +8,7 @@ import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import { disconnect, updateSettings } from "@/lib/api";
-import { useAuthStatus, useSettings } from "@/lib/hooks";
+import { useAuthStatus, useSettings, useVersion } from "@/lib/hooks";
 import type { CityCode, SettingsUpdate, TradingMode } from "@/lib/types";
 import { centsToDollars } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ const ALL_CITIES: CityCode[] = ["NYC", "CHI", "MIA", "AUS"];
 export default function SettingsPage() {
   const { data: settings, error, isLoading } = useSettings();
   const { data: authStatus } = useAuthStatus();
+  const { data: versionInfo } = useVersion();
 
   // Local form state
   const [tradingMode, setTradingMode] = useState<TradingMode>("manual");
@@ -346,6 +347,45 @@ export default function SettingsPage() {
           )}
           {saving ? "Saving..." : "Save Settings"}
         </button>
+
+        {/* About */}
+        <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+          <h2 className="text-sm font-semibold mb-3">About</h2>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-boz-neutral">Version</span>
+            <span className="text-sm font-medium" data-testid="current-version">
+              v{versionInfo?.current_version ?? "..."}
+            </span>
+          </div>
+          {versionInfo?.update_available && versionInfo.release_url && (
+            <div className="mt-3 bg-orange-50 border border-orange-200 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-orange-800">
+                    Update available
+                  </p>
+                  <p className="text-xs text-orange-600">
+                    v{versionInfo.latest_version} is now available
+                  </p>
+                </div>
+                <a
+                  href={versionInfo.release_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-orange-600 text-white text-xs font-medium rounded-lg hover:bg-orange-700 transition-colors"
+                  data-testid="update-link"
+                >
+                  View Release
+                </a>
+              </div>
+            </div>
+          )}
+          {versionInfo && !versionInfo.update_available && versionInfo.latest_version && (
+            <p className="text-xs text-boz-success mt-2" data-testid="up-to-date">
+              You&apos;re running the latest version
+            </p>
+          )}
+        </section>
 
         {/* Disconnect */}
         <section className="border-t border-gray-200 pt-6">

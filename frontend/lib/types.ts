@@ -260,6 +260,15 @@ export interface CurrentWeatherResponse {
   fetched_at: string; // ISO datetime with Z suffix
 }
 
+// ─── Version Info ───
+
+export interface VersionInfo {
+  current_version: string;
+  latest_version: string | null;
+  update_available: boolean;
+  release_url: string | null;
+}
+
 // ─── Grouped Trades (frontend-only aggregation) ───
 
 /** Trades sharing the same market_ticker+bracket+side+status, aggregated into one card. */

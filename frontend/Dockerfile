@@ -10,9 +10,11 @@ RUN npm ci
 # Copy application source
 COPY . .
 
-# Accept API URL as build arg (baked into JS bundle by Next.js)
+# Accept build args (baked into JS bundle by Next.js)
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_APP_VERSION=0.0.0
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
 
 # Build optimized production bundle
 RUN npm run build

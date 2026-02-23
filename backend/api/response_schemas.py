@@ -220,3 +220,15 @@ class CurrentWeatherResponse(BaseModel):
 
     cities: list[CityCurrentWeather]
     fetched_at: UTCDatetime
+
+
+# ─── Version Info ───
+
+
+class VersionInfo(BaseModel):
+    """Application version with optional update availability check."""
+
+    current_version: str
+    latest_version: str | None = None
+    update_available: bool = False
+    release_url: str | None = None

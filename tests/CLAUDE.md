@@ -78,7 +78,7 @@ tests/
 │   ├── test_executor.py           → Order placement + DB recording + market_date setting (9 tests)
 │   ├── test_cooldown.py           → Per-loss + consecutive cooldowns (9 tests)
 │   └── test_notifications.py      → Web push via VAPID (5 tests)
-├── api/                 → API endpoint tests (116 tests)
+├── api/                 → API endpoint tests (125 tests)
 │   ├── conftest.py      → API fixtures (api_engine, client, mock_kalshi, factories)
 │   ├── test_accuracy.py    → Forecast accuracy endpoints: sources, calibration, trends (17 tests)
 │   ├── test_auth.py     → Auth validate + disconnect (5 tests)
@@ -94,7 +94,8 @@ tests/
 │   ├── test_queue.py        → Trade queue approve/reject/list (8 tests)
 │   ├── test_settings.py     → Settings read/update (5 tests)
 │   ├── test_trades.py       → Trade history endpoint + date filter (7 tests)
-│   └── test_trades_sync.py  → Portfolio sync API endpoint: sync result, auth, WS events (5 tests)
+│   ├── test_trades_sync.py  → Portfolio sync API endpoint: sync result, auth, WS events (5 tests)
+│   └── test_version.py      → Version endpoint: current version, update check, Redis cache (10 tests)
 ├── websocket/           → Unit tests for backend/websocket/ (40 tests)
 │   ├── test_events.py   → Event model, publish_event, publish_event_sync (13 tests)
 │   ├── test_manager.py  → ConnectionManager connect/disconnect/broadcast (12 tests)
@@ -1135,8 +1136,8 @@ jobs:
 | Job | What It Does | Failure Blocks Merge? |
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
-| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1280 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
-| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 163 tests) | Yes |
+| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1299 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
+| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 174 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 
 **Key design decisions:**

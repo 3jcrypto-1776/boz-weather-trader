@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from backend import __version__
 from backend.main import app
 
 
@@ -59,7 +60,7 @@ class TestHealthEndpoint:
         resp = await bare_client.get("/health")
         body = resp.json()
         assert body["status"] == "ok"
-        assert body["version"] == "0.1.0"
+        assert body["version"] == __version__
 
 
 # ─── Readiness Probe ───
@@ -157,4 +158,4 @@ class TestReadinessEndpoint:
             resp = await bare_client.get("/ready")
 
         body = resp.json()
-        assert body["version"] == "0.1.0"
+        assert body["version"] == __version__

@@ -25,6 +25,7 @@ import {
   fetchSettings,
   fetchSourceAccuracy,
   fetchTrades,
+  fetchVersion,
 } from "./api";
 import type {
   AuthStatusResponse,
@@ -40,6 +41,7 @@ import type {
   SourceAccuracy,
   TradesPage,
   UserSettings,
+  VersionInfo,
 } from "./types";
 
 // ─── Auth Status ───
@@ -200,6 +202,19 @@ export function useCurrentWeather(config?: SWRConfiguration) {
     () => fetchCurrentWeather(),
     {
       refreshInterval: 300_000, // 5 minutes — matches backend cache TTL
+      ...config,
+    }
+  );
+}
+
+// ─── Version ───
+
+export function useVersion(config?: SWRConfiguration) {
+  return useSWR<VersionInfo>(
+    "/api/version",
+    () => fetchVersion(),
+    {
+      refreshInterval: 3_600_000, // 1 hour
       ...config,
     }
   );

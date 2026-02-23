@@ -24,6 +24,7 @@ import type {
   TradeRecord,
   TradesPage,
   UserSettings,
+  VersionInfo,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -248,6 +249,12 @@ export async function fetchSourceAccuracy(
 
 export async function fetchCurrentWeather(): Promise<CurrentWeatherResponse> {
   return apiFetch<CurrentWeatherResponse>("/api/weather/current");
+}
+
+// ─── Version (1 endpoint) ───
+
+export async function fetchVersion(): Promise<VersionInfo> {
+  return apiFetch<VersionInfo>("/api/version");
 }
 
 // ─── Calendar (1 endpoint) ───
