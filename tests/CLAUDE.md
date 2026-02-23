@@ -38,12 +38,12 @@ tests/
 │   ├── test_nws.py        → fetch_with_retry, grid coordinates, caching (10 tests)
 │   ├── test_openmeteo.py  → Module constants + _extract_model_daily (9 tests)
 │   └── test_rate_limiter.py → Async rate limiter timing + module singletons (6 tests)
-├── kalshi/              → Unit tests for backend/kalshi/ (122 tests)
+├── kalshi/              → Unit tests for backend/kalshi/ (134 tests)
 │   ├── conftest.py      → Kalshi-specific fixtures (mock API responses, test keys)
+│   ├── test_markets.py     → Market discovery, tickers, bracket parsing, market date extraction (27 tests)
 │   ├── test_market_feed.py → Market feed consumer lifecycle + auth + messages (25 tests)
 │   ├── test_models.py      → Pydantic models, validators, serialization (23 tests)
 │   ├── test_cache.py       → Redis cache set/get/TTL/status (17 tests)
-│   ├── test_markets.py     → Market discovery, tickers, bracket parsing (15 tests)
 │   ├── test_client.py      → REST wrapper, HTTP status, error mapping (11 tests)
 │   ├── test_auth.py        → RSA-PSS signing, header generation, query param stripping (11 tests)
 │   ├── test_orders.py      → Order build + pre-flight validation (8 tests)
@@ -64,19 +64,19 @@ tests/
 │   ├── test_error_dist.py    → Season detection + error std calculation (12 tests)
 │   ├── test_postmortem.py    → Post-mortem narrative generation (8 tests)
 │   └── test_pipeline.py      → Full prediction pipeline orchestration + multi-model integration (11 tests)
-├── trading/             → Unit tests + safety tests for backend/trading/ (222 tests)
+├── trading/             → Unit tests + safety tests for backend/trading/ (239 tests)
 │   ├── conftest.py      → Trading fixtures (mock Kalshi client, sample predictions)
 │   ├── test_ev_calculator.py      → EV math, fees, bracket scanning, Kelly integration (45 tests)
+│   ├── test_scheduler.py          → Celery tasks: trading cycle, expiry, settlement w/ market_date, Kelly params (40 tests)
 │   ├── test_kelly.py              → Kelly Criterion: sizing, fractional, fees, caps, edge cases (35 tests)
-│   ├── test_scheduler.py          → Celery tasks: trading cycle, expiry, settlement, Kelly params (37 tests)
-│   ├── test_sync.py               → Portfolio sync: ticker parsing, reconciliation, sentinel values, error handling (20 tests)
-│   ├── test_postmortem.py         → Settlement matching, P&L, rich narratives w/ sections (22 tests)
-│   ├── test_risk_manager.py       → Risk check ordering + enforcement (12 tests)
+│   ├── test_postmortem.py         → Settlement matching, P&L, rich narratives w/ sections, market_date queries (24 tests)
+│   ├── test_sync.py               → Portfolio sync: ticker parsing, reconciliation, sentinel values, market_date (22 tests)
 │   ├── test_celery_hardening.py   → Task timeout configs (15 tests)
+│   ├── test_risk_manager.py       → Risk check ordering + enforcement (12 tests)
 │   ├── test_performance.py        → Performance analytics: trade stats, P&L tracking (12 tests)
 │   ├── test_trade_queue.py        → Queue state machine (11 tests)
+│   ├── test_executor.py           → Order placement + DB recording + market_date setting (9 tests)
 │   ├── test_cooldown.py           → Per-loss + consecutive cooldowns (9 tests)
-│   ├── test_executor.py           → Order placement + DB recording (8 tests)
 │   └── test_notifications.py      → Web push via VAPID (5 tests)
 ├── api/                 → API endpoint tests (116 tests)
 │   ├── conftest.py      → API fixtures (api_engine, client, mock_kalshi, factories)
@@ -1135,7 +1135,7 @@ jobs:
 | Job | What It Does | Failure Blocks Merge? |
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
-| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1260 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
+| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1280 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
 | `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 163 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 

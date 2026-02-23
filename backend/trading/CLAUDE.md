@@ -1656,11 +1656,23 @@ async def _settle_and_postmortem():
         )
 
         for trade in open_trades.scalars().all():
-            # Look for matching settlement data
+            # Use market_date (from ticker) for settlement matching, NOT trade_date.
+            # trade_date is when the order was placed (could be evening before),
+            # market_date is the actual weather event date.
+            settle_date = trade.market_date
+            if settle_date is None:
+                # Fallback: parse from ticker for pre-migration trades
+                from backend.kalshi.markets import parse_market_date_from_ticker
+                parsed = parse_market_date_from_ticker(trade.market_ticker)
+                if parsed is not None:
+                    settle_date = datetime.combine(parsed, datetime.min.time())
+                else:
+                    settle_date = trade.trade_date  # last resort
+
             settlement_result = await db.execute(
                 select(Settlement).where(
                     Settlement.city == trade.city,
-                    Settlement.settlement_date == trade.trade_date,
+                    func.date(Settlement.settlement_date) == func.date(settle_date),
                 )
             )
             settlement = settlement_result.scalar_one_or_none()

@@ -1034,6 +1034,7 @@ Your `markets.py` must:
 - Parse bracket ranges from `floor_strike` / `cap_strike` (see bracket parsing section above)
 - Map tickers to cities using `WEATHER_SERIES_TICKERS` and `SERIES_TO_CITY`
 - Handle the case where markets haven't launched yet (before 10 AM ET) — return empty list, don't crash
+- Extract market event dates from tickers via `parse_market_date_from_ticker()` (parses YYMONDD segment)
 - Provide a function to build event tickers from city + date:
 
 ```python
