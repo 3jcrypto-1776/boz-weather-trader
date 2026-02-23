@@ -474,6 +474,7 @@ async def _settle_and_postmortem() -> None:
     from sqlalchemy import func, select
 
     from backend.common.models import Settlement, Trade, TradeStatus
+    from backend.kalshi.markets import parse_market_date_from_ticker
     from backend.trading.cooldown import CooldownManager
     from backend.trading.postmortem import settle_trade
 
@@ -486,13 +487,26 @@ async def _settle_and_postmortem() -> None:
 
         settled_count = 0
         for trade in open_trades_result.scalars().all():
-            # Look for matching settlement data.
-            # trade_date is a datetime; settlement_date is stored as midnight.
-            # Compare date portions only with func.date().
+            # Match settlement using the market event date (from ticker),
+            # NOT trade_date which is when the order was placed. This prevents
+            # evening trades for next-day markets from settling against
+            # the wrong day's data.
+            settle_date = trade.market_date
+            if settle_date is None:
+                # Fallback: parse from ticker for trades created before migration
+                parsed = parse_market_date_from_ticker(trade.market_ticker)
+                if parsed is not None:
+                    from datetime import datetime
+
+                    settle_date = datetime(parsed.year, parsed.month, parsed.day)
+                else:
+                    # Last resort: use trade_date (original behavior)
+                    settle_date = trade.trade_date
+
             settlement_result = await session.execute(
                 select(Settlement).where(
                     Settlement.city == trade.city,
-                    func.date(Settlement.settlement_date) == func.date(trade.trade_date),
+                    func.date(Settlement.settlement_date) == func.date(settle_date),
                 )
             )
             settlement = settlement_result.scalar_one_or_none()

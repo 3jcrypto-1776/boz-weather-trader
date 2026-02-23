@@ -22,7 +22,11 @@ from backend.common.logging import get_logger
 from backend.common.metrics import PORTFOLIO_SYNC_TOTAL, PORTFOLIO_SYNC_TRADES_CREATED
 from backend.common.models import Trade, TradeStatus
 from backend.common.schemas import SyncResult
-from backend.kalshi.markets import SERIES_TO_CITY, parse_bracket_from_market
+from backend.kalshi.markets import (
+    SERIES_TO_CITY,
+    parse_bracket_from_market,
+    parse_market_date_from_ticker,
+)
 from backend.kalshi.models import OrderResponse
 
 logger = get_logger("TRADING")
@@ -71,12 +75,16 @@ async def _create_synced_trade(
     Synced trades use sentinel values for model-specific fields since they
     were placed outside the bot's prediction pipeline.
     """
+    # Extract the market event date from the ticker (e.g., KXHIGHAUS-26FEB23 → Feb 23)
+    market_date = parse_market_date_from_ticker(order.ticker)
+
     trade = Trade(
         id=str(uuid4()),
         user_id=user_id,
         kalshi_order_id=order.order_id,
         city=city,
         trade_date=order.created_time,
+        market_date=market_date,
         market_ticker=order.ticker,
         bracket_label=bracket_label,
         side=order.side,

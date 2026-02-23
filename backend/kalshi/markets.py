@@ -12,6 +12,7 @@ Usage:
         build_event_ticker,
         parse_bracket_from_market,
         parse_event_markets,
+        parse_market_date_from_ticker,
     )
 
     ticker = build_event_ticker("NYC", date(2026, 2, 18))
@@ -20,7 +21,7 @@ Usage:
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 
 from backend.common.logging import get_logger
 from backend.kalshi.models import KalshiMarket
@@ -75,6 +76,38 @@ def build_event_ticker(city: str, target_date: date) -> str:
     # Format: YY + uppercase 3-letter month + DD
     date_str = target_date.strftime("%y%b%d").upper()
     return f"{series}-{date_str}"
+
+
+def parse_market_date_from_ticker(ticker: str) -> date | None:
+    """Extract the market event date from a Kalshi market or event ticker.
+
+    Parses the YYMONDD date segment from tickers like "KXHIGHNY-26FEB18-T52"
+    or event tickers like "KXHIGHNY-26FEB18".
+
+    Args:
+        ticker: Market ticker (e.g., "KXHIGHAUS-26FEB23-T63") or
+                event ticker (e.g., "KXHIGHNY-26FEB18").
+
+    Returns:
+        The market event date, or None if the ticker cannot be parsed.
+
+    Examples:
+        >>> parse_market_date_from_ticker("KXHIGHNY-26FEB18-T52")
+        datetime.date(2026, 2, 18)
+        >>> parse_market_date_from_ticker("KXHIGHAUS-26FEB23-B65.5")
+        datetime.date(2026, 2, 23)
+        >>> parse_market_date_from_ticker("invalid")
+        None
+    """
+    parts = ticker.split("-")
+    if len(parts) < 2:
+        return None
+
+    date_str = parts[1].upper()
+    try:
+        return datetime.strptime(date_str, "%y%b%d").date()
+    except ValueError:
+        return None
 
 
 # ─── Bracket Parsing ───

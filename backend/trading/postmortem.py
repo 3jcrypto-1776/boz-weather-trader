@@ -199,11 +199,14 @@ async def settle_trade(
     trade.settlement_source = settlement.source
     trade.settled_at = datetime.now(UTC).replace(tzinfo=None)
 
-    # Fetch forecasts for the post-mortem narrative
+    # Fetch forecasts for the post-mortem narrative.
+    # Use market_date (the event date) to find relevant forecasts, not trade_date
+    # (which is order placement time and may be the evening before).
+    forecast_date = trade.market_date if trade.market_date is not None else trade.trade_date
     forecasts_result = await db.execute(
         select(WeatherForecast).where(
             WeatherForecast.city == trade.city,
-            WeatherForecast.forecast_date == trade.trade_date,
+            WeatherForecast.forecast_date == forecast_date,
         )
     )
     forecasts = list(forecasts_result.scalars().all())

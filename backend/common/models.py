@@ -190,6 +190,7 @@ class Trade(Base):
     kalshi_order_id = Column(String, nullable=True)
     city = Column(Enum(CityEnum, native_enum=False), nullable=False)
     trade_date = Column(TZNaiveDateTime, nullable=False)
+    market_date = Column(TZNaiveDateTime, nullable=True)  # Market event date (from ticker)
     market_ticker = Column(String, nullable=False)
     bracket_label = Column(String, nullable=False)
     side = Column(String, nullable=False)  # "yes" or "no"

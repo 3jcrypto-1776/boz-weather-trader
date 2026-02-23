@@ -652,10 +652,12 @@ class TestSettleAndPostmortem:
 
         mock_session = _make_mock_db_session()
 
-        # Mock Trade query
+        # Mock Trade query — market_date takes precedence over trade_date
         mock_trade = MagicMock()
         mock_trade.city = "NYC"
-        mock_trade.trade_date = date(2026, 2, 18)
+        mock_trade.trade_date = datetime(2026, 2, 17, 22, 0, 0)  # Evening before
+        mock_trade.market_date = datetime(2026, 2, 18, 0, 0, 0)  # Market event day
+        mock_trade.market_ticker = "KXHIGHNY-26FEB18-T52"
         mock_trade.user_id = "user-1"
         mock_trade.status = TradeStatus.WON  # After settlement
 
@@ -700,7 +702,9 @@ class TestSettleAndPostmortem:
 
         mock_trade = MagicMock()
         mock_trade.city = "NYC"
-        mock_trade.trade_date = date(2026, 2, 18)
+        mock_trade.trade_date = datetime(2026, 2, 18, 12, 0, 0)
+        mock_trade.market_date = datetime(2026, 2, 18, 0, 0, 0)
+        mock_trade.market_ticker = "KXHIGHNY-26FEB18-T52"
 
         trade_result = MagicMock()
         trade_result.scalars.return_value.all.return_value = [mock_trade]
@@ -730,7 +734,9 @@ class TestSettleAndPostmortem:
 
         mock_trade = MagicMock()
         mock_trade.city = "NYC"
-        mock_trade.trade_date = date(2026, 2, 18)
+        mock_trade.trade_date = datetime(2026, 2, 18, 12, 0, 0)
+        mock_trade.market_date = datetime(2026, 2, 18, 0, 0, 0)
+        mock_trade.market_ticker = "KXHIGHNY-26FEB18-T52"
         mock_trade.user_id = "user-1"
         mock_trade.status = TradeStatus.WON
 
@@ -760,6 +766,144 @@ class TestSettleAndPostmortem:
 
         mock_cm.on_trade_win.assert_awaited_once()
         mock_cm.on_trade_loss.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_uses_market_date_not_trade_date_for_settlement(self) -> None:
+        """Settlement matching uses market_date, so evening trades match next-day settlement."""
+        from backend.common.models import TradeStatus
+        from backend.trading.scheduler import _settle_and_postmortem
+
+        mock_session = _make_mock_db_session()
+
+        # Trade placed evening of Feb 22 for Feb 23 market
+        mock_trade = MagicMock()
+        mock_trade.city = "AUS"
+        mock_trade.trade_date = datetime(2026, 2, 22, 21, 12, 0)  # 9:12 PM Feb 22
+        mock_trade.market_date = datetime(2026, 2, 23, 0, 0, 0)  # Feb 23 market
+        mock_trade.market_ticker = "KXHIGHAUS-26FEB23-T63"
+        mock_trade.user_id = "user-1"
+        mock_trade.status = TradeStatus.WON
+
+        mock_settlement = MagicMock()
+
+        trade_result = MagicMock()
+        trade_result.scalars.return_value.all.return_value = [mock_trade]
+
+        settlement_result = MagicMock()
+        settlement_result.scalar_one_or_none.return_value = mock_settlement
+
+        mock_session.execute.side_effect = [trade_result, settlement_result]
+
+        mock_settle = AsyncMock()
+
+        with (
+            patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
+            patch("backend.trading.postmortem.settle_trade", mock_settle),
+            patch(
+                "backend.trading.scheduler._load_user_settings",
+                return_value=_make_user_settings(),
+            ),
+            patch(
+                "backend.trading.cooldown.CooldownManager",
+                return_value=MagicMock(on_trade_win=AsyncMock(), on_trade_loss=AsyncMock()),
+            ),
+        ):
+            await _settle_and_postmortem()
+
+        # settle_trade should be called — settlement matched via market_date (Feb 23),
+        # NOT trade_date (Feb 22)
+        mock_settle.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_fallback_to_ticker_when_market_date_is_none(self) -> None:
+        """If market_date is None, parse from market_ticker as fallback."""
+        from backend.common.models import TradeStatus
+        from backend.trading.scheduler import _settle_and_postmortem
+
+        mock_session = _make_mock_db_session()
+
+        # Trade without market_date (pre-migration trade)
+        mock_trade = MagicMock()
+        mock_trade.city = "AUS"
+        mock_trade.trade_date = datetime(2026, 2, 22, 21, 0, 0)
+        mock_trade.market_date = None  # Not set (pre-migration)
+        mock_trade.market_ticker = "KXHIGHAUS-26FEB23-T63"
+        mock_trade.user_id = "user-1"
+        mock_trade.status = TradeStatus.WON
+
+        mock_settlement = MagicMock()
+
+        trade_result = MagicMock()
+        trade_result.scalars.return_value.all.return_value = [mock_trade]
+
+        settlement_result = MagicMock()
+        settlement_result.scalar_one_or_none.return_value = mock_settlement
+
+        mock_session.execute.side_effect = [trade_result, settlement_result]
+
+        mock_settle = AsyncMock()
+
+        with (
+            patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
+            patch("backend.trading.postmortem.settle_trade", mock_settle),
+            patch(
+                "backend.trading.scheduler._load_user_settings",
+                return_value=_make_user_settings(),
+            ),
+            patch(
+                "backend.trading.cooldown.CooldownManager",
+                return_value=MagicMock(on_trade_win=AsyncMock(), on_trade_loss=AsyncMock()),
+            ),
+        ):
+            await _settle_and_postmortem()
+
+        # Should still settle (parsed date from ticker as fallback)
+        mock_settle.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_fallback_to_trade_date_when_no_market_date_or_ticker(self) -> None:
+        """If market_date is None and ticker can't be parsed, use trade_date."""
+        from backend.common.models import TradeStatus
+        from backend.trading.scheduler import _settle_and_postmortem
+
+        mock_session = _make_mock_db_session()
+
+        mock_trade = MagicMock()
+        mock_trade.city = "NYC"
+        mock_trade.trade_date = datetime(2026, 2, 18, 12, 0, 0)
+        mock_trade.market_date = None
+        mock_trade.market_ticker = "BADTICKER"  # Can't be parsed
+        mock_trade.user_id = "user-1"
+        mock_trade.status = TradeStatus.WON
+
+        mock_settlement = MagicMock()
+
+        trade_result = MagicMock()
+        trade_result.scalars.return_value.all.return_value = [mock_trade]
+
+        settlement_result = MagicMock()
+        settlement_result.scalar_one_or_none.return_value = mock_settlement
+
+        mock_session.execute.side_effect = [trade_result, settlement_result]
+
+        mock_settle = AsyncMock()
+
+        with (
+            patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
+            patch("backend.trading.postmortem.settle_trade", mock_settle),
+            patch(
+                "backend.trading.scheduler._load_user_settings",
+                return_value=_make_user_settings(),
+            ),
+            patch(
+                "backend.trading.cooldown.CooldownManager",
+                return_value=MagicMock(on_trade_win=AsyncMock(), on_trade_loss=AsyncMock()),
+            ),
+        ):
+            await _settle_and_postmortem()
+
+        # Falls back to trade_date — should still settle
+        mock_settle.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_rollback_on_exception(self) -> None:

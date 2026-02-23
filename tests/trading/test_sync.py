@@ -354,3 +354,55 @@ class TestSyncPortfolio:
         assert result.synced_count == 1
         assert result.failed_count == 1
         assert len(result.errors) == 1
+
+    @pytest.mark.asyncio
+    async def test_synced_trade_gets_market_date(self) -> None:
+        """Synced trades have market_date parsed from the ticker."""
+        from datetime import date
+
+        order = _make_order(
+            order_id="ord-aus-date",
+            ticker="KXHIGHAUS-26FEB23-T63",
+        )
+
+        client = AsyncMock()
+        client.get_orders.return_value = [order]
+        client.get_market.return_value = _make_mock_market(
+            ticker="KXHIGHAUS-26FEB23-T63",
+            floor_strike=63.0,
+            cap_strike=64.99,
+        )
+
+        db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        await sync_portfolio(client, db, "user-1")
+
+        trade = db.add.call_args[0][0]
+        assert trade.market_date == date(2026, 2, 23)
+
+    @pytest.mark.asyncio
+    async def test_synced_trade_market_date_none_for_bad_ticker(self) -> None:
+        """If ticker date segment is invalid, market_date is None."""
+        order = _make_order(
+            order_id="ord-bad-date",
+            ticker="KXHIGHNY-BADDATE-T52",
+        )
+
+        client = AsyncMock()
+        client.get_orders.return_value = [order]
+        client.get_market.return_value = _make_mock_market(
+            ticker="KXHIGHNY-BADDATE-T52",
+        )
+
+        db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        await sync_portfolio(client, db, "user-1")
+
+        trade = db.add.call_args[0][0]
+        assert trade.market_date is None

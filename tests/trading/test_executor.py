@@ -149,3 +149,37 @@ class TestExecuteTrade:
             user_id="test-user",
         )
         assert result.status == "OPEN"
+
+    @pytest.mark.asyncio
+    async def test_trade_gets_market_date_from_ticker(
+        self, mock_db: AsyncMock, mock_kalshi_client: AsyncMock
+    ) -> None:
+        """Trade ORM record has market_date parsed from the ticker."""
+        from datetime import date
+
+        from backend.common.schemas import TradeSignal
+
+        signal = TradeSignal(
+            city="AUS",
+            bracket="63-65°F",
+            side="yes",
+            price_cents=35,
+            quantity=1,
+            model_probability=0.45,
+            market_probability=0.35,
+            ev=0.08,
+            confidence="medium",
+            market_ticker="KXHIGHAUS-26FEB23-T63",
+            reasoning="test market_date",
+        )
+
+        await execute_trade(
+            signal=signal,
+            kalshi_client=mock_kalshi_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        # The Trade ORM added to DB should have market_date set
+        trade_obj = mock_db.add.call_args[0][0]
+        assert trade_obj.market_date == date(2026, 2, 23)

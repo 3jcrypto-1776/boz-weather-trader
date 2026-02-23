@@ -279,3 +279,36 @@ class TestSettleTrade:
         assert trade.status == TradeStatus.LOST
         assert trade.pnl_cents == -22
         assert trade.fees_cents == 0
+
+    @pytest.mark.asyncio
+    async def test_uses_market_date_for_forecast_query(self) -> None:
+        """settle_trade queries forecasts using market_date, not trade_date."""
+        trade = self._make_trade()
+        # Trade placed evening of Feb 17 for Feb 18 market
+        trade.trade_date = datetime(2026, 2, 17, 22, 0, 0, tzinfo=UTC)
+        trade.market_date = datetime(2026, 2, 18, 0, 0, 0)
+
+        settlement = self._make_settlement(53.5)
+        mock_db = self._make_mock_db()
+
+        await settle_trade(trade, settlement, mock_db)
+
+        # Verify the trade settled correctly. The forecast query uses market_date
+        # (Feb 18) not trade_date (Feb 17) to find relevant forecasts.
+        assert trade.status == TradeStatus.WON
+        mock_db.execute.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_trade_date_when_market_date_none(self) -> None:
+        """If market_date is None, forecast query uses trade_date."""
+        trade = self._make_trade()
+        trade.market_date = None  # Pre-migration trade
+
+        settlement = self._make_settlement(53.5)
+        mock_db = self._make_mock_db()
+
+        await settle_trade(trade, settlement, mock_db)
+
+        # Should still settle correctly even without market_date
+        assert trade.status == TradeStatus.WON
+        assert trade.pnl_cents == 67

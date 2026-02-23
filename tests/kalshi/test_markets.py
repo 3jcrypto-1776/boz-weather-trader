@@ -16,6 +16,7 @@ from backend.kalshi.markets import (
     build_event_ticker,
     parse_bracket_from_market,
     parse_event_markets,
+    parse_market_date_from_ticker,
 )
 from backend.kalshi.models import KalshiMarket
 
@@ -218,3 +219,81 @@ class TestParseEventMarkets:
         assert mid["yes_ask"] == 25
         assert mid["volume"] == 1542
         assert mid["last_price"] == 0  # default
+
+
+# ─── Ticker Date Parsing ───
+
+
+class TestParseMarketDateFromTicker:
+    """Tests for parse_market_date_from_ticker — extracts event date from ticker."""
+
+    def test_standard_market_ticker(self) -> None:
+        """Full market ticker 'KXHIGHNY-26FEB18-T52' → date(2026, 2, 18)."""
+        result = parse_market_date_from_ticker("KXHIGHNY-26FEB18-T52")
+        assert result == date(2026, 2, 18)
+
+    def test_event_ticker_without_bracket(self) -> None:
+        """Event ticker 'KXHIGHNY-26FEB18' → date(2026, 2, 18)."""
+        result = parse_market_date_from_ticker("KXHIGHNY-26FEB18")
+        assert result == date(2026, 2, 18)
+
+    def test_austin_ticker(self) -> None:
+        """Austin ticker 'KXHIGHAUS-26FEB23-T63' → date(2026, 2, 23)."""
+        result = parse_market_date_from_ticker("KXHIGHAUS-26FEB23-T63")
+        assert result == date(2026, 2, 23)
+
+    def test_chicago_march(self) -> None:
+        """Chicago March ticker → date(2026, 3, 5)."""
+        result = parse_market_date_from_ticker("KXHIGHCHI-26MAR05-B35")
+        assert result == date(2026, 3, 5)
+
+    def test_miami_december(self) -> None:
+        """Miami December ticker → date(2026, 12, 25)."""
+        result = parse_market_date_from_ticker("KXHIGHMIA-26DEC25-T81")
+        assert result == date(2026, 12, 25)
+
+    def test_lowercase_month_is_handled(self) -> None:
+        """Mixed-case month (26feb18) → still parses correctly."""
+        result = parse_market_date_from_ticker("KXHIGHNY-26feb18-T52")
+        assert result == date(2026, 2, 18)
+
+    def test_invalid_ticker_returns_none(self) -> None:
+        """Non-parseable ticker returns None."""
+        assert parse_market_date_from_ticker("invalid") is None
+
+    def test_no_dashes_returns_none(self) -> None:
+        """Ticker without dashes returns None."""
+        assert parse_market_date_from_ticker("KXHIGHNY") is None
+
+    def test_empty_string_returns_none(self) -> None:
+        """Empty string returns None."""
+        assert parse_market_date_from_ticker("") is None
+
+    def test_bad_date_segment_returns_none(self) -> None:
+        """Non-date second segment returns None."""
+        assert parse_market_date_from_ticker("KXHIGHNY-NOTADATE-T52") is None
+
+    def test_all_months(self) -> None:
+        """All 12 months parse correctly."""
+        months_and_expected = [
+            ("26JAN15", date(2026, 1, 15)),
+            ("26FEB28", date(2026, 2, 28)),
+            ("26MAR01", date(2026, 3, 1)),
+            ("26APR10", date(2026, 4, 10)),
+            ("26MAY20", date(2026, 5, 20)),
+            ("26JUN30", date(2026, 6, 30)),
+            ("26JUL04", date(2026, 7, 4)),
+            ("26AUG15", date(2026, 8, 15)),
+            ("26SEP22", date(2026, 9, 22)),
+            ("26OCT31", date(2026, 10, 31)),
+            ("26NOV11", date(2026, 11, 11)),
+            ("26DEC25", date(2026, 12, 25)),
+        ]
+        for date_str, expected in months_and_expected:
+            result = parse_market_date_from_ticker(f"KXHIGHNY-{date_str}-T52")
+            assert result == expected, f"Failed for {date_str}"
+
+    def test_bottom_bracket_suffix(self) -> None:
+        """Bottom bracket suffix (B65.5) still parses date correctly."""
+        result = parse_market_date_from_ticker("KXHIGHAUS-26FEB23-B65.5")
+        assert result == date(2026, 2, 23)

@@ -33,6 +33,7 @@ from backend.common.exceptions import InvalidOrderError
 from backend.common.logging import get_logger
 from backend.common.models import Trade, TradeStatus
 from backend.common.schemas import TradeRecord, TradeSignal
+from backend.kalshi.markets import parse_market_date_from_ticker
 from backend.kalshi.models import OrderRequest
 
 logger = get_logger("ORDER")
@@ -180,12 +181,16 @@ async def execute_trade(
     trade_id = str(uuid4())
     now = datetime.now(UTC).replace(tzinfo=None)
 
+    # Extract the market event date from the ticker (e.g., KXHIGHAUS-26FEB23 → Feb 23)
+    market_date = parse_market_date_from_ticker(signal.market_ticker)
+
     trade = Trade(
         id=trade_id,
         user_id=user_id,
         kalshi_order_id=order_id,
         city=signal.city,
         trade_date=now,
+        market_date=market_date,
         market_ticker=signal.market_ticker,
         bracket_label=signal.bracket,
         side=signal.side,
