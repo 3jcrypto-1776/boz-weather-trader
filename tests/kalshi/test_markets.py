@@ -82,33 +82,33 @@ class TestParseBracketFromMarket:
     """Tests for parse_bracket_from_market function."""
 
     def test_bottom_edge_bracket(self) -> None:
-        """Bottom edge: floor=None, cap=47.99 produces 'Below 48F'."""
+        """Bottom edge: floor=None, cap=47.99 produces '47°F or below'."""
         market = {"floor_strike": None, "cap_strike": 47.99, "ticker": "T48"}
         result = parse_bracket_from_market(market)
 
-        assert result["label"] == "Below 48F"
+        assert result["label"] == "47°F or below"
         assert result["lower_bound_f"] is None
         assert result["upper_bound_f"] == 47.99
         assert result["is_edge_lower"] is True
         assert result["is_edge_upper"] is False
 
     def test_top_edge_bracket(self) -> None:
-        """Top edge: floor=58.0, cap=None produces '58F or above'."""
+        """Top edge: floor=58.0, cap=None produces '58°F or above'."""
         market = {"floor_strike": 58.0, "cap_strike": None, "ticker": "T58"}
         result = parse_bracket_from_market(market)
 
-        assert result["label"] == "58F or above"
+        assert result["label"] == "58°F or above"
         assert result["lower_bound_f"] == 58.0
         assert result["upper_bound_f"] is None
         assert result["is_edge_lower"] is False
         assert result["is_edge_upper"] is True
 
     def test_middle_bracket(self) -> None:
-        """Middle: floor=52.0, cap=53.99 produces '52-54F'."""
+        """Middle: floor=52.0, cap=53.99 produces '52° to 53°F'."""
         market = {"floor_strike": 52.0, "cap_strike": 53.99, "ticker": "T52"}
         result = parse_bracket_from_market(market)
 
-        assert result["label"] == "52-54F"
+        assert result["label"] == "52° to 53°F"
         assert result["lower_bound_f"] == 52.0
         assert result["upper_bound_f"] == 53.99
         assert result["is_edge_lower"] is False
@@ -139,7 +139,7 @@ class TestParseEventMarkets:
             KalshiMarket(
                 ticker="KXHIGHNY-26FEB18-T54",
                 event_ticker="KXHIGHNY-26FEB18",
-                title="54-56F",
+                title="54° to 55°F",
                 status="active",
                 floor_strike=54.0,
                 cap_strike=55.99,
@@ -163,7 +163,7 @@ class TestParseEventMarkets:
             KalshiMarket(
                 ticker="KXHIGHNY-26FEB18-T48",
                 event_ticker="KXHIGHNY-26FEB18",
-                title="Below 48F",
+                title="47°F or below",
                 status="active",
                 floor_strike=None,
                 cap_strike=47.99,
@@ -175,7 +175,7 @@ class TestParseEventMarkets:
             KalshiMarket(
                 ticker="KXHIGHNY-26FEB18-T52",
                 event_ticker="KXHIGHNY-26FEB18",
-                title="52-54F",
+                title="52° to 53°F",
                 status="active",
                 floor_strike=52.0,
                 cap_strike=53.99,
@@ -193,10 +193,10 @@ class TestParseEventMarkets:
         assert len(brackets) == 4
         # First bracket should be bottom edge
         assert brackets[0]["is_edge_lower"] is True
-        assert brackets[0]["label"] == "Below 48F"
+        assert brackets[0]["label"] == "47°F or below"
         # Last bracket should be top edge
         assert brackets[-1]["is_edge_upper"] is True
-        assert brackets[-1]["label"] == "58F or above"
+        assert brackets[-1]["label"] == "58°F or above"
         # Middle brackets sorted by lower_bound_f
         assert brackets[1]["lower_bound_f"] == 52.0
         assert brackets[2]["lower_bound_f"] == 54.0
@@ -213,7 +213,7 @@ class TestParseEventMarkets:
         assert bottom["volume"] == 50
         assert bottom["status"] == "active"
 
-        # Check a middle bracket (52-54F)
+        # Check a middle bracket (52° to 53°F)
         mid = brackets[1]
         assert mid["yes_bid"] == 22
         assert mid["yes_ask"] == 25

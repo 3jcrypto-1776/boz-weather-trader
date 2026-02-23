@@ -314,7 +314,7 @@ def parse_bracket_from_market(market: dict) -> dict:
 
     Returns:
         Dict with bracket metadata:
-            label: Human-readable label (e.g., "52-54 F")
+            label: Human-readable label (e.g., "52° to 53°F", "47°F or below")
             lower_bound_f: Floor temp in Fahrenheit, or None for bottom edge
             upper_bound_f: Cap temp in Fahrenheit, or None for top edge
             is_edge_lower: True if this is the bottom catch-all bracket
@@ -324,27 +324,27 @@ def parse_bracket_from_market(market: dict) -> dict:
     cap = market.get("cap_strike")
 
     if floor is None:
-        # Bottom edge bracket: "Below X F"
+        # Bottom edge bracket: "X°F or below" (cap=47.99 → 47°F or below)
         return {
-            "label": f"Below {int(cap + 0.01)}F",
+            "label": f"{int(cap)}°F or below",
             "lower_bound_f": None,
             "upper_bound_f": cap,
             "is_edge_lower": True,
             "is_edge_upper": False,
         }
     elif cap is None:
-        # Top edge bracket: "X F or above"
+        # Top edge bracket: "X°F or above"
         return {
-            "label": f"{int(floor)}F or above",
+            "label": f"{int(floor)}°F or above",
             "lower_bound_f": floor,
             "upper_bound_f": None,
             "is_edge_lower": False,
             "is_edge_upper": True,
         }
     else:
-        # Middle bracket: "X-Y F" (2 degrees wide)
+        # Middle bracket: "X° to Y°F" (cap=53.99 → "52° to 53°F")
         return {
-            "label": f"{int(floor)}-{int(cap + 0.01)}F",
+            "label": f"{int(floor)}° to {int(cap)}°F",
             "lower_bound_f": floor,
             "upper_bound_f": cap,
             "is_edge_lower": False,
@@ -354,14 +354,14 @@ def parse_bracket_from_market(market: dict) -> dict:
 
 **Example bracket layout for an event with 6 markets:**
 
-| Ticker suffix | floor_strike | cap_strike | Label           | Type          |
-|---------------|-------------|------------|-----------------|---------------|
-| T48           | null        | 47.99      | Below 48F       | Bottom edge   |
-| T50           | 50.0        | 51.99      | 50-52F          | Middle        |
-| T52           | 52.0        | 53.99      | 52-54F          | Middle        |
-| T54           | 54.0        | 55.99      | 54-56F          | Middle        |
-| T56           | 56.0        | 57.99      | 56-58F          | Middle        |
-| T58           | 58.0        | null       | 58F or above    | Top edge      |
+| Ticker suffix | floor_strike | cap_strike | Label             | Type          |
+|---------------|-------------|------------|-------------------|---------------|
+| T48           | null        | 47.99      | 47°F or below     | Bottom edge   |
+| T50           | 50.0        | 51.99      | 50° to 51°F       | Middle        |
+| T52           | 52.0        | 53.99      | 52° to 53°F       | Middle        |
+| T54           | 54.0        | 55.99      | 54° to 55°F       | Middle        |
+| T56           | 56.0        | 57.99      | 56° to 57°F       | Middle        |
+| T58           | 58.0        | null       | 58°F or above     | Top edge      |
 
 Note: The gap between T48 (cap 47.99) and T50 (floor 50.0) means temperatures 48.00-49.99 would fall in neither bracket. Verify against actual Kalshi market data whether these gaps exist or whether the brackets are contiguous. If the actual API returns contiguous brackets, adjust parsing accordingly.
 

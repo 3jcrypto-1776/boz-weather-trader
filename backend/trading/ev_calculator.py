@@ -18,8 +18,8 @@ Usage:
 
     signals = scan_all_brackets(
         prediction=bracket_prediction,
-        market_prices={"52-54F": 22, "54-56F": 35},
-        market_tickers={"52-54F": "KXHIGHNY-26FEB18-T52", ...},
+        market_prices={"52° to 53°F": 22, "54° to 55°F": 35},
+        market_tickers={"52° to 53°F": "KXHIGHNY-26FEB18-T52", ...},
         min_ev_threshold=0.05,
     )
 """

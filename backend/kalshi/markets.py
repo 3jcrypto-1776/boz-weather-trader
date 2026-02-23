@@ -117,9 +117,13 @@ def parse_bracket_from_market(market: dict) -> dict:
     """Parse bracket range from a Kalshi market data dict.
 
     Uses floor_strike and cap_strike to determine the bracket type:
-    - Bottom edge: floor_strike is None -> "Below XF"
-    - Top edge: cap_strike is None -> "XF or above"
-    - Middle: both present -> "X-YF"
+    - Bottom edge: floor_strike is None -> "X°F or below"
+    - Top edge: cap_strike is None -> "X°F or above"
+    - Middle: both present -> "X° to Y°F"
+
+    Labels match Kalshi's display format. Kalshi uses .99 cap strikes
+    (e.g., cap=72.99 for "72° or below"), so int(cap) gives the correct
+    display temperature.
 
     Args:
         market: Dict from Kalshi market API response. Must contain
@@ -127,7 +131,7 @@ def parse_bracket_from_market(market: dict) -> dict:
 
     Returns:
         Dict with bracket metadata:
-            label: Human-readable label (e.g., "52-54F", "Below 48F")
+            label: Human-readable label (e.g., "52° to 53°F", "47°F or below")
             lower_bound_f: Floor temp in Fahrenheit, or None for bottom edge
             upper_bound_f: Cap temp in Fahrenheit, or None for top edge
             is_edge_lower: True if this is the bottom catch-all bracket
@@ -139,8 +143,8 @@ def parse_bracket_from_market(market: dict) -> dict:
     ticker = market.get("ticker", "")
 
     if floor is None and cap is not None:
-        # Bottom edge bracket: "Below X F"
-        label = f"Below {int(cap + 0.01)}F"
+        # Bottom edge bracket: "X°F or below" (cap=72.99 → 72°F or below)
+        label = f"{int(cap)}°F or below"
         return {
             "label": label,
             "lower_bound_f": None,
@@ -151,8 +155,8 @@ def parse_bracket_from_market(market: dict) -> dict:
         }
 
     if cap is None and floor is not None:
-        # Top edge bracket: "X F or above"
-        label = f"{int(floor)}F or above"
+        # Top edge bracket: "X°F or above"
+        label = f"{int(floor)}°F or above"
         return {
             "label": label,
             "lower_bound_f": floor,
@@ -163,8 +167,8 @@ def parse_bracket_from_market(market: dict) -> dict:
         }
 
     if floor is not None and cap is not None:
-        # Middle bracket: "X-Y F" (typically 2 degrees wide)
-        label = f"{int(floor)}-{int(cap + 0.01)}F"
+        # Middle bracket: "X° to Y°F" (cap=53.99 → "52° to 53°F")
+        label = f"{int(floor)}° to {int(cap)}°F"
         return {
             "label": label,
             "lower_bound_f": floor,

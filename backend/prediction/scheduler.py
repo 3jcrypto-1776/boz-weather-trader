@@ -94,29 +94,33 @@ def _generate_fallback_brackets(ensemble_mean_f: float) -> list[dict]:
     low = center - 4  # Start 4°F below center
 
     return [
-        {"label": f"Below {low}F", "lower_bound_f": None, "upper_bound_f": float(low)},
         {
-            "label": f"{low}-{low + 2}F",
+            "label": f"{low - 1}°F or below",
+            "lower_bound_f": None,
+            "upper_bound_f": float(low),
+        },
+        {
+            "label": f"{low}° to {low + 1}°F",
             "lower_bound_f": float(low),
             "upper_bound_f": float(low + 2),
         },
         {
-            "label": f"{low + 2}-{low + 4}F",
+            "label": f"{low + 2}° to {low + 3}°F",
             "lower_bound_f": float(low + 2),
             "upper_bound_f": float(low + 4),
         },
         {
-            "label": f"{low + 4}-{low + 6}F",
+            "label": f"{low + 4}° to {low + 5}°F",
             "lower_bound_f": float(low + 4),
             "upper_bound_f": float(low + 6),
         },
         {
-            "label": f"{low + 6}-{low + 8}F",
+            "label": f"{low + 6}° to {low + 7}°F",
             "lower_bound_f": float(low + 6),
             "upper_bound_f": float(low + 8),
         },
         {
-            "label": f"{low + 8}F or above",
+            "label": f"{low + 8}°F or above",
             "lower_bound_f": float(low + 8),
             "upper_bound_f": None,
         },

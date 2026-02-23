@@ -11,7 +11,7 @@ function makeTrade(overrides: Partial<TradeRecord> = {}): TradeRecord {
     city: "NYC",
     date: "2026-02-21",
     market_ticker: "KXHIGHNYC-26FEB21-T38",
-    bracket_label: "Below 38F",
+    bracket_label: "37°F or below",
     side: "yes",
     price_cents: 10,
     quantity: 1,
@@ -76,8 +76,8 @@ describe("groupTrades", () => {
 
   it("keeps trades with different brackets separate", () => {
     const trades = [
-      makeTrade({ id: "t1", bracket_label: "Below 38F" }),
-      makeTrade({ id: "t2", bracket_label: "38-40F" }),
+      makeTrade({ id: "t1", bracket_label: "37°F or below" }),
+      makeTrade({ id: "t2", bracket_label: "38° to 39°F" }),
     ];
     const groups = groupTrades(trades);
     expect(groups).toHaveLength(2);
@@ -231,8 +231,8 @@ describe("groupByMarket", () => {
 
   it("creates one market group for same city+date", () => {
     const trades = [
-      makeTrade({ id: "t1", bracket_label: "Below 38F" }),
-      makeTrade({ id: "t2", bracket_label: "38-40F" }),
+      makeTrade({ id: "t1", bracket_label: "37°F or below" }),
+      makeTrade({ id: "t2", bracket_label: "38° to 39°F" }),
     ];
     const markets = groupByMarket(trades);
     expect(markets).toHaveLength(1);
