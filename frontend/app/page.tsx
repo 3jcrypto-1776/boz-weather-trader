@@ -16,7 +16,7 @@ import TradeCard from "@/components/trade-card/trade-card";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import { useDashboard, useDashboardStats } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
-import type { DashboardData, DashboardStats, StatsPeriod } from "@/lib/types";
+import type { CityCode, DashboardData, DashboardStats, StatsPeriod } from "@/lib/types";
 import { centsToDollars, formatPnL, shortBracketLabel, CITY_NAMES } from "@/lib/utils";
 
 // ─── Period Toggle Helpers ───
@@ -72,6 +72,169 @@ function StatCard({
       </div>
       <span className={`text-lg font-bold ${color}`}>{value}</span>
     </Wrapper>
+  );
+}
+
+// ─── Predictions Section ───
+
+function formatPredictionDate(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+const PREDICTION_CITIES: CityCode[] = ["NYC", "CHI", "MIA", "AUS"];
+
+function PredictionsSection({
+  predictions,
+}: {
+  predictions: DashboardData["predictions"];
+}) {
+  const [selectedCity, setSelectedCity] = useState<CityCode>(
+    predictions[0]?.city ?? "NYC",
+  );
+
+  const pred = predictions.find((p) => p.city === selectedCity);
+  const dateLabel = predictions[0]?.date
+    ? formatPredictionDate(predictions[0].date)
+    : "";
+
+  // Cities that have predictions available
+  const availableCities = new Set(predictions.map((p) => p.city));
+
+  return (
+    <section className="mb-6">
+      {/* Title with date */}
+      <div className="flex items-baseline gap-2 mb-3">
+        <h2 className="text-sm font-semibold text-gray-900">
+          Today&apos;s Predictions
+        </h2>
+        {dateLabel && (
+          <span className="text-xs text-boz-neutral">{dateLabel}</span>
+        )}
+      </div>
+
+      {/* City toggle buttons */}
+      <div className="flex bg-gray-100 rounded-lg p-0.5 mb-3">
+        {PREDICTION_CITIES.filter((c) => availableCities.has(c)).map((city) => (
+          <button
+            key={city}
+            onClick={() => setSelectedCity(city)}
+            className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              selectedCity === city
+                ? "bg-white text-boz-primary shadow-sm"
+                : "text-boz-neutral hover:text-gray-900"
+            }`}
+          >
+            {CITY_NAMES[city]}
+          </button>
+        ))}
+      </div>
+
+      {/* Single city prediction chart */}
+      {pred && <PredictionChart pred={pred} />}
+    </section>
+  );
+}
+
+function PredictionChart({
+  pred,
+}: {
+  pred: DashboardData["predictions"][number];
+}) {
+  const peakBracket = pred.brackets.reduce((best, b) =>
+    b.probability > best.probability ? b : best,
+  );
+  const peakPct = Math.round(peakBracket.probability * 100);
+  const peakLabel = shortBracketLabel(
+    peakBracket.bracket_label,
+    peakBracket.lower_bound_f,
+    peakBracket.upper_bound_f,
+  );
+  const maxProb = peakBracket.probability;
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-3">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium">
+          {CITY_NAMES[pred.city]}
+        </span>
+        <span className="text-xs text-boz-neutral">
+          Peak:{" "}
+          <span className="text-boz-primary font-semibold">
+            {peakLabel} ({peakPct}%)
+          </span>
+        </span>
+      </div>
+
+      {/* Horizontal bar chart */}
+      <div className="space-y-1">
+        {pred.brackets.map((b) => {
+          const pct = Math.round(b.probability * 100);
+          const isPeak = b === peakBracket;
+          const barWidth =
+            maxProb > 0 ? (b.probability / maxProb) * 100 : 0;
+          const label = shortBracketLabel(
+            b.bracket_label,
+            b.lower_bound_f,
+            b.upper_bound_f,
+          );
+
+          return (
+            <div
+              key={b.bracket_label}
+              className="flex items-center gap-1.5"
+              title={b.bracket_label}
+            >
+              <span
+                className={`text-[11px] w-[50px] text-right shrink-0 ${
+                  isPeak
+                    ? "font-semibold text-boz-primary"
+                    : "text-boz-neutral"
+                }`}
+              >
+                {label}
+              </span>
+              <div className="flex-1 h-3.5 bg-gray-100 rounded-sm overflow-hidden">
+                <div
+                  className={`h-full rounded-sm ${
+                    isPeak ? "bg-boz-primary" : "bg-blue-200"
+                  }`}
+                  style={{
+                    width: `${Math.max(barWidth, 2)}%`,
+                  }}
+                />
+              </div>
+              <span
+                className={`text-[11px] w-[30px] shrink-0 ${
+                  isPeak
+                    ? "font-semibold text-boz-primary"
+                    : "text-boz-neutral"
+                }`}
+              >
+                {pct}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer: mean + confidence */}
+      <div className="flex items-center justify-between mt-1.5 text-[10px] text-boz-neutral">
+        <span>
+          Mean {pred.ensemble_mean_f.toFixed(0)}°F ±
+          {pred.ensemble_std_f.toFixed(1)}
+        </span>
+        <span className="capitalize">
+          {pred.confidence} confidence
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -149,108 +312,7 @@ function DashboardContent({
 
       {/* Predictions Summary */}
       {data.predictions.length > 0 && (
-        <section className="mb-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">
-            Today&apos;s Predictions
-          </h2>
-          <div className="space-y-2">
-            {data.predictions.map((pred) => {
-              const peakBracket = pred.brackets.reduce((best, b) =>
-                b.probability > best.probability ? b : best,
-              );
-              const peakPct = Math.round(peakBracket.probability * 100);
-              const peakLabel = shortBracketLabel(
-                peakBracket.bracket_label,
-                peakBracket.lower_bound_f,
-                peakBracket.upper_bound_f,
-              );
-              const maxProb = peakBracket.probability;
-
-              return (
-                <div
-                  key={pred.city}
-                  className="bg-white rounded-lg border border-gray-200 shadow-sm p-3"
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">
-                      {CITY_NAMES[pred.city]}
-                    </span>
-                    <span className="text-xs text-boz-neutral">
-                      Peak:{" "}
-                      <span className="text-boz-primary font-semibold">
-                        {peakLabel} ({peakPct}%)
-                      </span>
-                    </span>
-                  </div>
-
-                  {/* Horizontal bar chart */}
-                  <div className="space-y-1">
-                    {pred.brackets.map((b) => {
-                      const pct = Math.round(b.probability * 100);
-                      const isPeak = b === peakBracket;
-                      const barWidth =
-                        maxProb > 0 ? (b.probability / maxProb) * 100 : 0;
-                      const label = shortBracketLabel(
-                        b.bracket_label,
-                        b.lower_bound_f,
-                        b.upper_bound_f,
-                      );
-
-                      return (
-                        <div
-                          key={b.bracket_label}
-                          className="flex items-center gap-1.5"
-                          title={b.bracket_label}
-                        >
-                          <span
-                            className={`text-[11px] w-[50px] text-right shrink-0 ${
-                              isPeak
-                                ? "font-semibold text-boz-primary"
-                                : "text-boz-neutral"
-                            }`}
-                          >
-                            {label}
-                          </span>
-                          <div className="flex-1 h-3.5 bg-gray-100 rounded-sm overflow-hidden">
-                            <div
-                              className={`h-full rounded-sm ${
-                                isPeak ? "bg-boz-primary" : "bg-blue-200"
-                              }`}
-                              style={{
-                                width: `${Math.max(barWidth, 2)}%`,
-                              }}
-                            />
-                          </div>
-                          <span
-                            className={`text-[11px] w-[30px] shrink-0 ${
-                              isPeak
-                                ? "font-semibold text-boz-primary"
-                                : "text-boz-neutral"
-                            }`}
-                          >
-                            {pct}%
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Footer: mean + confidence */}
-                  <div className="flex items-center justify-between mt-1.5 text-[10px] text-boz-neutral">
-                    <span>
-                      Mean {pred.ensemble_mean_f.toFixed(0)}°F ±
-                      {pred.ensemble_std_f.toFixed(1)}
-                    </span>
-                    <span className="capitalize">
-                      {pred.confidence} confidence
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        <PredictionsSection predictions={data.predictions} />
       )}
 
       {/* Active Positions */}

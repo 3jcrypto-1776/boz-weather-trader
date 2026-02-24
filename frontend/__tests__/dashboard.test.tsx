@@ -155,7 +155,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("+$3.50")).toBeInTheDocument();
     // Predictions section
     expect(screen.getByText("Today's Predictions")).toBeInTheDocument();
-    expect(screen.getByText("New York")).toBeInTheDocument();
+    expect(screen.getAllByText("New York").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders prediction horizontal bars with bracket labels", () => {
