@@ -25,8 +25,16 @@ def _make_order(
     yes_price: int = 22,
     fill_count: int = 1,
     status: str = "executed",
+    taker_fill_cost: int | None = None,
+    taker_fees: int = 0,
 ) -> OrderResponse:
-    """Create a mock OrderResponse."""
+    """Create a mock OrderResponse.
+
+    If taker_fill_cost is not provided, defaults to yes_price * fill_count
+    (no price improvement, matching the limit price).
+    """
+    if taker_fill_cost is None:
+        taker_fill_cost = yes_price * fill_count
     return OrderResponse(
         order_id=order_id,
         ticker=ticker,
@@ -38,8 +46,8 @@ def _make_order(
         yes_price=yes_price,
         status=status,
         created_time=datetime(2026, 2, 21, 15, 0, 0, tzinfo=UTC),
-        taker_fees=0,
-        taker_fill_cost=0,
+        taker_fees=taker_fees,
+        taker_fill_cost=taker_fill_cost,
     )
 
 
@@ -406,3 +414,53 @@ class TestSyncPortfolio:
 
         trade = db.add.call_args[0][0]
         assert trade.market_date is None
+
+    @pytest.mark.asyncio
+    async def test_synced_trade_uses_fill_price(self) -> None:
+        """Synced trade price_cents uses actual fill price, not limit price."""
+        # Limit was 40¢ but filled at 35¢ (price improvement)
+        order = _make_order(
+            order_id="ord-fill-price",
+            yes_price=40,
+            fill_count=2,
+            taker_fill_cost=70,  # 2 contracts × 35¢ = 70¢ total
+        )
+
+        client = AsyncMock()
+        client.get_orders.return_value = [order]
+        client.get_market.return_value = _make_mock_market()
+
+        db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        await sync_portfolio(client, db, "user-1")
+
+        trade = db.add.call_args[0][0]
+        assert trade.price_cents == 35  # 70 // 2 = 35, not limit price of 40
+        assert trade.market_probability == 0.35  # Based on fill price
+
+    @pytest.mark.asyncio
+    async def test_synced_trade_fallback_to_yes_price(self) -> None:
+        """When taker_fill_cost is 0, falls back to yes_price."""
+        order = _make_order(
+            order_id="ord-no-cost",
+            yes_price=25,
+            fill_count=1,
+            taker_fill_cost=0,  # No fill cost reported
+        )
+
+        client = AsyncMock()
+        client.get_orders.return_value = [order]
+        client.get_market.return_value = _make_mock_market()
+
+        db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        await sync_portfolio(client, db, "user-1")
+
+        trade = db.add.call_args[0][0]
+        assert trade.price_cents == 25  # Falls back to yes_price

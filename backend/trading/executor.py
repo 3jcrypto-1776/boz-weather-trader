@@ -112,6 +112,16 @@ async def execute_trade(
     filled_count = response.count
     order_status = response.status
 
+    # Calculate actual fill price per contract from Kalshi response.
+    # taker_fill_cost is the total cost in cents for all filled contracts.
+    # Falls back to signal limit price if fill cost not available (e.g., demo mode).
+    taker_fill_cost = getattr(response, "taker_fill_cost", 0) or 0
+    fill_price_cents = (
+        taker_fill_cost // filled_count
+        if taker_fill_cost > 0 and filled_count > 0
+        else signal.price_cents
+    )
+
     # Check for cancellation
     if order_status == "canceled":
         logger.warning(
@@ -194,7 +204,7 @@ async def execute_trade(
         market_ticker=signal.market_ticker,
         bracket_label=signal.bracket,
         side=signal.side,
-        price_cents=signal.price_cents,
+        price_cents=fill_price_cents,
         quantity=filled_count,
         model_probability=signal.model_probability,
         market_probability=signal.market_probability,
@@ -216,7 +226,8 @@ async def execute_trade(
                 "city": signal.city,
                 "bracket": signal.bracket,
                 "side": signal.side,
-                "price_cents": signal.price_cents,
+                "limit_price_cents": signal.price_cents,
+                "fill_price_cents": fill_price_cents,
                 "quantity": filled_count,
                 "ev": signal.ev,
             }
@@ -231,7 +242,7 @@ async def execute_trade(
         market_ticker=signal.market_ticker,
         bracket_label=signal.bracket,
         side=signal.side,
-        price_cents=signal.price_cents,
+        price_cents=fill_price_cents,
         quantity=filled_count,
         model_probability=signal.model_probability,
         market_probability=signal.market_probability,

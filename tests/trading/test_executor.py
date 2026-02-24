@@ -19,12 +19,19 @@ def _make_mock_response(
     order_id: str = "order-123",
     count: int = 1,
     status: str = "filled",
+    taker_fill_cost: int | None = None,
+    taker_fees: int = 0,
 ) -> MagicMock:
-    """Create a mock order response from Kalshi."""
+    """Create a mock order response from Kalshi.
+
+    If taker_fill_cost is not provided, defaults to 22 * count (assuming 22¢ fill).
+    """
     mock = MagicMock()
     mock.order_id = order_id
     mock.count = count
     mock.status = status
+    mock.taker_fill_cost = taker_fill_cost if taker_fill_cost is not None else 22 * count
+    mock.taker_fees = taker_fees
     return mock
 
 
@@ -62,17 +69,100 @@ class TestExecuteTrade:
         mock_db.flush.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_returns_correct_price_cents(
+    async def test_returns_actual_fill_price(
         self, sample_signal: TradeSignal, mock_db: AsyncMock, mock_kalshi_client: AsyncMock
     ) -> None:
-        """TradeRecord.price_cents matches the signal's price_cents."""
+        """TradeRecord.price_cents reflects the actual fill price from Kalshi."""
+        # mock_kalshi_client has taker_fill_cost=22 for 1 contract → 22¢ per contract
         result = await execute_trade(
             signal=sample_signal,
             kalshi_client=mock_kalshi_client,
             db=mock_db,
             user_id="test-user",
         )
+        assert result.price_cents == 22
+
+    @pytest.mark.asyncio
+    async def test_fill_price_differs_from_limit_price(
+        self, sample_signal: TradeSignal, mock_db: AsyncMock
+    ) -> None:
+        """When actual fill price differs from limit, the fill price is recorded."""
+        mock_client = AsyncMock()
+        # Limit was 22¢ but filled at 20¢ (price improvement)
+        mock_client.place_order.return_value = _make_mock_response(taker_fill_cost=20, count=1)
+
+        result = await execute_trade(
+            signal=sample_signal,
+            kalshi_client=mock_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+        # Should use 20¢ fill price, not 22¢ limit price
+        assert result.price_cents == 20
+
+    @pytest.mark.asyncio
+    async def test_fill_price_multi_contract(self, mock_db: AsyncMock) -> None:
+        """Fill price is correctly computed for multi-contract orders."""
+        signal = TradeSignal(
+            city="NYC",
+            bracket="55-56°F",
+            side="yes",
+            price_cents=22,
+            quantity=3,
+            model_probability=0.30,
+            market_probability=0.22,
+            ev=0.05,
+            confidence="medium",
+            market_ticker="KXHIGHNY-26FEB18-B3",
+        )
+        mock_client = AsyncMock()
+        # 3 contracts × 20¢ each = 60¢ total fill cost
+        mock_client.place_order.return_value = _make_mock_response(taker_fill_cost=60, count=3)
+
+        result = await execute_trade(
+            signal=signal,
+            kalshi_client=mock_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+        assert result.price_cents == 20  # 60 // 3 = 20
+        assert result.quantity == 3
+
+    @pytest.mark.asyncio
+    async def test_fallback_to_limit_price_when_no_fill_cost(
+        self, sample_signal: TradeSignal, mock_db: AsyncMock
+    ) -> None:
+        """Falls back to signal limit price when taker_fill_cost is 0."""
+        mock_client = AsyncMock()
+        mock_client.place_order.return_value = _make_mock_response(taker_fill_cost=0, count=1)
+
+        result = await execute_trade(
+            signal=sample_signal,
+            kalshi_client=mock_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+        # Falls back to signal's limit price of 22¢
         assert result.price_cents == sample_signal.price_cents
+
+    @pytest.mark.asyncio
+    async def test_db_trade_uses_fill_price(
+        self, sample_signal: TradeSignal, mock_db: AsyncMock
+    ) -> None:
+        """The Trade ORM record stored in DB uses the fill price, not limit price."""
+        mock_client = AsyncMock()
+        # Fill at 18¢ instead of 22¢ limit
+        mock_client.place_order.return_value = _make_mock_response(taker_fill_cost=18, count=1)
+
+        await execute_trade(
+            signal=sample_signal,
+            kalshi_client=mock_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        trade_obj = mock_db.add.call_args[0][0]
+        assert trade_obj.price_cents == 18  # Fill price, not 22¢ limit
 
     @pytest.mark.asyncio
     async def test_api_failure_propagates(

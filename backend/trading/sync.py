@@ -78,6 +78,14 @@ async def _create_synced_trade(
     # Extract the market event date from the ticker (e.g., KXHIGHAUS-26FEB23 → Feb 23)
     market_date = parse_market_date_from_ticker(order.ticker)
 
+    # Use actual fill price from Kalshi response (taker_fill_cost / fill_count).
+    # Falls back to limit order price (yes_price) if fill cost not available.
+    fill_price = (
+        order.taker_fill_cost // order.fill_count
+        if order.taker_fill_cost > 0 and order.fill_count > 0
+        else order.yes_price
+    )
+
     trade = Trade(
         id=str(uuid4()),
         user_id=user_id,
@@ -88,10 +96,10 @@ async def _create_synced_trade(
         market_ticker=order.ticker,
         bracket_label=bracket_label,
         side=order.side,
-        price_cents=order.yes_price,
+        price_cents=fill_price,
         quantity=order.fill_count,
         model_probability=0.0,
-        market_probability=order.yes_price / 100.0,
+        market_probability=fill_price / 100.0,
         ev_at_entry=0.0,
         confidence="low",
         status=TradeStatus.OPEN,

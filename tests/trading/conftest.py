@@ -69,6 +69,8 @@ def mock_kalshi_client() -> AsyncMock:
     mock_response.order_id = "order-123"
     mock_response.count = 1
     mock_response.status = "filled"
+    mock_response.taker_fill_cost = 22  # 22 cents × 1 contract (matches sample_signal)
+    mock_response.taker_fees = 0
 
     client = AsyncMock()
     client.place_order.return_value = mock_response
