@@ -1,9 +1,9 @@
 # Product Requirements Document (PRD)
 # Boz Weather Trader
 
-**Version:** 1.4
-**Date:** February 23, 2026
-**Status:** All P0+P1 complete (36 phases + 3 hotfixes + deployment hardening, 1513 tests)
+**Version:** 1.4.7
+**Date:** February 24, 2026
+**Status:** All P0+P1 complete (36 phases + 7 hotfixes + deployment hardening, 1536 tests)
 
 ---
 
@@ -492,7 +492,7 @@ Your Machine (homelab / cloud VPS)
 - [x] **Trade logging** - Full audit trail of every trade placed with reasoning (Phase 4)
 - [x] **Trade post-mortems** - Auto-generated executive summary for each trade after settlement (Phase 3, 14)
 - [x] **Structured logging** - Module-tagged, leveled logs to stdout + database (Phase 1)
-- [x] **Unit + safety tests** - Every module ships with tests; 1324 backend + 189 frontend = 1513 tests (All phases)
+- [x] **Unit + safety tests** - Every module ships with tests; 1347 backend + 189 frontend = 1536 tests (All phases)
 - [x] **CI/CD pipeline** - GitHub Actions: 4 parallel jobs (backend-lint, backend-test w/ coverage, frontend, docker-build) (Phase 8, 22)
 - [x] **Docker Compose deployment** - 10-service Docker Compose (backend, frontend, postgres, redis, celery worker/beat, prometheus, grafana, alertmanager, updater) (Phase 6, 16, 19, 34)
 - [x] **Market type selector UI** - High Temp active, others show "Coming Soon" (Phase 5)
@@ -576,7 +576,11 @@ Your Machine (homelab / cloud VPS)
 | 35 | Dashboard stats toggle | /api/dashboard/stats endpoint with multi-period P/L & W/L, click-to-cycle stat cards, SETTLED pseudo-filter, open trades section under calendar | 8 backend + 4 frontend |
 | 36 | Predictions redesign | Horizontal bar chart with bracket labels, peak highlighting, shortBracketLabel() utility, compact label generation from numeric bounds, v1.3.0 release | 6 frontend |
 | DH | Deployment hardening | Configurable CORS origins (env var), docker-compose.override.yml pattern for personal deployment, .gitignore for override file, v1.4.0 release | — |
-| **Total** | | **1324 backend + 189 frontend = 1513 tests** | |
+| HF | Fill price recording | executor.py and sync.py use actual Kalshi fill price (`taker_fill_cost // fill_count`) instead of limit order price, with graceful fallback; fixes P&L accuracy | 6 |
+| HF | NO side price + pagination + backfill | NO fill prices converted to YES-equivalent (`100 - fill_cost_per_contract`), `get_orders()` cursor-based pagination, Alembic 0007 backfills 6 historical trades with corrected price/pnl/fees/qty | 11 |
+| HF | Bracket label off-by-one | `parse_bracket_from_market()` bottom bracket formula changed from `int(cap)` to `math.ceil(cap) - 1` for Kalshi's inconsistent cap_strike format (72.99 vs 73.0), Alembic 0008 migration fixes existing trades/predictions | 4 |
+| HF | Cache zero-price fallback | `_fetch_market_prices()` cache validity check changed from `if prices:` to `if prices and any(v > 0 for v in prices.values())` to prevent all-zero WS cache from blocking REST fallback | 2 |
+| **Total** | | **1347 backend + 189 frontend = 1536 tests** | |
 
 ---
 
@@ -837,7 +841,7 @@ Tests run automatically on every commit via GitHub Actions:
 ```
 On every push to master / PR targeting master (4 parallel jobs):
   Job 1: Backend Lint — ruff check + ruff format --check on backend/ and tests/
-  Job 2: Backend Tests — pytest (1324 tests, in-memory SQLite, no Docker needed) + coverage artifact
+  Job 2: Backend Tests — pytest (1347 tests, in-memory SQLite, no Docker needed) + coverage artifact
   Job 3: Frontend — ESLint (next lint) + Vitest (189 tests)
   Job 4: Docker Build — smoke test that backend + frontend Dockerfiles build successfully
 ```
