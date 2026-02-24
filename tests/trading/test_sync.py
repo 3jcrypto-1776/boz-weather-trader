@@ -464,3 +464,98 @@ class TestSyncPortfolio:
 
         trade = db.add.call_args[0][0]
         assert trade.price_cents == 25  # Falls back to yes_price
+
+    @pytest.mark.asyncio
+    async def test_synced_no_trade_uses_yes_equivalent_price(self) -> None:
+        """NO side synced trades store YES-equivalent price_cents.
+
+        When Kalshi reports taker_fill_cost=59 for a NO fill, the raw NO
+        cost per contract is 59¢. We store the YES-equivalent: 100-59=41¢
+        so that settlement math (100-price)*qty gives the actual NO cost.
+        """
+        order = _make_order(
+            order_id="ord-no-fill",
+            ticker="KXHIGHAUS-26FEB23-B65.5",
+            side="no",
+            yes_price=40,
+            fill_count=1,
+            taker_fill_cost=59,  # Paid 59¢ for the NO contract
+        )
+
+        client = AsyncMock()
+        client.get_orders.return_value = [order]
+        client.get_market.return_value = _make_mock_market(
+            ticker="KXHIGHAUS-26FEB23-B65.5",
+            floor_strike=65.0,
+            cap_strike=66.99,
+        )
+
+        db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        await sync_portfolio(client, db, "user-1")
+
+        trade = db.add.call_args[0][0]
+        # YES-equivalent: 100 - 59 = 41
+        assert trade.price_cents == 41
+        assert trade.market_probability == 0.41
+
+    @pytest.mark.asyncio
+    async def test_synced_no_trade_fallback_no_conversion(self) -> None:
+        """NO side with taker_fill_cost=0 falls back to yes_price, no conversion."""
+        order = _make_order(
+            order_id="ord-no-fallback",
+            ticker="KXHIGHAUS-26FEB23-B65.5",
+            side="no",
+            yes_price=40,
+            fill_count=1,
+            taker_fill_cost=0,
+        )
+
+        client = AsyncMock()
+        client.get_orders.return_value = [order]
+        client.get_market.return_value = _make_mock_market(
+            ticker="KXHIGHAUS-26FEB23-B65.5",
+        )
+
+        db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        await sync_portfolio(client, db, "user-1")
+
+        trade = db.add.call_args[0][0]
+        # Falls back to yes_price, no conversion applied
+        assert trade.price_cents == 40
+
+    @pytest.mark.asyncio
+    async def test_synced_yes_trade_not_converted(self) -> None:
+        """YES side synced trades store fill price directly (no conversion)."""
+        order = _make_order(
+            order_id="ord-yes-fill",
+            ticker="KXHIGHNY-26FEB22-T38",
+            side="yes",
+            yes_price=22,
+            fill_count=1,
+            taker_fill_cost=18,  # Filled at 18¢
+        )
+
+        client = AsyncMock()
+        client.get_orders.return_value = [order]
+        client.get_market.return_value = _make_mock_market(
+            ticker="KXHIGHNY-26FEB22-T38",
+        )
+
+        db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        db.execute.return_value = mock_result
+
+        await sync_portfolio(client, db, "user-1")
+
+        trade = db.add.call_args[0][0]
+        # YES side: 18¢ stored directly, NOT 100-18=82
+        assert trade.price_cents == 18

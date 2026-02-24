@@ -829,6 +829,7 @@ class KalshiClient:
     async def get_market(self, ticker: str) -> KalshiMarket
     async def get_orderbook(self, ticker: str) -> KalshiOrderbook
     async def place_order(self, order: OrderRequest) -> OrderResponse
+    async def get_orders(self, status: str | None = None, limit: int = 200) -> list[OrderResponse]  # cursor-paginated
     async def cancel_order(self, order_id: str) -> bool
     async def get_positions(self) -> list[KalshiPosition]
     async def get_settlements(self, limit: int = 100) -> list[KalshiSettlement]

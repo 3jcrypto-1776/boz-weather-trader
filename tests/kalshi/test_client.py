@@ -209,3 +209,116 @@ class TestKalshiClientMethods:
 
         with pytest.raises(ValueError, match="ticker"):
             await client.place_order(order)
+
+
+class TestGetOrdersPagination:
+    """Tests for get_orders cursor-based pagination."""
+
+    @pytest.fixture
+    def client(self, rsa_key_pair):
+        """Create a KalshiClient with mocked internals."""
+        c = KalshiClient(
+            api_key_id=rsa_key_pair["api_key_id"],
+            private_key_pem=rsa_key_pair["private_key_pem"],
+            demo=True,
+        )
+        c.rate_limiter.acquire = AsyncMock()
+        return c
+
+    def _make_orders_page(self, count: int, cursor: str | None = None) -> dict:
+        """Create a mock Kalshi orders API response page."""
+        orders = []
+        for i in range(count):
+            orders.append(
+                {
+                    "order_id": f"order-{i}",
+                    "ticker": f"KXHIGHNY-26FEB21-T{50 + i}",
+                    "action": "buy",
+                    "side": "yes",
+                    "type": "limit",
+                    "fill_count": 1,
+                    "initial_count": 1,
+                    "yes_price": 22,
+                    "status": "executed",
+                    "created_time": "2026-02-21T15:00:00Z",
+                    "taker_fees": 0,
+                    "taker_fill_cost": 22,
+                }
+            )
+        result: dict = {"orders": orders}
+        if cursor:
+            result["cursor"] = cursor
+        return result
+
+    @pytest.mark.asyncio
+    async def test_single_page_no_cursor(self, client) -> None:
+        """Single page with no cursor returns all orders."""
+        page_data = self._make_orders_page(3)
+        mock_resp = _make_response(200, json_data=page_data)
+        client.client.request = AsyncMock(return_value=mock_resp)
+
+        orders = await client.get_orders(status="executed")
+
+        assert len(orders) == 3
+        assert client.client.request.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_two_pages_with_cursor(self, client) -> None:
+        """Two pages fetched when first page returns a cursor."""
+        page1 = self._make_orders_page(200, cursor="next-page-token")
+        page2 = self._make_orders_page(50)
+
+        mock_resp1 = _make_response(200, json_data=page1)
+        mock_resp2 = _make_response(200, json_data=page2)
+        client.client.request = AsyncMock(side_effect=[mock_resp1, mock_resp2])
+
+        orders = await client.get_orders(status="executed")
+
+        assert len(orders) == 250
+        assert client.client.request.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_empty_first_page(self, client) -> None:
+        """Empty first page returns empty list."""
+        page_data = self._make_orders_page(0)
+        mock_resp = _make_response(200, json_data=page_data)
+        client.client.request = AsyncMock(return_value=mock_resp)
+
+        orders = await client.get_orders(status="executed")
+
+        assert len(orders) == 0
+        assert client.client.request.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_short_last_page_stops(self, client) -> None:
+        """Pagination stops when page has fewer items than limit."""
+        # First page full (200 items), second page short (10 items)
+        page1 = self._make_orders_page(200, cursor="page2")
+        page2 = self._make_orders_page(10)
+
+        mock_resp1 = _make_response(200, json_data=page1)
+        mock_resp2 = _make_response(200, json_data=page2)
+        client.client.request = AsyncMock(side_effect=[mock_resp1, mock_resp2])
+
+        orders = await client.get_orders(status="executed", limit=200)
+
+        assert len(orders) == 210
+        # Should stop after 2 pages (second is short)
+        assert client.client.request.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_status_filter_passed_on_every_page(self, client) -> None:
+        """Status filter is included in params for every page request."""
+        page1 = self._make_orders_page(200, cursor="page2")
+        page2 = self._make_orders_page(50)
+
+        mock_resp1 = _make_response(200, json_data=page1)
+        mock_resp2 = _make_response(200, json_data=page2)
+        client.client.request = AsyncMock(side_effect=[mock_resp1, mock_resp2])
+
+        await client.get_orders(status="executed")
+
+        # Both calls should include status=executed in params
+        for call in client.client.request.call_args_list:
+            params = call.kwargs.get("params", {})
+            assert params.get("status") == "executed"

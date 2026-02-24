@@ -273,3 +273,96 @@ class TestExecuteTrade:
         # The Trade ORM added to DB should have market_date set
         trade_obj = mock_db.add.call_args[0][0]
         assert trade_obj.market_date == date(2026, 2, 23)
+
+    @pytest.mark.asyncio
+    async def test_no_side_fill_price_is_yes_equivalent(self, mock_db: AsyncMock) -> None:
+        """For NO side trades, price_cents is stored as the YES-equivalent.
+
+        When Kalshi returns taker_fill_cost=59 for a NO fill, the raw NO
+        cost per contract is 59¢. The YES-equivalent is 100-59=41¢.
+        Settlement code expects price_cents to be the YES price so that
+        NO cost = (100 - price_cents) * qty works correctly.
+        """
+        signal = TradeSignal(
+            city="AUS",
+            bracket="65-66°F",
+            side="no",
+            price_cents=40,
+            quantity=1,
+            model_probability=0.60,
+            market_probability=0.40,
+            ev=0.12,
+            confidence="high",
+            market_ticker="KXHIGHAUS-26FEB23-B65.5",
+        )
+        mock_client = AsyncMock()
+        # NO fill: taker_fill_cost=59 means you paid 59¢ for the NO contract
+        mock_client.place_order.return_value = _make_mock_response(taker_fill_cost=59, count=1)
+
+        result = await execute_trade(
+            signal=signal,
+            kalshi_client=mock_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        # Should store YES-equivalent: 100 - 59 = 41
+        assert result.price_cents == 41
+        trade_obj = mock_db.add.call_args[0][0]
+        assert trade_obj.price_cents == 41
+
+    @pytest.mark.asyncio
+    async def test_no_side_fallback_uses_limit_price_unchanged(self, mock_db: AsyncMock) -> None:
+        """When taker_fill_cost is 0 for NO side, falls back to limit price."""
+        signal = TradeSignal(
+            city="AUS",
+            bracket="65-66°F",
+            side="no",
+            price_cents=40,
+            quantity=1,
+            model_probability=0.60,
+            market_probability=0.40,
+            ev=0.12,
+            confidence="high",
+            market_ticker="KXHIGHAUS-26FEB23-B65.5",
+        )
+        mock_client = AsyncMock()
+        mock_client.place_order.return_value = _make_mock_response(taker_fill_cost=0, count=1)
+
+        result = await execute_trade(
+            signal=signal,
+            kalshi_client=mock_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        # Falls back to signal's limit price — no YES-equivalent conversion
+        assert result.price_cents == 40
+
+    @pytest.mark.asyncio
+    async def test_yes_side_fill_price_not_converted(self, mock_db: AsyncMock) -> None:
+        """For YES side trades, fill price is stored directly (no conversion)."""
+        signal = TradeSignal(
+            city="NYC",
+            bracket="55-56°F",
+            side="yes",
+            price_cents=22,
+            quantity=1,
+            model_probability=0.30,
+            market_probability=0.22,
+            ev=0.05,
+            confidence="medium",
+            market_ticker="KXHIGHNY-26FEB18-B3",
+        )
+        mock_client = AsyncMock()
+        mock_client.place_order.return_value = _make_mock_response(taker_fill_cost=20, count=1)
+
+        result = await execute_trade(
+            signal=signal,
+            kalshi_client=mock_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        # YES side: store the fill price directly (20¢), NOT 100-20=80
+        assert result.price_cents == 20

@@ -325,26 +325,47 @@ class KalshiClient:
 
         return response
 
-    async def get_orders(self, status: str | None = None) -> list[OrderResponse]:
+    async def get_orders(
+        self,
+        status: str | None = None,
+        limit: int = 200,
+    ) -> list[OrderResponse]:
         """Get orders from the portfolio, optionally filtered by status.
+
+        Paginates through all pages using Kalshi's cursor-based pagination.
 
         Args:
             status: Filter by order status (e.g., "resting", "executed", "canceled").
                     None returns all orders.
+            limit: Maximum orders per page (1-200, default 200).
 
         Returns:
-            List of OrderResponse models.
+            List of OrderResponse models across all pages.
         """
-        params: dict[str, str] = {}
-        if status is not None:
-            params["status"] = status
-        data = await self._request("GET", "/portfolio/orders", params=params)
-        orders = [OrderResponse(**o) for o in data.get("orders", [])]
+        all_orders: list[OrderResponse] = []
+        cursor: str | None = None
+
+        while True:
+            params: dict[str, str] = {"limit": str(limit)}
+            if status is not None:
+                params["status"] = status
+            if cursor is not None:
+                params["cursor"] = cursor
+
+            data = await self._request("GET", "/portfolio/orders", params=params)
+            page_orders = [OrderResponse(**o) for o in data.get("orders", [])]
+            all_orders.extend(page_orders)
+
+            # Check for next page: Kalshi returns a cursor for pagination
+            cursor = data.get("cursor")
+            if not cursor or len(page_orders) < limit:
+                break
+
         logger.info(
             "Orders fetched",
-            extra={"data": {"count": len(orders), "status_filter": status}},
+            extra={"data": {"count": len(all_orders), "status_filter": status}},
         )
-        return orders
+        return all_orders
 
     async def cancel_order(self, order_id: str) -> bool:
         """Cancel a resting order.
