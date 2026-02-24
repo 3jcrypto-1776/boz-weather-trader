@@ -35,6 +35,9 @@ out/
 frontend/public/sw.js
 frontend/public/workbox-*.js
 
+# Docker local overrides
+docker-compose.override.yml
+
 # Data files
 *.csv
 *.xlsx

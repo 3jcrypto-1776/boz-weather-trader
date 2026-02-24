@@ -101,14 +101,20 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS — allow frontend origins (dev + Docker)
+    # CORS — allow frontend origins (dev + Docker + custom via CORS_ORIGINS env var)
+    settings = get_settings()
+    cors_origins = [
+        "http://localhost:3000",  # Next.js dev server
+        "http://127.0.0.1:3000",
+        "http://frontend:3000",  # Docker Compose networking
+    ]
+    if settings.cors_origins:
+        cors_origins.extend(
+            origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()
+        )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",  # Next.js dev server
-            "http://127.0.0.1:3000",
-            "http://frontend:3000",  # Docker Compose networking
-        ],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

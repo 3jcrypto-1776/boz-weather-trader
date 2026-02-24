@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     # ─── App ───
     environment: str = "development"
     log_level: str = "INFO"
+    cors_origins: str = ""  # Extra CORS origins (comma-separated), e.g. "https://boznet.org"
 
     # ─── NWS API ───
     nws_user_agent: str = "BozWeatherTrader/1.0 (contact@example.com)"

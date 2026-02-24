@@ -1,7 +1,0 @@
-# Dev-only overrides — auto-loaded by `docker compose up` on the host.
-# NOT loaded by the updater sidecar (which uses -f docker-compose.yml explicitly).
-
-services:
-  backend:
-    volumes:
-      - ./backend:/app/backend  # Hot reload in dev
