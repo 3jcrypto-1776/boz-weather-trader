@@ -21,6 +21,7 @@ Usage:
 
 from __future__ import annotations
 
+import math
 from datetime import date, datetime
 
 from backend.common.logging import get_logger
@@ -121,9 +122,10 @@ def parse_bracket_from_market(market: dict) -> dict:
     - Top edge: cap_strike is None -> "X°F or above"
     - Middle: both present -> "X° to Y°F"
 
-    Labels match Kalshi's display format. Kalshi uses .99 cap strikes
-    (e.g., cap=72.99 for "72° or below"), so int(cap) gives the correct
-    display temperature.
+    Labels match Kalshi's display format. Kalshi's cap_strike is an
+    exclusive upper bound — typically X.99 (e.g., 72.99) but sometimes
+    an integer (e.g., 73.0). We use math.ceil(cap) - 1 to handle both:
+        ceil(72.99) - 1 = 72,  ceil(73.0) - 1 = 72  →  "72°F or below"
 
     Args:
         market: Dict from Kalshi market API response. Must contain
@@ -143,8 +145,9 @@ def parse_bracket_from_market(market: dict) -> dict:
     ticker = market.get("ticker", "")
 
     if floor is None and cap is not None:
-        # Bottom edge bracket: "X°F or below" (cap=72.99 → 72°F or below)
-        label = f"{int(cap)}°F or below"
+        # Bottom edge bracket: "X°F or below"
+        # ceil(72.99)-1=72, ceil(73.0)-1=72 — handles both .99 and integer cap
+        label = f"{math.ceil(cap) - 1}°F or below"
         return {
             "label": label,
             "lower_bound_f": None,
@@ -167,7 +170,9 @@ def parse_bracket_from_market(market: dict) -> dict:
         }
 
     if floor is not None and cap is not None:
-        # Middle bracket: "X° to Y°F" (cap=53.99 → "52° to 53°F")
+        # Middle bracket: "X° to Y°F"
+        # Kalshi sends cap as the inclusive display value (85.0 for "84° to 85°F"
+        # or 85.99), so int(cap) gives the correct display in both cases.
         label = f"{int(floor)}° to {int(cap)}°F"
         return {
             "label": label,

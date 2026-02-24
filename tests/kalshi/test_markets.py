@@ -125,6 +125,71 @@ class TestParseBracketFromMarket:
         assert result["is_edge_lower"] is False
         assert result["is_edge_upper"] is False
 
+    # ─── Integer cap_strike robustness tests ───
+
+    def test_bottom_edge_integer_cap_strike(self) -> None:
+        """Bottom edge with integer cap_strike (73.0) produces same label as 72.99."""
+        # Kalshi sometimes returns integer cap_strike instead of .99
+        market_dotninety = {"floor_strike": None, "cap_strike": 72.99, "ticker": "T73"}
+        market_integer = {"floor_strike": None, "cap_strike": 73.0, "ticker": "T73"}
+
+        result_dotninety = parse_bracket_from_market(market_dotninety)
+        result_integer = parse_bracket_from_market(market_integer)
+
+        assert result_dotninety["label"] == "72°F or below"
+        assert result_integer["label"] == "72°F or below"
+        assert result_dotninety["label"] == result_integer["label"]
+
+    def test_middle_bracket_integer_cap_strike(self) -> None:
+        """Middle bracket with integer cap_strike uses int(cap) as display value.
+
+        Kalshi sends cap as the inclusive display value for middle brackets:
+        cap=53.99 or cap=53.0 both display as "52° to 53°F".
+        """
+        market_dotninety = {"floor_strike": 52.0, "cap_strike": 53.99, "ticker": "T52"}
+        market_integer = {"floor_strike": 52.0, "cap_strike": 53.0, "ticker": "T52"}
+
+        result_dotninety = parse_bracket_from_market(market_dotninety)
+        result_integer = parse_bracket_from_market(market_integer)
+
+        assert result_dotninety["label"] == "52° to 53°F"
+        assert result_integer["label"] == "52° to 53°F"
+        assert result_dotninety["label"] == result_integer["label"]
+
+    def test_bottom_edge_various_integer_caps(self) -> None:
+        """Bottom edge labels are consistent across various integer cap_strike values."""
+        test_cases = [
+            (47.99, 48.0, "47°F or below"),
+            (62.99, 63.0, "62°F or below"),
+            (80.99, 81.0, "80°F or below"),
+        ]
+        for dotninety, integer, expected_label in test_cases:
+            result_dn = parse_bracket_from_market({"floor_strike": None, "cap_strike": dotninety})
+            result_int = parse_bracket_from_market({"floor_strike": None, "cap_strike": integer})
+            assert result_dn["label"] == expected_label, f"cap={dotninety}"
+            assert result_int["label"] == expected_label, f"cap={integer}"
+
+    def test_middle_bracket_various_integer_caps(self) -> None:
+        """Middle bracket labels consistent for .99 and integer cap_strike values.
+
+        Kalshi sends cap as the inclusive display upper bound for middle brackets.
+        int(cap) works correctly for both: int(85.99)=85 and int(85.0)=85.
+        """
+        test_cases = [
+            (48.0, 49.99, 49.0, "48° to 49°F"),
+            (63.0, 64.99, 64.0, "63° to 64°F"),
+            (75.0, 76.99, 76.0, "75° to 76°F"),
+        ]
+        for floor, dotninety_cap, integer_cap, expected_label in test_cases:
+            result_dn = parse_bracket_from_market(
+                {"floor_strike": floor, "cap_strike": dotninety_cap}
+            )
+            result_int = parse_bracket_from_market(
+                {"floor_strike": floor, "cap_strike": integer_cap}
+            )
+            assert result_dn["label"] == expected_label, f"cap={dotninety_cap}"
+            assert result_int["label"] == expected_label, f"cap={integer_cap}"
+
 
 # ─── Event Markets Parsing ───
 

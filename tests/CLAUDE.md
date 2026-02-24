@@ -38,9 +38,9 @@ tests/
 │   ├── test_nws.py        → fetch_with_retry, grid coordinates, caching (10 tests)
 │   ├── test_openmeteo.py  → Module constants + _extract_model_daily (9 tests)
 │   └── test_rate_limiter.py → Async rate limiter timing + module singletons (6 tests)
-├── kalshi/              → Unit tests for backend/kalshi/ (139 tests)
+├── kalshi/              → Unit tests for backend/kalshi/ (143 tests)
 │   ├── conftest.py      → Kalshi-specific fixtures (mock API responses, test keys)
-│   ├── test_markets.py     → Market discovery, tickers, bracket parsing, market date extraction (27 tests)
+│   ├── test_markets.py     → Market discovery, tickers, bracket parsing, market date extraction, integer cap_strike handling (31 tests)
 │   ├── test_market_feed.py → Market feed consumer lifecycle + auth + messages (25 tests)
 │   ├── test_models.py      → Pydantic models, validators, serialization (23 tests)
 │   ├── test_cache.py       → Redis cache set/get/TTL/status (17 tests)
@@ -1140,7 +1140,7 @@ jobs:
 | Job | What It Does | Failure Blocks Merge? |
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
-| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1341 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
+| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1345 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
 | `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 189 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 

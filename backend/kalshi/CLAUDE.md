@@ -301,6 +301,7 @@ Each event has 6 brackets. The middle 4 are 2 degrees F wide. The bottom and top
 ```python
 # Part of backend/kalshi/markets.py
 from __future__ import annotations
+import math
 
 
 def parse_bracket_from_market(market: dict) -> dict:
@@ -308,6 +309,10 @@ def parse_bracket_from_market(market: dict) -> dict:
 
     Uses floor_strike and cap_strike from the market object.
     Edge brackets have one null bound.
+
+    Kalshi's cap_strike is an exclusive upper bound — typically X.99
+    (e.g., 72.99) but sometimes an integer (e.g., 73.0). We use
+    math.ceil(cap) - 1 for bottom brackets to handle both formats.
 
     Args:
         market: Dict from Kalshi market API response.
@@ -324,9 +329,10 @@ def parse_bracket_from_market(market: dict) -> dict:
     cap = market.get("cap_strike")
 
     if floor is None:
-        # Bottom edge bracket: "X°F or below" (cap=47.99 → 47°F or below)
+        # Bottom edge bracket: "X°F or below"
+        # ceil(72.99)-1=72, ceil(73.0)-1=72 — handles both .99 and integer cap
         return {
-            "label": f"{int(cap)}°F or below",
+            "label": f"{math.ceil(cap) - 1}°F or below",
             "lower_bound_f": None,
             "upper_bound_f": cap,
             "is_edge_lower": True,
@@ -342,7 +348,9 @@ def parse_bracket_from_market(market: dict) -> dict:
             "is_edge_upper": True,
         }
     else:
-        # Middle bracket: "X° to Y°F" (cap=53.99 → "52° to 53°F")
+        # Middle bracket: "X° to Y°F"
+        # Kalshi sends cap as the inclusive display value (85.0 for "84° to 85°F"
+        # or 85.99), so int(cap) gives the correct display in both cases.
         return {
             "label": f"{int(floor)}° to {int(cap)}°F",
             "lower_bound_f": floor,
