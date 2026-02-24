@@ -2,8 +2,8 @@
 # Boz Weather Trader
 
 **Version:** 1.3
-**Date:** February 22, 2026
-**Status:** All P0+P1 complete (32 phases, 1407 tests)
+**Date:** February 23, 2026
+**Status:** All P0+P1 complete (36 phases + 3 hotfixes, 1513 tests)
 
 ---
 
@@ -294,9 +294,10 @@ This makes adding new market types straightforward without touching the core tra
 | ML | XGBoost, scikit-learn (Random Forest + Ridge), scipy, numpy | Multi-model ensemble for tabular data / time-series |
 | Task Queue | Celery + Redis | Scheduled jobs (data fetch, model runs, trade execution) |
 | Monitoring | Prometheus + Grafana + Alertmanager | Metrics collection, dashboards (3), alerting (17 rules) |
+| Self-Update | Updater sidecar container + Docker socket | Git pull, rebuild, restart via UI button |
 | Notifications | Web Push API (via pywebpush) | Push notifications to PWA on all devices |
 | Real-time | WebSocket (FastAPI) + Redis pub/sub | Live event streaming to browser, SWR revalidation |
-| Containerization | Docker + Docker Compose (9 services) | Self-hostable on homelab, VPS, or cloud |
+| Containerization | Docker + Docker Compose (10 services) | Self-hostable on homelab, VPS, or cloud |
 | Auth | Kalshi API keys (user-provided, RSA-PSS signed, encrypted at rest) | No password storage needed |
 
 ### 3.4 Deployment Options
@@ -437,7 +438,7 @@ All data lives inside the Docker setup, on whatever machine hosts the bot.
 
 ```
 Your Machine (homelab / cloud VPS)
-  └── Docker Compose (9 services)
+  └── Docker Compose (10 services)
        ├── Container: backend        (FastAPI — Python app, REST API + WebSocket)
        ├── Container: frontend       (Next.js — PWA dashboard)
        ├── Container: postgres       (PostgreSQL 16 — all persistent data)
@@ -446,7 +447,8 @@ Your Machine (homelab / cloud VPS)
        ├── Container: celery-beat    (Celery beat — scheduled job triggers)
        ├── Container: prometheus     (Prometheus — metrics scraping + alerting rules)
        ├── Container: grafana        (Grafana — 3 auto-provisioned dashboards)
-       └── Container: alertmanager   (Alertmanager — webhook alert routing)
+       ├── Container: alertmanager   (Alertmanager — webhook alert routing)
+       └── Container: updater        (Sidecar — self-update via Docker socket mount)
 
        └── Volume: /data/postgres   ← your actual data lives here on disk
        └── Volume: /data/redis      ← cache data
@@ -489,9 +491,9 @@ Your Machine (homelab / cloud VPS)
 - [x] **Trade logging** - Full audit trail of every trade placed with reasoning (Phase 4)
 - [x] **Trade post-mortems** - Auto-generated executive summary for each trade after settlement (Phase 3, 14)
 - [x] **Structured logging** - Module-tagged, leveled logs to stdout + database (Phase 1)
-- [x] **Unit + safety tests** - Every module ships with tests; 1244 backend + 163 frontend = 1407 tests (All phases)
+- [x] **Unit + safety tests** - Every module ships with tests; 1324 backend + 189 frontend = 1513 tests (All phases)
 - [x] **CI/CD pipeline** - GitHub Actions: 4 parallel jobs (backend-lint, backend-test w/ coverage, frontend, docker-build) (Phase 8, 22)
-- [x] **Docker Compose deployment** - 9-service Docker Compose (backend, frontend, postgres, redis, celery worker/beat, prometheus, grafana, alertmanager) (Phase 6, 16, 19)
+- [x] **Docker Compose deployment** - 10-service Docker Compose (backend, frontend, postgres, redis, celery worker/beat, prometheus, grafana, alertmanager, updater) (Phase 6, 16, 19, 34)
 - [x] **Market type selector UI** - High Temp active, others show "Coming Soon" (Phase 5)
 - [x] **Demo mode** - Safe demo/production toggle, new users start in demo mode (Phase 15, 17)
 - [x] **Monitoring & alerting** - Prometheus metrics, 3 Grafana dashboards, 17 alert rules, Alertmanager webhook routing (Phases 12, 16, 19, 21)
@@ -508,6 +510,10 @@ Your Machine (homelab / cloud VPS)
 - [x] **PWA install prompt** - Installable via manifest.json + next-pwa service worker (Phase 5)
 - [x] **Log viewer in dashboard** - Filterable log viewer with module/level/time filters (Phase 5)
 - [x] **One-click cloud deploy** - Railway / Fly.io / Oracle Cloud deploy guides in README (Phase 28)
+- [x] **Versioning system** - Single source of truth VERSION file, /api/version endpoint with GitHub Releases check, update notifications on Settings page + sidebar, GitHub release workflow (Phase 33)
+- [x] **Self-update feature** - Updater sidecar container with Docker socket mount, POST /api/version/update + status polling endpoints, shared secret auth, frontend Update & Restart button with progress states (Phase 34)
+- [x] **Dashboard stats toggle** - Multi-period P/L and W/L stat cards with click-to-cycle periods, open trades section under calendar, SETTLED pseudo-filter (Phase 35)
+- [x] **Predictions redesign** - Horizontal bar chart with bracket labels, peak highlighting, compact label generation from numeric bounds (Phase 36)
 
 ### 4.2 Phase 2 (Post-MVP) — Not Yet Started
 
@@ -561,7 +567,14 @@ Your Machine (homelab / cloud VPS)
 | 30 | Trade grouping by market | Frontend-only GroupedTrade aggregation, market section headers, VWAP, quantity badges | 28 (frontend) |
 | 31 | Rich trade post-mortem | Multi-section narrative (5 sections), API+frontend display, regenerate endpoint | 9 backend + 12 frontend |
 | 32 | Performance + Calendar | Brier score, calibration chart, source accuracy, ROI by city, monthly calendar grid with daily P&L/trade counts/win rates, clickable day drill-down, Calendar/History tabs | 14 backend + 13 frontend |
-| **Total** | | **1244 backend + 163 frontend = 1407 tests** | |
+| 33 | Versioning system | VERSION file (single source of truth), /api/version endpoint with GitHub Releases check, update notifications on Settings + sidebar, dynamic pyproject.toml versioning, GitHub release workflow | 15 |
+| 34 | Self-update feature | Updater sidecar container with Docker socket mount, POST /api/version/update + GET /api/version/update/status, shared secret auth, update.sh with status file, frontend Update & Restart button with progress states | 22 |
+| HF | Log persistence pipeline | DatabaseLogHandler → Redis → log_subscriber → DB, module tag mapping, log ordering fix | 16 |
+| HF | Settlement date matching | market_date column on Trade, parse_market_date_from_ticker(), Alembic 0005 migration with backfill | 20 |
+| HF | Bracket label format | Match Kalshi display exactly ("72°F or below" not "Below 73F", "52° to 53°F" not "52-54F") | — |
+| 35 | Dashboard stats toggle | /api/dashboard/stats endpoint with multi-period P/L & W/L, click-to-cycle stat cards, SETTLED pseudo-filter, open trades section under calendar | 8 backend + 4 frontend |
+| 36 | Predictions redesign | Horizontal bar chart with bracket labels, peak highlighting, shortBracketLabel() utility, compact label generation from numeric bounds, v1.3.0 release | 6 frontend |
+| **Total** | | **1324 backend + 189 frontend = 1513 tests** | |
 
 ---
 
@@ -822,8 +835,8 @@ Tests run automatically on every commit via GitHub Actions:
 ```
 On every push to master / PR targeting master (4 parallel jobs):
   Job 1: Backend Lint — ruff check + ruff format --check on backend/ and tests/
-  Job 2: Backend Tests — pytest (1244 tests, in-memory SQLite, no Docker needed) + coverage artifact
-  Job 3: Frontend — ESLint (next lint) + Vitest (163 tests)
+  Job 2: Backend Tests — pytest (1324 tests, in-memory SQLite, no Docker needed) + coverage artifact
+  Job 3: Frontend — ESLint (next lint) + Vitest (189 tests)
   Job 4: Docker Build — smoke test that backend + frontend Dockerfiles build successfully
 ```
 
