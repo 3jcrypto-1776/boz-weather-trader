@@ -61,36 +61,47 @@ export default function LogsPage() {
       <WeatherTicker />
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <div className="flex gap-1">
-          {MODULE_OPTIONS.map((m) => (
-            <button
-              key={m}
-              onClick={() => setModuleFilter(m)}
-              className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                moduleFilter === m
-                  ? "bg-boz-primary text-white"
-                  : "bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-center gap-4 mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-boz-neutral uppercase tracking-wide">
+            Module
+          </span>
+          <div className="flex gap-1">
+            {MODULE_OPTIONS.map((m) => (
+              <button
+                key={m}
+                onClick={() => setModuleFilter(m)}
+                className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  moduleFilter === m
+                    ? "bg-boz-primary text-white"
+                    : "bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1">
-          {LEVEL_OPTIONS.map((l) => (
-            <button
-              key={l}
-              onClick={() => setLevelFilter(l)}
-              className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                levelFilter === l
-                  ? "bg-boz-primary text-white"
-                  : "bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50"
-              }`}
-            >
-              {l}
-            </button>
-          ))}
+        <div className="h-6 w-px bg-gray-200 hidden sm:block" />
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-boz-neutral uppercase tracking-wide">
+            Level
+          </span>
+          <div className="flex gap-1">
+            {LEVEL_OPTIONS.map((l) => (
+              <button
+                key={l}
+                onClick={() => setLevelFilter(l)}
+                className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  levelFilter === l
+                    ? "bg-boz-primary text-white"
+                    : "bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50"
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -135,12 +146,12 @@ export default function LogsPage() {
         >
           <div className="space-y-0.5 font-mono text-xs">
             {data.map((entry) => (
-              <div key={entry.id} className="flex gap-2 leading-relaxed">
+              <div key={entry.id} className="flex gap-3 leading-relaxed">
                 <span className="text-gray-500 whitespace-nowrap flex-shrink-0">
                   {formatDateTime(entry.timestamp)}
                 </span>
                 <span
-                  className={`px-1 rounded text-[10px] font-bold uppercase flex-shrink-0 ${levelColor(entry.level)}`}
+                  className={`px-1.5 rounded text-[10px] font-bold uppercase flex-shrink-0 ${levelColor(entry.level)}`}
                 >
                   {entry.level}
                 </span>
