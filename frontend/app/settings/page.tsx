@@ -1,9 +1,10 @@
 "use client";
 
-import { Loader2, Save } from "lucide-react";
+import { FileText, Loader2, Save, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { mutate } from "swr";
 
+import LogsViewer from "@/components/logs/logs-viewer";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
@@ -14,7 +15,11 @@ import { centsToDollars } from "@/lib/utils";
 
 const ALL_CITIES: CityCode[] = ["NYC", "CHI", "MIA", "AUS"];
 
+type SettingsTab = "settings" | "logs";
+
 export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<SettingsTab>("settings");
+
   const { data: settings, error, isLoading } = useSettings();
   const { data: authStatus } = useAuthStatus();
   const { data: versionInfo } = useVersion();
@@ -147,360 +152,387 @@ export default function SettingsPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div>
-        <h1 className="text-xl font-bold mb-4">Settings</h1>
-        <WeatherTicker />
-        <div className="space-y-4">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-16" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div>
-        <h1 className="text-xl font-bold mb-4">Settings</h1>
-        <WeatherTicker />
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-boz-danger">
-          {error.message || "Unable to load settings"}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <ErrorBoundary>
-      <h1 className="text-xl font-bold mb-4">Settings</h1>
-      <WeatherTicker />
-
-      <div className="space-y-6">
-        {/* Connection Status */}
-        {authStatus && (
-          <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-            <h2 className="text-sm font-semibold mb-3">Connection Status</h2>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-boz-success" />
-                <span className="text-sm font-medium">Connected</span>
-              </div>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  authStatus.demo_mode
-                    ? "bg-orange-100 text-orange-700"
-                    : "bg-green-100 text-green-700"
-                }`}
-              >
-                {authStatus.demo_mode ? "DEMO" : "LIVE"}
-              </span>
-            </div>
-            <p className="text-xs text-boz-neutral mt-2">
-              Key: {authStatus.key_id_prefix}
-            </p>
-          </section>
-        )}
-
-        {/* Trading Mode */}
-        <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <h2 className="text-sm font-semibold mb-3">Trading Mode</h2>
-          <div className="flex gap-2">
-            {(["manual", "auto"] as TradingMode[]).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setTradingMode(mode)}
-                className={`min-h-[44px] flex-1 px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
-                  tradingMode === mode
-                    ? "bg-boz-primary text-white"
-                    : "bg-gray-100 text-boz-neutral hover:bg-gray-200"
-                }`}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-boz-neutral mt-2">
-            {tradingMode === "auto"
-              ? "Trades are executed automatically when +EV opportunities are found."
-              : "Trades require your approval in the Queue before execution."}
-          </p>
-        </section>
-
-        {/* Risk Limits */}
-        <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <h2 className="text-sm font-semibold mb-3">Risk Limits</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="flex justify-between text-xs mb-1">
-                <span>Max Trade Size</span>
-                <span className="font-medium">${centsToDollars(maxTradeSize)}</span>
-              </label>
-              <input
-                type="range"
-                min={10}
-                max={1000}
-                step={10}
-                value={maxTradeSize}
-                onChange={(e) => setMaxTradeSize(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
-              />
-            </div>
-            <div>
-              <label className="flex justify-between text-xs mb-1">
-                <span>Daily Loss Limit</span>
-                <span className="font-medium">${centsToDollars(dailyLossLimit)}</span>
-              </label>
-              <input
-                type="range"
-                min={100}
-                max={10000}
-                step={100}
-                value={dailyLossLimit}
-                onChange={(e) => setDailyLossLimit(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
-              />
-            </div>
-            <div>
-              <label className="flex justify-between text-xs mb-1">
-                <span>Max Daily Exposure</span>
-                <span className="font-medium">${centsToDollars(maxExposure)}</span>
-              </label>
-              <input
-                type="range"
-                min={100}
-                max={25000}
-                step={100}
-                value={maxExposure}
-                onChange={(e) => setMaxExposure(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
-              />
-            </div>
-            <div>
-              <label className="flex justify-between text-xs mb-1">
-                <span>Min EV Threshold</span>
-                <span className="font-medium">{(minEv * 100).toFixed(0)}%</span>
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={0.5}
-                step={0.01}
-                value={minEv}
-                onChange={(e) => setMinEv(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
-              />
-            </div>
-            <div>
-              <label className="flex justify-between text-xs mb-1">
-                <span>Cooldown After Loss</span>
-                <span className="font-medium">{cooldown} min</span>
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={1440}
-                step={15}
-                value={cooldown}
-                onChange={(e) => setCooldown(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
-              />
-            </div>
-            <div>
-              <label className="flex justify-between text-xs mb-1">
-                <span>Consecutive Loss Limit</span>
-                <span className="font-medium">{consecutiveLossLimit}</span>
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={10}
-                step={1}
-                value={consecutiveLossLimit}
-                onChange={(e) => setConsecutiveLossLimit(Number(e.target.value))}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* Active Cities */}
-        <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <h2 className="text-sm font-semibold mb-3">Active Cities</h2>
-          <div className="grid grid-cols-2 gap-2">
-            {ALL_CITIES.map((city) => (
-              <button
-                key={city}
-                onClick={() => toggleCity(city)}
-                className={`min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeCities.includes(city)
-                    ? "bg-boz-primary text-white"
-                    : "bg-gray-100 text-boz-neutral hover:bg-gray-200"
-                }`}
-              >
-                {city}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Notifications */}
-        <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold">Notifications</h2>
-              <p className="text-xs text-boz-neutral">
-                Receive push alerts for trades and settlements
-              </p>
-            </div>
-            <button
-              onClick={() => setNotifications(!notifications)}
-              className={`relative w-12 h-7 rounded-full transition-colors ${
-                notifications ? "bg-boz-primary" : "bg-gray-300"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform shadow ${
-                  notifications ? "translate-x-5" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
-        </section>
-
-        {/* Save */}
-        {saveMessage && (
-          <div
-            className={`text-sm text-center py-2 rounded-lg ${
-              saveMessage.includes("saved")
-                ? "bg-green-50 text-boz-success"
-                : "bg-red-50 text-boz-danger"
+      {/* Header with tab toggle */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold">Settings</h1>
+        <div className="flex bg-gray-100 rounded-lg p-0.5">
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              activeTab === "settings"
+                ? "bg-white text-boz-primary shadow-sm"
+                : "text-boz-neutral hover:text-gray-900"
             }`}
           >
-            {saveMessage}
-          </div>
-        )}
+            <Settings size={14} />
+            Settings
+          </button>
+          <button
+            onClick={() => setActiveTab("logs")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              activeTab === "logs"
+                ? "bg-white text-boz-primary shadow-sm"
+                : "text-boz-neutral hover:text-gray-900"
+            }`}
+          >
+            <FileText size={14} />
+            Logs
+          </button>
+        </div>
+      </div>
+      <WeatherTicker />
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="min-h-[44px] w-full px-6 py-3 bg-boz-primary text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          {saving ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <Save size={16} />
-          )}
-          {saving ? "Saving..." : "Save Settings"}
-        </button>
-
-        {/* About */}
-        <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
-          <h2 className="text-sm font-semibold mb-3">About</h2>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-boz-neutral">Version</span>
-            <span className="text-sm font-medium" data-testid="current-version">
-              v{versionInfo?.current_version ?? "..."}
-            </span>
-          </div>
-          {versionInfo?.update_available && versionInfo.release_url && (
-            <div className="mt-3 bg-orange-50 border border-orange-200 rounded-lg p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-orange-800">
-                    Update available
-                  </p>
-                  <p className="text-xs text-orange-600">
-                    v{versionInfo.latest_version} is now available
-                  </p>
-                </div>
-                <a
-                  href={versionInfo.release_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-orange-600 text-white text-xs font-medium rounded-lg hover:bg-orange-700 transition-colors"
-                  data-testid="update-link"
-                >
-                  View Release
-                </a>
-              </div>
-              {/* Self-update button */}
-              {(!updateStatus || updateStatus.status === "idle" || updateStatus.status === "error") && (
-                <button
-                  onClick={handleUpdate}
-                  className="mt-3 w-full min-h-[44px] px-4 py-2 bg-boz-primary text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                  data-testid="update-button"
-                >
-                  Update &amp; Restart
-                </button>
-              )}
-              {/* Update in progress */}
-              {updateStatus && !["idle", "done", "error"].includes(updateStatus.status) && (
-                <div className="mt-3 flex items-center gap-2" data-testid="update-progress">
-                  <Loader2 size={14} className="animate-spin text-orange-600" />
-                  <span className="text-xs text-orange-700 font-medium">
-                    {updateStatus.status === "pulling" && "Pulling latest code..."}
-                    {updateStatus.status === "building" && "Building Docker images..."}
-                    {updateStatus.status === "restarting" && "Restarting containers..."}
-                  </span>
-                </div>
-              )}
-              {/* Update done */}
-              {updateStatus?.status === "done" && (
-                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-2" data-testid="update-done">
-                  <p className="text-xs text-green-700 font-medium">
-                    Update complete! Reload the page to see the new version.
-                  </p>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="mt-1 text-xs text-green-600 underline hover:text-green-800"
-                  >
-                    Reload now
-                  </button>
-                </div>
-              )}
-              {/* Update error */}
-              {updateStatus?.status === "error" && (
-                <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-2" data-testid="update-error">
-                  <p className="text-xs text-red-700 font-medium">
-                    Update failed: {updateStatus.error || "Unknown error"}
-                  </p>
-                  <button
-                    onClick={handleUpdate}
-                    className="mt-1 text-xs text-red-600 underline hover:text-red-800"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
+      {/* Tab content */}
+      {activeTab === "settings" ? (
+        <>
+          {/* Settings loading state */}
+          {isLoading && (
+            <div className="space-y-4">
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} className="h-16" />
+              ))}
             </div>
           )}
-          {versionInfo && !versionInfo.update_available && versionInfo.latest_version && (
-            <p className="text-xs text-boz-success mt-2" data-testid="up-to-date">
-              You&apos;re running the latest version
-            </p>
-          )}
-        </section>
 
-        {/* Disconnect */}
-        <section className="border-t border-gray-200 pt-6">
-          <button
-            onClick={handleDisconnect}
-            disabled={disconnecting}
-            className="min-h-[44px] w-full px-6 py-3 bg-white border border-boz-danger text-boz-danger rounded-lg font-medium hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {disconnecting ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : null}
-            {disconnecting ? "Disconnecting..." : "Disconnect Kalshi Account"}
-          </button>
-          <p className="text-xs text-boz-neutral text-center mt-2">
-            This will delete all stored credentials and trade data.
-          </p>
-        </section>
-      </div>
+          {/* Settings error state */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-boz-danger">
+              {error.message || "Unable to load settings"}
+            </div>
+          )}
+
+          {/* Settings content */}
+          {!isLoading && !error && (
+            <div className="space-y-6">
+              {/* Connection Status */}
+              {authStatus && (
+                <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                  <h2 className="text-sm font-semibold mb-3">Connection Status</h2>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-boz-success" />
+                      <span className="text-sm font-medium">Connected</span>
+                    </div>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        authStatus.demo_mode
+                          ? "bg-orange-100 text-orange-700"
+                          : "bg-green-100 text-green-700"
+                      }`}
+                    >
+                      {authStatus.demo_mode ? "DEMO" : "LIVE"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-boz-neutral mt-2">
+                    Key: {authStatus.key_id_prefix}
+                  </p>
+                </section>
+              )}
+
+              {/* Trading Mode */}
+              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <h2 className="text-sm font-semibold mb-3">Trading Mode</h2>
+                <div className="flex gap-2">
+                  {(["manual", "auto"] as TradingMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setTradingMode(mode)}
+                      className={`min-h-[44px] flex-1 px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                        tradingMode === mode
+                          ? "bg-boz-primary text-white"
+                          : "bg-gray-100 text-boz-neutral hover:bg-gray-200"
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-boz-neutral mt-2">
+                  {tradingMode === "auto"
+                    ? "Trades are executed automatically when +EV opportunities are found."
+                    : "Trades require your approval in the Queue before execution."}
+                </p>
+              </section>
+
+              {/* Risk Limits */}
+              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <h2 className="text-sm font-semibold mb-3">Risk Limits</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Max Trade Size</span>
+                      <span className="font-medium">${centsToDollars(maxTradeSize)}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={10}
+                      max={1000}
+                      step={10}
+                      value={maxTradeSize}
+                      onChange={(e) => setMaxTradeSize(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Daily Loss Limit</span>
+                      <span className="font-medium">${centsToDollars(dailyLossLimit)}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={100}
+                      max={10000}
+                      step={100}
+                      value={dailyLossLimit}
+                      onChange={(e) => setDailyLossLimit(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Max Daily Exposure</span>
+                      <span className="font-medium">${centsToDollars(maxExposure)}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={100}
+                      max={25000}
+                      step={100}
+                      value={maxExposure}
+                      onChange={(e) => setMaxExposure(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Min EV Threshold</span>
+                      <span className="font-medium">{(minEv * 100).toFixed(0)}%</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={0.5}
+                      step={0.01}
+                      value={minEv}
+                      onChange={(e) => setMinEv(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Cooldown After Loss</span>
+                      <span className="font-medium">{cooldown} min</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1440}
+                      step={15}
+                      value={cooldown}
+                      onChange={(e) => setCooldown(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Consecutive Loss Limit</span>
+                      <span className="font-medium">{consecutiveLossLimit}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={10}
+                      step={1}
+                      value={consecutiveLossLimit}
+                      onChange={(e) => setConsecutiveLossLimit(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Active Cities */}
+              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <h2 className="text-sm font-semibold mb-3">Active Cities</h2>
+                <div className="grid grid-cols-2 gap-2">
+                  {ALL_CITIES.map((city) => (
+                    <button
+                      key={city}
+                      onClick={() => toggleCity(city)}
+                      className={`min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        activeCities.includes(city)
+                          ? "bg-boz-primary text-white"
+                          : "bg-gray-100 text-boz-neutral hover:bg-gray-200"
+                      }`}
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              {/* Notifications */}
+              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold">Notifications</h2>
+                    <p className="text-xs text-boz-neutral">
+                      Receive push alerts for trades and settlements
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setNotifications(!notifications)}
+                    className={`relative w-12 h-7 rounded-full transition-colors ${
+                      notifications ? "bg-boz-primary" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform shadow ${
+                        notifications ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </section>
+
+              {/* Save */}
+              {saveMessage && (
+                <div
+                  className={`text-sm text-center py-2 rounded-lg ${
+                    saveMessage.includes("saved")
+                      ? "bg-green-50 text-boz-success"
+                      : "bg-red-50 text-boz-danger"
+                  }`}
+                >
+                  {saveMessage}
+                </div>
+              )}
+
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="min-h-[44px] w-full px-6 py-3 bg-boz-primary text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Save size={16} />
+                )}
+                {saving ? "Saving..." : "Save Settings"}
+              </button>
+
+              {/* About */}
+              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <h2 className="text-sm font-semibold mb-3">About</h2>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-boz-neutral">Version</span>
+                  <span className="text-sm font-medium" data-testid="current-version">
+                    v{versionInfo?.current_version ?? "..."}
+                  </span>
+                </div>
+                {versionInfo?.update_available && versionInfo.release_url && (
+                  <div className="mt-3 bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-orange-800">
+                          Update available
+                        </p>
+                        <p className="text-xs text-orange-600">
+                          v{versionInfo.latest_version} is now available
+                        </p>
+                      </div>
+                      <a
+                        href={versionInfo.release_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 bg-orange-600 text-white text-xs font-medium rounded-lg hover:bg-orange-700 transition-colors"
+                        data-testid="update-link"
+                      >
+                        View Release
+                      </a>
+                    </div>
+                    {/* Self-update button */}
+                    {(!updateStatus || updateStatus.status === "idle" || updateStatus.status === "error") && (
+                      <button
+                        onClick={handleUpdate}
+                        className="mt-3 w-full min-h-[44px] px-4 py-2 bg-boz-primary text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                        data-testid="update-button"
+                      >
+                        Update &amp; Restart
+                      </button>
+                    )}
+                    {/* Update in progress */}
+                    {updateStatus && !["idle", "done", "error"].includes(updateStatus.status) && (
+                      <div className="mt-3 flex items-center gap-2" data-testid="update-progress">
+                        <Loader2 size={14} className="animate-spin text-orange-600" />
+                        <span className="text-xs text-orange-700 font-medium">
+                          {updateStatus.status === "pulling" && "Pulling latest code..."}
+                          {updateStatus.status === "building" && "Building Docker images..."}
+                          {updateStatus.status === "restarting" && "Restarting containers..."}
+                        </span>
+                      </div>
+                    )}
+                    {/* Update done */}
+                    {updateStatus?.status === "done" && (
+                      <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-2" data-testid="update-done">
+                        <p className="text-xs text-green-700 font-medium">
+                          Update complete! Reload the page to see the new version.
+                        </p>
+                        <button
+                          onClick={() => window.location.reload()}
+                          className="mt-1 text-xs text-green-600 underline hover:text-green-800"
+                        >
+                          Reload now
+                        </button>
+                      </div>
+                    )}
+                    {/* Update error */}
+                    {updateStatus?.status === "error" && (
+                      <div className="mt-3 bg-red-50 border border-red-200 rounded-lg p-2" data-testid="update-error">
+                        <p className="text-xs text-red-700 font-medium">
+                          Update failed: {updateStatus.error || "Unknown error"}
+                        </p>
+                        <button
+                          onClick={handleUpdate}
+                          className="mt-1 text-xs text-red-600 underline hover:text-red-800"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {versionInfo && !versionInfo.update_available && versionInfo.latest_version && (
+                  <p className="text-xs text-boz-success mt-2" data-testid="up-to-date">
+                    You&apos;re running the latest version
+                  </p>
+                )}
+              </section>
+
+              {/* Disconnect */}
+              <section className="border-t border-gray-200 pt-6">
+                <button
+                  onClick={handleDisconnect}
+                  disabled={disconnecting}
+                  className="min-h-[44px] w-full px-6 py-3 bg-white border border-boz-danger text-boz-danger rounded-lg font-medium hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {disconnecting ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : null}
+                  {disconnecting ? "Disconnecting..." : "Disconnect Kalshi Account"}
+                </button>
+                <p className="text-xs text-boz-neutral text-center mt-2">
+                  This will delete all stored credentials and trade data.
+                </p>
+              </section>
+            </div>
+          )}
+        </>
+      ) : (
+        <LogsViewer />
+      )}
     </ErrorBoundary>
   );
 }

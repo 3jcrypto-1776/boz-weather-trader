@@ -7,11 +7,13 @@ import type { UserSettings } from "@/lib/types";
 const mockUseSettings = vi.fn();
 const mockUseAuthStatus = vi.fn();
 const mockUseVersion = vi.fn();
+const mockUseLogs = vi.fn();
 vi.mock("@/lib/hooks", () => ({
   useSettings: () => mockUseSettings(),
   useAuthStatus: () => mockUseAuthStatus(),
   useCurrentWeather: () => ({ data: undefined, error: undefined }),
   useVersion: () => mockUseVersion(),
+  useLogs: () => mockUseLogs(),
 }));
 
 // Mock API
@@ -20,6 +22,7 @@ const mockDisconnect = vi.fn();
 vi.mock("@/lib/api", () => ({
   updateSettings: (...args: unknown[]) => mockUpdateSettings(...args),
   disconnect: () => mockDisconnect(),
+  fetchLogs: vi.fn().mockResolvedValue([]),
 }));
 
 // Mock SWR mutate
@@ -73,6 +76,12 @@ describe("SettingsPage", () => {
       error: undefined,
       isLoading: false,
     });
+    // Default logs mock
+    mockUseLogs.mockReturnValue({
+      data: [],
+      error: undefined,
+      isLoading: false,
+    });
   });
 
   it("shows loading state", () => {
@@ -83,7 +92,9 @@ describe("SettingsPage", () => {
     });
 
     render(<SettingsPage />);
-    expect(screen.getByText("Settings")).toBeInTheDocument();
+    // "Settings" appears as both heading and tab button
+    const settingsElements = screen.getAllByText("Settings");
+    expect(settingsElements.length).toBeGreaterThanOrEqual(2);
     const skeletons = document.querySelectorAll('[aria-hidden="true"]');
     expect(skeletons.length).toBeGreaterThan(0);
   });
@@ -288,5 +299,88 @@ describe("SettingsPage", () => {
     // Change the first slider (max trade size)
     fireEvent.change(sliders[0], { target: { value: "200" } });
     expect(screen.getByText("$2.00")).toBeInTheDocument();
+  });
+
+  // ─── Tab switching tests ───
+
+  it("renders Settings and Logs tab buttons", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+
+    // Both tab buttons should be present
+    // "Settings" appears as both heading and tab — use getAllByText
+    const settingsElements = screen.getAllByText("Settings");
+    expect(settingsElements.length).toBeGreaterThanOrEqual(2); // heading + tab button
+    expect(screen.getByText("Logs")).toBeInTheDocument();
+  });
+
+  it("shows settings content by default, not logs", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+
+    // Settings content visible
+    expect(screen.getByText("Trading Mode")).toBeInTheDocument();
+    expect(screen.getByText("Risk Limits")).toBeInTheDocument();
+
+    // Logs filter buttons should NOT be visible
+    expect(screen.queryByText("WEATHER")).not.toBeInTheDocument();
+  });
+
+  it("switches to Logs tab and hides settings content", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+
+    // Click the Logs tab
+    fireEvent.click(screen.getByText("Logs"));
+
+    // Settings content should be hidden
+    expect(screen.queryByText("Trading Mode")).not.toBeInTheDocument();
+    expect(screen.queryByText("Risk Limits")).not.toBeInTheDocument();
+    expect(screen.queryByText("Save Settings")).not.toBeInTheDocument();
+
+    // Logs empty state should be visible (since mock returns empty array)
+    expect(screen.getByText("No Logs")).toBeInTheDocument();
+  });
+
+  it("switches back to Settings tab from Logs", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+
+    // Switch to Logs
+    fireEvent.click(screen.getByText("Logs"));
+    expect(screen.queryByText("Trading Mode")).not.toBeInTheDocument();
+
+    // Switch back to Settings — find the tab button (not the heading)
+    const settingsButtons = screen.getAllByText("Settings");
+    // The tab button is the one inside the tab toggle
+    const tabButton = settingsButtons.find((el) =>
+      el.closest(".flex.bg-gray-100")
+    );
+    expect(tabButton).toBeDefined();
+    fireEvent.click(tabButton!);
+
+    // Settings content should be visible again
+    expect(screen.getByText("Trading Mode")).toBeInTheDocument();
+    expect(screen.getByText("Save Settings")).toBeInTheDocument();
   });
 });

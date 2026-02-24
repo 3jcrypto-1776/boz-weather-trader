@@ -38,6 +38,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+    image: boz-weather-trader-backend
     restart: unless-stopped
     ports:
       - "8000:8000"
@@ -59,9 +60,7 @@ services:
 
   # ─── Celery Worker (processes tasks) ───
   celery-worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+    image: boz-weather-trader-backend
     restart: unless-stopped
     env_file: .env.docker
     depends_on:
@@ -81,9 +80,7 @@ services:
 
   # ─── Celery Beat (schedules tasks) ───
   celery-beat:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+    image: boz-weather-trader-backend
     restart: unless-stopped
     env_file: .env.docker
     depends_on:
