@@ -77,13 +77,13 @@ function StatCard({
 
 // ─── Predictions Section ───
 
-function formatPredictionDate(dateStr: string): string {
+function formatMarketDate(dateStr: string): string {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(year, month - 1, day);
   return date.toLocaleDateString("en-US", {
+    weekday: "short",
     month: "short",
     day: "numeric",
-    year: "numeric",
   });
 }
 
@@ -100,7 +100,7 @@ function PredictionsSection({
 
   const pred = predictions.find((p) => p.city === selectedCity);
   const dateLabel = predictions[0]?.date
-    ? formatPredictionDate(predictions[0].date)
+    ? formatMarketDate(predictions[0].date)
     : "";
 
   // Cities that have predictions available
@@ -108,13 +108,13 @@ function PredictionsSection({
 
   return (
     <section className="mb-6">
-      {/* Title with date */}
+      {/* Title with market date */}
       <div className="flex items-baseline gap-2 mb-3">
         <h2 className="text-sm font-semibold text-gray-900">
-          Today&apos;s Predictions
+          Predictions
         </h2>
         {dateLabel && (
-          <span className="text-xs text-boz-neutral">{dateLabel}</span>
+          <span className="text-xs text-boz-neutral">for {dateLabel}</span>
         )}
       </div>
 

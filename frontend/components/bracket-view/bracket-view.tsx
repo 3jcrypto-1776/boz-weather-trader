@@ -3,6 +3,15 @@
 import type { BracketPrediction } from "@/lib/types";
 import { confidenceBadgeColor, formatProbability } from "@/lib/utils";
 
+function formatMarketDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 interface BracketViewProps {
   prediction: BracketPrediction;
   /** Optional market prices (bracket_label → market probability) for EV comparison */
@@ -17,12 +26,17 @@ export default function BracketView({
   prediction,
   marketPrices,
 }: BracketViewProps) {
+  const dateLabel = prediction.date ? formatMarketDate(prediction.date) : "";
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
       <div className="flex items-center justify-between mb-3">
         <div>
           <h3 className="text-sm font-semibold">
-            {prediction.city} — High Temp Brackets
+            {prediction.city} — High Temp
+            {dateLabel && (
+              <span className="font-normal text-boz-neutral"> {dateLabel}</span>
+            )}
           </h3>
           <p className="text-xs text-boz-neutral">
             Mean: {prediction.ensemble_mean_f.toFixed(1)}°F | Std:{" "}
