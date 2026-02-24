@@ -358,42 +358,49 @@ function HistoryView() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <div className="flex gap-1">
-          {CITY_OPTIONS.map((c) => (
-            <button
-              key={c}
-              onClick={() => {
-                setCityFilter(c);
-                setPage(1);
-              }}
-              className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                cityFilter === c
-                  ? "bg-boz-primary text-white"
-                  : "bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50"
-              }`}
-            >
-              {c === "ALL" ? "All" : c}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-center gap-4 mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-boz-neutral uppercase tracking-wide">City</span>
+          <div className="flex gap-1">
+            {CITY_OPTIONS.map((c) => (
+              <button
+                key={c}
+                onClick={() => {
+                  setCityFilter(c);
+                  setPage(1);
+                }}
+                className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  cityFilter === c
+                    ? "bg-boz-primary text-white"
+                    : "bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50"
+                }`}
+              >
+                {c === "ALL" ? "All" : c}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1">
-          {STATUS_OPTIONS.map((s) => (
-            <button
-              key={s}
-              onClick={() => {
-                setStatusFilter(s);
-                setPage(1);
-              }}
-              className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                statusFilter === s
-                  ? "bg-boz-primary text-white"
-                  : "bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50"
-              }`}
-            >
-              {s === "SETTLED" ? "Settled" : s === "ALL" ? "All" : s}
-            </button>
-          ))}
+        <div className="h-6 w-px bg-gray-200 hidden sm:block" />
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-semibold text-boz-neutral uppercase tracking-wide">Status</span>
+          <div className="flex gap-1">
+            {STATUS_OPTIONS.map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  setStatusFilter(s);
+                  setPage(1);
+                }}
+                className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  statusFilter === s
+                    ? "bg-boz-primary text-white"
+                    : "bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50"
+                }`}
+              >
+                {s === "SETTLED" ? "Settled" : s === "ALL" ? "All" : s}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
