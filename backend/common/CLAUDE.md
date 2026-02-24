@@ -636,6 +636,7 @@ settings = Settings()
 | `default_cooldown_minutes`     | int    | 60                       | Cooldown after a loss before trading again          |
 | `default_consecutive_loss_limit`| int   | 3                        | Max consecutive losses before halting               |
 | `celery_broker_url`            | str    | redis://localhost:6379/1 | Celery task broker                                  |
+| `cors_origins`                 | str    | ""                       | Extra CORS origins (comma-separated) for reverse proxy/tunnel deployments |
 | `celery_result_backend`        | str    | redis://localhost:6379/2 | Celery result storage                               |
 
 ### Environment Variable Mapping

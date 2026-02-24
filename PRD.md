@@ -1,9 +1,9 @@
 # Product Requirements Document (PRD)
 # Boz Weather Trader
 
-**Version:** 1.3
+**Version:** 1.4
 **Date:** February 23, 2026
-**Status:** All P0+P1 complete (36 phases + 3 hotfixes, 1513 tests)
+**Status:** All P0+P1 complete (36 phases + 3 hotfixes + deployment hardening, 1513 tests)
 
 ---
 
@@ -313,6 +313,7 @@ docker-compose up -d
 - Perfect for homelabs, Raspberry Pi, VPS
 - Full control over data
 - Zero recurring cost (besides electricity)
+- **Custom domain / reverse proxy**: Create a `docker-compose.override.yml` (git-ignored) to set `CORS_ORIGINS` and `NEXT_PUBLIC_API_URL` for your domain (e.g., Cloudflare Tunnel, Nginx, Traefik)
 
 #### Option B: Cloud Deploy (Free Tiers Available)
 
@@ -574,6 +575,7 @@ Your Machine (homelab / cloud VPS)
 | HF | Bracket label format | Match Kalshi display exactly ("72°F or below" not "Below 73F", "52° to 53°F" not "52-54F") | — |
 | 35 | Dashboard stats toggle | /api/dashboard/stats endpoint with multi-period P/L & W/L, click-to-cycle stat cards, SETTLED pseudo-filter, open trades section under calendar | 8 backend + 4 frontend |
 | 36 | Predictions redesign | Horizontal bar chart with bracket labels, peak highlighting, shortBracketLabel() utility, compact label generation from numeric bounds, v1.3.0 release | 6 frontend |
+| DH | Deployment hardening | Configurable CORS origins (env var), docker-compose.override.yml pattern for personal deployment, .gitignore for override file, v1.4.0 release | — |
 | **Total** | | **1324 backend + 189 frontend = 1513 tests** | |
 
 ---

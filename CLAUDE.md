@@ -51,7 +51,7 @@ tests/                   → 1324 backend + 189 frontend = 1513 tests (all passi
 - **Frontend:** Next.js 14+, React, Tailwind CSS, PWA (Workbox)
 - **ML/Stats:** scipy, numpy, XGBoost, scikit-learn (Gaussian CDF + multi-model ML ensemble: XGBoost + Random Forest + Ridge)
 - **Monitoring:** prometheus-client, Prometheus, Grafana (auto-provisioned dashboards), Alertmanager (webhook alerts)
-- **Containerization:** Docker + Docker Compose (10 services incl. Prometheus, Grafana, Alertmanager, updater sidecar) + `docker-compose.prod.yml` production overrides + `docker-compose.cloud.yml` cloud override (no monitoring)
+- **Containerization:** Docker + Docker Compose (10 services incl. Prometheus, Grafana, Alertmanager, updater sidecar) + `docker-compose.prod.yml` production overrides + `docker-compose.cloud.yml` cloud override (no monitoring) + `docker-compose.override.yml` (git-ignored, personal deployment config)
 - **Testing:** pytest (backend), Jest/Vitest (frontend)
 - **CI/CD:** GitHub Actions + GitHub Releases (automated via `.github/workflows/release.yml`)
 - **Versioning:** Single source of truth `VERSION` file, `/api/version` endpoint with GitHub Releases update check, self-update via updater sidecar (`POST /api/version/update`)
@@ -141,6 +141,7 @@ tests/                   → 1324 backend + 189 frontend = 1513 tests (all passi
 
 ## Deployment
 - **Self-hosted:** `docker compose up -d` (see `README.md`)
+- **Custom domain:** Create `docker-compose.override.yml` (git-ignored) to set `CORS_ORIGINS` and `NEXT_PUBLIC_API_URL` for reverse proxy / tunnel deployments
 - **Cloud:** Deploy guides in `docs/` for Railway, Fly.io, Oracle Cloud Free Tier
 - **Config files:** `fly.toml` (backend), `fly.frontend.toml` (frontend), `railway.json` (Railway button)
 - **Cloud override:** `docker-compose.cloud.yml` disables monitoring stack (replicas: 0)
