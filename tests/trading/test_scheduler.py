@@ -1258,3 +1258,83 @@ class TestTradingCycleKellyIntegration:
         assert call_kwargs.kwargs.get("bankroll_cents") == 75_000
         assert call_kwargs.kwargs.get("kelly_settings") is not None
         assert call_kwargs.kwargs.get("max_trade_size_cents") == 100
+
+
+# ─── Cache zero-price fallback ───────────────────────────────────────────────
+
+
+class TestFetchMarketPricesCacheZeroFallback:
+    """Test that _fetch_market_prices falls back to REST when cache has all-zero prices."""
+
+    async def test_all_zero_prices_triggers_rest_fallback(self):
+        """Cache with all-zero prices should NOT be treated as a valid cache hit."""
+        from backend.trading.scheduler import _fetch_market_prices
+
+        zero_prices = {"38°F or below": 0, "39° to 40°F": 0, "41° to 42°F": 0}
+        zero_tickers = {
+            "38°F or below": "KXHIGHNY-T38",
+            "39° to 40°F": "KXHIGHNY-T40",
+            "41° to 42°F": "KXHIGHNY-T42",
+        }
+
+        mock_redis = AsyncMock()
+        mock_redis.aclose = AsyncMock()
+
+        mock_market_1 = MagicMock(
+            ticker="KXHIGHNY-T38", floor_strike=None, cap_strike=37.99, yes_ask=5
+        )
+        mock_market_2 = MagicMock(
+            ticker="KXHIGHNY-T40", floor_strike=40.0, cap_strike=41.99, yes_ask=15
+        )
+
+        mock_client = AsyncMock()
+        mock_client.get_event_markets.return_value = [mock_market_1, mock_market_2]
+
+        with (
+            patch(
+                "backend.kalshi.cache.get_city_prices",
+                AsyncMock(return_value=(zero_prices, zero_tickers)),
+            ),
+            patch(
+                "backend.kalshi.cache.get_redis_client",
+                AsyncMock(return_value=mock_redis),
+            ),
+        ):
+            result = await _fetch_market_prices(mock_client, "NYC", date(2026, 2, 25))
+
+        # Should have called REST fallback since cache was all zeros
+        mock_client.get_event_markets.assert_called_once()
+        # Should return real prices from REST, not zeros
+        assert any(v > 0 for v in result.values()) or result == {}
+
+    async def test_valid_cache_prices_no_rest_call(self):
+        """Cache with real non-zero prices should be returned without REST call."""
+        from backend.trading.scheduler import _fetch_market_prices
+
+        real_prices = {"38°F or below": 5, "39° to 40°F": 22, "41° to 42°F": 45}
+        real_tickers = {
+            "38°F or below": "KXHIGHNY-T38",
+            "39° to 40°F": "KXHIGHNY-T40",
+            "41° to 42°F": "KXHIGHNY-T42",
+        }
+
+        mock_redis = AsyncMock()
+        mock_redis.aclose = AsyncMock()
+
+        mock_client = AsyncMock()
+
+        with (
+            patch(
+                "backend.kalshi.cache.get_city_prices",
+                AsyncMock(return_value=(real_prices, real_tickers)),
+            ),
+            patch(
+                "backend.kalshi.cache.get_redis_client",
+                AsyncMock(return_value=mock_redis),
+            ),
+        ):
+            result = await _fetch_market_prices(mock_client, "NYC", date(2026, 2, 25))
+
+        # Should NOT have called REST — cache was valid
+        mock_client.get_event_markets.assert_not_called()
+        assert result == real_prices

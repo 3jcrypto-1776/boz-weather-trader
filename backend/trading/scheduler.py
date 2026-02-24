@@ -848,7 +848,7 @@ async def _fetch_market_prices(kalshi_client, city: str, target_date) -> dict[st
                 cached = await get_city_prices(redis, city, cache_date_str)
                 if cached is not None:
                     prices, _tickers = cached
-                    if prices:
+                    if prices and any(v > 0 for v in prices.values()):
                         KALSHI_WS_CACHE_HITS_TOTAL.labels(source="cache").inc()
                         logger.debug(
                             "Market prices served from cache",
