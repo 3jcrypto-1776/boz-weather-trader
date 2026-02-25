@@ -52,7 +52,7 @@ tests/                   → 1421 backend + 209 frontend = 1630 tests (1 known f
 - **Frontend:** Next.js 14+, React, Tailwind CSS, PWA (Workbox)
 - **ML/Stats:** scipy, numpy, XGBoost, scikit-learn (Gaussian CDF + multi-model ML ensemble: XGBoost + Random Forest + Ridge)
 - **Monitoring:** prometheus-client, Prometheus, Grafana (auto-provisioned dashboards), Alertmanager (webhook alerts)
-- **Containerization:** Docker + Docker Compose (10 services incl. Prometheus, Grafana, Alertmanager, updater sidecar) + `docker-compose.prod.yml` production overrides + `docker-compose.cloud.yml` cloud override (no monitoring) + `docker-compose.override.yml` (git-ignored, personal deployment config)
+- **Containerization:** Docker + Docker Compose (10 services incl. Prometheus, Grafana, Alertmanager, updater sidecar) + persistent `modeldata` volume (ML models + source weights) + `docker-compose.prod.yml` production overrides + `docker-compose.cloud.yml` cloud override (no monitoring) + `docker-compose.override.yml` (git-ignored, personal deployment config)
 - **Testing:** pytest (backend), Jest/Vitest (frontend)
 - **CI/CD:** GitHub Actions + GitHub Releases (automated via `.github/workflows/release.yml`)
 - **Versioning:** Single source of truth `VERSION` file, `/api/version` endpoint with GitHub Releases update check, self-update via updater sidecar (`POST /api/version/update`)
