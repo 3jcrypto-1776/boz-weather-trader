@@ -23,7 +23,7 @@ from celery import shared_task
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.common.database import get_task_session
+from backend.common.database import get_task_session, reset_engine
 from backend.common.logging import get_logger
 from backend.common.models import CityEnum, Prediction, User, WeatherForecast
 from backend.common.schemas import WeatherData, WeatherVariables
@@ -243,6 +243,12 @@ async def _generate_predictions_async() -> dict:
     Returns:
         Dict with counts: generated, skipped, errors.
     """
+    # Reset the async engine so it is recreated in THIS event loop.
+    # async_to_sync creates a fresh loop per Celery task invocation; the
+    # singleton engine from a previous loop causes "Future attached to a
+    # different loop" errors.
+    reset_engine()
+
     session = await get_task_session()
     generated = 0
     skipped = 0

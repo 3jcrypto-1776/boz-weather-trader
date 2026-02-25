@@ -74,6 +74,31 @@ async def publish_event(event_type: str, data: dict[str, Any]) -> None:
         await r.aclose()
 
 
+async def publish_event_safe(event_type: str, data: dict[str, Any]) -> None:
+    """Async wrapper for publish_event that never raises.
+
+    Use this inside async Celery task implementations (e.g., _run_trading_cycle)
+    where publish_event_sync cannot be used (nested async_to_sync is forbidden).
+    Catches all exceptions so a Redis failure never crashes a trading cycle.
+
+    Args:
+        event_type: Event type string (e.g., "trade.executed").
+        data: Event-specific payload dict.
+    """
+    try:
+        await publish_event(event_type, data)
+    except Exception as exc:
+        logger.warning(
+            "Failed to publish WebSocket event",
+            extra={
+                "data": {
+                    "event_type": event_type,
+                    "error": str(exc),
+                }
+            },
+        )
+
+
 def publish_event_sync(event_type: str, data: dict[str, Any]) -> None:
     """Synchronous wrapper for publish_event, safe for Celery tasks.
 

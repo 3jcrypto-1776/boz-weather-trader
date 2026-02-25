@@ -65,13 +65,19 @@ async def _train_all_async(
     Returns:
         Training metrics dict, or dict with status="skipped"/"error".
     """
-    from backend.common.database import async_session
+    from backend.common.database import async_session, reset_engine
     from backend.common.models import TrainingReport
     from backend.prediction.source_weights import (
         compute_source_weights_from_accuracy,
         load_source_weights,
         save_source_weights,
     )
+
+    # Reset the async engine so it is recreated in THIS event loop.
+    # async_to_sync creates a fresh loop per Celery task invocation; the
+    # singleton engine from a previous loop causes "Future attached to a
+    # different loop" errors.
+    reset_engine()
 
     settings = get_settings()
     started_at = datetime.now(UTC).replace(tzinfo=None)
@@ -271,6 +277,9 @@ def train_all_models(
             from backend.common.models import TrainingReport
 
             async def _save_error_report() -> None:
+                from backend.common.database import reset_engine as _reset
+
+                _reset()
                 async with async_session() as session:
                     report = TrainingReport(
                         triggered_by=triggered_by,

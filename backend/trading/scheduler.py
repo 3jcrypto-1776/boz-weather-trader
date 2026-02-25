@@ -33,7 +33,7 @@ from backend.common.metrics import (
     TRADES_RISK_BLOCKED_TOTAL,
     TRADING_CYCLES_TOTAL,
 )
-from backend.websocket.events import publish_event_sync
+from backend.websocket.events import publish_event_safe, publish_event_sync
 
 logger = get_logger("TRADING")
 ET = ZoneInfo("America/New_York")
@@ -282,7 +282,7 @@ async def _run_trading_cycle() -> None:
                         }
                     },
                 )
-                publish_event_sync(
+                await publish_event_safe(
                     "trade.synced",
                     {
                         "synced_count": sync_result.synced_count,
@@ -441,7 +441,7 @@ async def _run_trading_cycle() -> None:
                         )
                         continue
                     TRADES_EXECUTED_TOTAL.labels(mode="auto", city=signal.city).inc()
-                    publish_event_sync(
+                    await publish_event_safe(
                         "trade.executed",
                         {
                             "city": signal.city,
@@ -481,7 +481,7 @@ async def _run_trading_cycle() -> None:
                         notification_svc,
                     )
                     TRADES_EXECUTED_TOTAL.labels(mode="queued", city=signal.city).inc()
-                    publish_event_sync(
+                    await publish_event_safe(
                         "trade.queued",
                         {
                             "city": signal.city,
@@ -590,7 +590,7 @@ async def _settle_and_postmortem() -> None:
         await session.commit()
 
         if settled_count > 0:
-            publish_event_sync("trade.settled", {"settled_count": settled_count})
+            await publish_event_safe("trade.settled", {"settled_count": settled_count})
 
             # Check if model retraining should be triggered
             await _check_retraining_trigger(session, settled_count)
