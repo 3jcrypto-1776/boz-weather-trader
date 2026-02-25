@@ -4,8 +4,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install all dependencies (including devDependencies for build)
+# --ignore-scripts avoids esbuild postinstall EACCES in Docker
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts && npm rebuild esbuild
 
 # Copy application source
 COPY . .
@@ -28,7 +29,7 @@ ENV NODE_ENV=production
 
 # Copy only production dependencies + built output
 COPY --from=builder /app/package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
