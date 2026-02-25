@@ -17,7 +17,7 @@ import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import { useDashboard, useDashboardStats } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
 import type { CityCode, DashboardData, DashboardStats, StatsPeriod } from "@/lib/types";
-import { centsToDollars, formatPnL, shortBracketLabel, CITY_NAMES } from "@/lib/utils";
+import { centsToDollars, confidenceBadgeColor, formatPnL, shortBracketLabel, CITY_NAMES } from "@/lib/utils";
 
 // ─── Period Toggle Helpers ───
 
@@ -230,8 +230,8 @@ function PredictionChart({
           Mean {pred.ensemble_mean_f.toFixed(0)}°F ±
           {pred.ensemble_std_f.toFixed(1)}
         </span>
-        <span className="capitalize">
-          {pred.confidence} confidence
+        <span className={`capitalize px-1.5 py-0.5 rounded-full ${confidenceBadgeColor(pred.confidence)}`}>
+          {pred.confidence}
         </span>
       </div>
     </div>

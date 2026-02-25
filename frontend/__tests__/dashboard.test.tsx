@@ -175,8 +175,11 @@ describe("DashboardPage", () => {
     // Peak bracket summary (55-56° at 30%)
     expect(screen.getByText(/55-56° \(30%\)/)).toBeInTheDocument();
 
-    // Confidence shown in footer
-    expect(screen.getByText("medium confidence")).toBeInTheDocument();
+    // Confidence shown as color-coded badge in footer
+    const badges = screen.getAllByText("medium");
+    const predBadge = badges.find((el) => el.closest(".text-\\[10px\\]") || el.className.includes("capitalize"));
+    expect(predBadge).toBeDefined();
+    expect(predBadge!.className).toContain("bg-yellow-100");
   });
 
   it("renders W/L record with all-time default", () => {
