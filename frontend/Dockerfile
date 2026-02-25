@@ -1,5 +1,5 @@
 # ── Stage 1: Build ──
-FROM node:20-slim AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ ENV NEXT_PUBLIC_APP_VERSION=${NEXT_PUBLIC_APP_VERSION}
 RUN npm run build
 
 # ── Stage 2: Production ──
-FROM node:20-slim AS runner
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 
