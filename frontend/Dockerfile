@@ -4,9 +4,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install all dependencies (including devDependencies for build)
-# --ignore-scripts avoids esbuild postinstall EACCES in Docker
+# --ignore-scripts avoids esbuild postinstall EACCES in Docker.
+# esbuild is only needed by vitest (tests); Next.js uses SWC for builds.
 COPY package*.json ./
-RUN npm ci --ignore-scripts && npm rebuild esbuild
+RUN npm ci --ignore-scripts
 
 # Copy application source
 COPY . .
