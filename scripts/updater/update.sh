@@ -6,8 +6,8 @@
 # Docker compose commands talk to the HOST Docker daemon, but relative bind
 # mount paths (./monitoring/...) resolve to /project/... which doesn't exist
 # on the host. We avoid this by:
-#   1. Using -f docker-compose.yml explicitly (skips docker-compose.override.yml
-#      which has the dev bind mount for hot reload)
+#   1. Using -f docker-compose.yml + docker-compose.override.yml (the override
+#      contains AppArmor workaround + frontend build args for the host)
 #   2. Only recreating app services (backend, celery, frontend) which have NO
 #      relative bind mounts in the base compose file
 #   3. Skipping monitoring services (prometheus, alertmanager, grafana) which
@@ -18,8 +18,12 @@ set -e
 PROJECT_DIR="${COMPOSE_PROJECT_DIR:-/project}"
 STATUS_FILE="/tmp/update_status.json"
 
-# Compose command: explicit -f to skip docker-compose.override.yml
+# Compose command: include override for AppArmor workaround + frontend build args.
+# The override is git-ignored and host-specific (contains security_opt + NEXT_PUBLIC_API_URL).
 COMPOSE="docker compose -f ${PROJECT_DIR}/docker-compose.yml"
+if [ -f "${PROJECT_DIR}/docker-compose.override.yml" ]; then
+    COMPOSE="${COMPOSE} -f ${PROJECT_DIR}/docker-compose.override.yml"
+fi
 
 # Only recreate services that use our built images and have NO relative bind mounts.
 # Monitoring services (prometheus, alertmanager, grafana) use external images and
