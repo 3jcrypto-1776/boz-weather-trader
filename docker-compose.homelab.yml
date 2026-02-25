@@ -143,11 +143,14 @@ services:
 
   # ─── Watchtower (Auto-Pull New Images) ───
   watchtower:
-    image: containrrr/watchtower
+    image: containrrr/watchtower:latest
     restart: unless-stopped
+    privileged: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
+      # Docker API version (Docker 29 requires >= 1.44)
+      DOCKER_API_VERSION: "1.44"
       # Check for new images every 5 minutes
       WATCHTOWER_POLL_INTERVAL: 300
       # Only update containers in this compose project
