@@ -40,7 +40,7 @@ backend/
 │   ├── metrics.py       → Win rate, ROI, Sharpe ratio, max drawdown, per-city stats, Kelly effectiveness
 │   └── exceptions.py    → BacktestError, InsufficientDataError
 ├── websocket/           → Real-time event streaming (Redis pub/sub → WebSocket → browser)
-│   ├── events.py        → WebSocketEvent model, publish_event() async + publish_event_sync() wrapper
+│   ├── events.py        → WebSocketEvent model, publish_event() async + publish_event_safe() (async, never raises) + publish_event_sync() (sync wrapper)
 │   ├── manager.py       → ConnectionManager singleton (tracks WS connections, broadcasts)
 │   ├── subscriber.py    → redis_subscriber() + log_subscriber() — asyncio tasks bridging Redis pub/sub → WS + DB
 │   └── router.py        → FastAPI WebSocket endpoint at /ws
