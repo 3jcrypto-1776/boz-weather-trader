@@ -15,6 +15,7 @@ Also triggered post-settlement when conditions are met (see scheduler.py).
 
 from __future__ import annotations
 
+import math
 import time
 from datetime import UTC, datetime
 
@@ -33,6 +34,17 @@ from backend.prediction.model_ensemble import MultiModelEnsemble
 from backend.prediction.train_xgb import _fetch_training_data, _rows_to_arrays
 
 logger = get_logger("MODEL")
+
+
+def _sanitize_for_json(obj: object) -> object:
+    """Replace NaN/Inf floats with None so the dict is valid JSON for PostgreSQL."""
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_for_json(v) for v in obj]
+    return obj
 
 
 async def _get_avg_brier_score(session) -> float | None:  # noqa: ANN001
@@ -207,7 +219,7 @@ async def _train_all_async(
             test_samples=len(x_test),
             date_range_start=date_range_start,
             date_range_end=date_range_end,
-            model_metrics=result.get("models", {}),
+            model_metrics=_sanitize_for_json(result.get("models", {})),
             weights_before=weights_before,
             weights_after=weights_after,
             source_weights_before=source_weights_before,
