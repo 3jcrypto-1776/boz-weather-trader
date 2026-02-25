@@ -3,7 +3,7 @@
 
 **Version:** 1.4.7
 **Date:** February 24, 2026
-**Status:** All P0+P1 complete (36 phases + 7 hotfixes + deployment hardening, 1536 tests)
+**Status:** All P0+P1 complete (37 phases + 7 hotfixes + deployment hardening, 1600 tests)
 
 ---
 
@@ -492,7 +492,7 @@ Your Machine (homelab / cloud VPS)
 - [x] **Trade logging** - Full audit trail of every trade placed with reasoning (Phase 4)
 - [x] **Trade post-mortems** - Auto-generated executive summary for each trade after settlement (Phase 3, 14)
 - [x] **Structured logging** - Module-tagged, leveled logs to stdout + database (Phase 1)
-- [x] **Unit + safety tests** - Every module ships with tests; 1347 backend + 189 frontend = 1536 tests (All phases)
+- [x] **Unit + safety tests** - Every module ships with tests; 1396 backend + 204 frontend = 1600 tests (All phases)
 - [x] **CI/CD pipeline** - GitHub Actions: 4 parallel jobs (backend-lint, backend-test w/ coverage, frontend, docker-build) (Phase 8, 22)
 - [x] **Docker Compose deployment** - 10-service Docker Compose (backend, frontend, postgres, redis, celery worker/beat, prometheus, grafana, alertmanager, updater) (Phase 6, 16, 19, 34)
 - [x] **Market type selector UI** - High Temp active, others show "Coming Soon" (Phase 5)
@@ -524,6 +524,7 @@ Your Machine (homelab / cloud VPS)
 - [x] **Kelly Criterion position sizing** - Optimal bet sizing based on edge and bankroll (Phase 24)
 - [x] **Backtesting module** - Test strategy against historical data (Phase 25)
 - [x] **Historical forecast accuracy tracking** - Monitor model calibration over time (Phase 26)
+- [x] **Auto-retrain + Training Log** - Post-settlement retraining trigger, source weight adjustment, TrainingReport persistence, Training Log on Performance page (Phase 37)
 
 #### P2 - Nice to Have
 - [ ] **Additional market plugins** - Precipitation, snowfall, low temperature
@@ -580,7 +581,8 @@ Your Machine (homelab / cloud VPS)
 | HF | NO side price + pagination + backfill | NO fill prices converted to YES-equivalent (`100 - fill_cost_per_contract`), `get_orders()` cursor-based pagination, Alembic 0007 backfills 6 historical trades with corrected price/pnl/fees/qty | 11 |
 | HF | Bracket label off-by-one | `parse_bracket_from_market()` bottom bracket formula changed from `int(cap)` to `math.ceil(cap) - 1` for Kalshi's inconsistent cap_strike format (72.99 vs 73.0), Alembic 0008 migration fixes existing trades/predictions | 4 |
 | HF | Cache zero-price fallback | `_fetch_market_prices()` cache validity check changed from `if prices:` to `if prices and any(v > 0 for v in prices.values())` to prevent all-zero WS cache from blocking REST fallback | 2 |
-| **Total** | | **1347 backend + 189 frontend = 1536 tests** | |
+| 37 | Auto-Retrain + Training Log | TrainingReport DB model + Alembic 0009, post-settlement retraining trigger (3 conditions), source weight persistence from accuracy data, pipeline cache invalidation, training reports API + manual trigger, Training Log on Performance page with expandable report cards | 49 backend + 15 frontend |
+| **Total** | | **1396 backend + 204 frontend = 1600 tests** | |
 
 ---
 

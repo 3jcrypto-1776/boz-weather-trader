@@ -49,7 +49,7 @@ tests/
 │   ├── test_orders.py      → Order build + pre-flight validation (8 tests)
 │   ├── test_exceptions.py  → Exception context, formatting, filtering (7 tests)
 │   └── test_rate_limiter.py → Token bucket init, counting, acquire (5 tests)
-├── prediction/          → Unit tests for backend/prediction/ (217 tests)
+├── prediction/          → Unit tests for backend/prediction/ (266 tests)
 │   ├── conftest.py      → Prediction fixtures (sample weather data, bracket configs)
 │   ├── test_ml_models.py     → RF + Ridge model managers: train, save, load, predict, NaN (24 tests)
 │   ├── test_model_ensemble.py → Multi-model ensemble: weights, predict, train, save/load (22 tests)
@@ -58,19 +58,22 @@ tests/
 │   ├── test_xgb_model.py     → XGBoost model manager: train, save, load, predict (24 tests)
 │   ├── test_train_models.py  → Multi-model training Celery task: execution, partial accept, errors (10 tests)
 │   ├── test_train_xgb.py     → XGBoost training Celery task: data conversion, task execution (10 tests)
+│   ├── test_source_weights.py → Source weight persistence: load, save, compute from accuracy (14 tests)
+│   ├── test_retraining.py    → Auto-retrain pipeline: training report persistence, source weight computation (16 tests)
 │   ├── test_ensemble.py      → Ensemble forecast + confidence assessment (19 tests)
 │   ├── test_calibration.py   → Brier score, calibration buckets, bracket matching (17 tests)
 │   ├── test_brackets.py      → Normal-CDF bracket probabilities (14 tests)
 │   ├── test_error_dist.py    → Season detection + error std calculation (12 tests)
 │   ├── test_postmortem.py    → Post-mortem narrative generation (8 tests)
 │   └── test_pipeline.py      → Full prediction pipeline orchestration + multi-model integration (11 tests)
-├── trading/             → Unit tests + safety tests for backend/trading/ (245 tests)
+├── trading/             → Unit tests + safety tests for backend/trading/ (255 tests)
 │   ├── conftest.py      → Trading fixtures (mock Kalshi client, sample predictions)
 │   ├── test_ev_calculator.py      → EV math, fees, bracket scanning, Kelly integration (45 tests)
 │   ├── test_scheduler.py          → Celery tasks: trading cycle, expiry, settlement w/ market_date, Kelly params (40 tests)
 │   ├── test_kelly.py              → Kelly Criterion: sizing, fractional, fees, caps, edge cases (35 tests)
 │   ├── test_postmortem.py         → Settlement matching, P&L, rich narratives w/ sections, market_date queries (24 tests)
 │   ├── test_sync.py               → Portfolio sync: ticker parsing, reconciliation, sentinel values, market_date, fill price, NO side conversion (27 tests)
+│   ├── test_retraining_trigger.py → Post-settlement retraining trigger: 3 conditions, cooldown, metrics (8 tests)
 │   ├── test_celery_hardening.py   → Task timeout configs (15 tests)
 │   ├── test_risk_manager.py       → Risk check ordering + enforcement (12 tests)
 │   ├── test_performance.py        → Performance analytics: trade stats, P&L tracking (12 tests)
@@ -78,8 +81,9 @@ tests/
 │   ├── test_executor.py           → Order placement + DB recording + market_date + fill price + NO side conversion (16 tests)
 │   ├── test_cooldown.py           → Per-loss + consecutive cooldowns (9 tests)
 │   └── test_notifications.py      → Web push via VAPID (5 tests)
-├── api/                 → API endpoint tests (143 tests)
+├── api/                 → API endpoint tests (154 tests)
 │   ├── conftest.py      → API fixtures (api_engine, client, mock_kalshi, factories)
+│   ├── test_training.py    → Training reports endpoint + manual retrain trigger (11 tests)
 │   ├── test_accuracy.py    → Forecast accuracy endpoints: sources, calibration, trends (17 tests)
 │   ├── test_auth.py     → Auth validate + disconnect (5 tests)
 │   ├── test_auth_status.py → Auth status, demo mode, onboarding flow (17 tests)
@@ -1140,8 +1144,8 @@ jobs:
 | Job | What It Does | Failure Blocks Merge? |
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
-| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1347 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
-| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 189 tests) | Yes |
+| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1396 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
+| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 204 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 
 **Key design decisions:**

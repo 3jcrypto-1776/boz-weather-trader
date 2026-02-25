@@ -30,7 +30,7 @@ backend/
 │   └── metrics.py       → Centralized Prometheus metric definitions (counters, histograms, gauges)
 ├── weather/             → Agent 1: Weather data pipeline
 ├── kalshi/              → Agent 2: Kalshi API client (auth, orders, markets, WS feed, cache)
-├── prediction/          → Agent 3: Prediction engine (ensemble + multi-model ML + brackets + accuracy tracking)
+├── prediction/          → Agent 3: Prediction engine (ensemble + multi-model ML + brackets + accuracy tracking + auto-retrain + source weights)
 ├── trading/             → Agent 4: Trading engine (incl. portfolio sync)
 ├── backtesting/         → Backtesting engine (sync simulation, reuses trading pure functions)
 │   ├── schemas.py       → BacktestConfig, BacktestResult, BacktestDay, SimulatedTrade, CityStats, KellyStats
@@ -44,7 +44,7 @@ backend/
 │   ├── manager.py       → ConnectionManager singleton (tracks WS connections, broadcasts)
 │   ├── subscriber.py    → redis_subscriber() + log_subscriber() — asyncio tasks bridging Redis pub/sub → WS + DB
 │   └── router.py        → FastAPI WebSocket endpoint at /ws
-└── api/                 → FastAPI route handlers (auth, dashboard, dashboard_stats, settings, trades, version + self-update, etc.)
+└── api/                 → FastAPI route handlers (auth, dashboard, dashboard_stats, settings, trades, training, version + self-update, etc.)
 ```
 
 ### Monitoring (sibling directory)

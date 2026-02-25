@@ -32,6 +32,7 @@ from backend.api.performance import router as performance_router
 from backend.api.queue import router as queue_router
 from backend.api.settings import router as settings_router
 from backend.api.trades import router as trades_router
+from backend.api.training import router as training_router
 from backend.api.version import router as version_router
 from backend.api.weather import router as weather_router
 from backend.common.config import get_settings
@@ -280,6 +281,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications_router, prefix="/api/notifications", tags=["notifications"])
     app.include_router(backtest_router, prefix="/api/backtest", tags=["backtest"])
     app.include_router(accuracy_router, prefix="/api/accuracy", tags=["accuracy"])
+    app.include_router(training_router, prefix="/api/training", tags=["training"])
     app.include_router(weather_router, prefix="/api/weather", tags=["weather"])
     app.include_router(version_router, prefix="/api/version", tags=["version"])
     app.include_router(calendar_router, prefix="/api/trades/calendar", tags=["calendar"])

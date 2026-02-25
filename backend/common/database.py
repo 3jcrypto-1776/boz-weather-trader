@@ -85,6 +85,19 @@ async def get_task_session() -> AsyncSession:
     return factory()
 
 
+def async_session() -> AsyncSession:
+    """Create an async session usable as a context manager.
+
+    For use in non-FastAPI contexts (Celery tasks, background jobs).
+
+    Usage:
+        async with async_session() as session:
+            result = await session.execute(...)
+    """
+    factory = _get_session_factory()
+    return factory()
+
+
 def reset_engine() -> None:
     """Reset the engine and session factory. Used in tests."""
     global _engine, _session_factory

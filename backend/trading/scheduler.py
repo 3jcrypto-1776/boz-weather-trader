@@ -555,6 +555,9 @@ async def _settle_and_postmortem() -> None:
         if settled_count > 0:
             publish_event_sync("trade.settled", {"settled_count": settled_count})
 
+            # Check if model retraining should be triggered
+            await _check_retraining_trigger(session, settled_count)
+
         logger.info(
             "Settlement cycle complete",
             extra={"data": {"settled_count": settled_count}},
@@ -565,6 +568,109 @@ async def _settle_and_postmortem() -> None:
         raise
     finally:
         await session.close()
+
+
+async def _check_retraining_trigger(
+    session: object,  # AsyncSession
+    settled_count: int,
+) -> None:
+    """Check if conditions are met to trigger model retraining post-settlement.
+
+    Trigger conditions (any one fires):
+    1. Settlement count since last training >= retrain_settlement_threshold
+    2. Average Brier score across cities > retrain_brier_threshold
+    3. Days since last TrainingReport > retrain_max_days
+
+    If triggered, dispatches the train_all_models Celery task asynchronously
+    with triggered_by="settlement".
+    """
+    from sqlalchemy import func, select
+
+    from backend.common.config import get_settings
+    from backend.common.models import Trade, TradeStatus, TrainingReport
+
+    settings = get_settings()
+
+    try:
+        # Find the most recent training report
+        last_report_result = await session.execute(
+            select(TrainingReport)
+            .order_by(TrainingReport.completed_at.desc())
+            .limit(1)
+        )
+        last_report = last_report_result.scalar_one_or_none()
+
+        trigger_reason: str | None = None
+
+        if last_report is None:
+            # Never trained before — trigger on first settlement batch
+            trigger_reason = "first_training"
+        else:
+            from datetime import datetime
+
+            # Check 1: Settlement count since last training
+            settled_since = await session.execute(
+                select(func.count())
+                .select_from(Trade)
+                .where(
+                    Trade.status.in_([TradeStatus.WON, TradeStatus.LOST]),
+                    Trade.settled_at > last_report.completed_at,
+                )
+            )
+            count_since = settled_since.scalar() or 0
+
+            if count_since >= settings.retrain_settlement_threshold:
+                trigger_reason = f"settlement_count_{count_since}"
+
+            # Check 2: Time elapsed since last training
+            if trigger_reason is None:
+                now = datetime.utcnow()
+                days_since = (now - last_report.completed_at).total_seconds() / 86400
+                if days_since >= settings.retrain_max_days:
+                    trigger_reason = f"days_elapsed_{int(days_since)}"
+
+            # Check 3: Brier score degradation
+            if trigger_reason is None:
+                try:
+                    from backend.prediction.calibration import check_calibration
+
+                    scores: list[float] = []
+                    for city in ["NYC", "CHI", "MIA", "AUS"]:
+                        report = await check_calibration(city, session, lookback_days=90)
+                        if (
+                            report.status == "ok"
+                            and report.brier_score is not None
+                        ):
+                            scores.append(report.brier_score)
+                    if scores:
+                        avg_brier = sum(scores) / len(scores)
+                        if avg_brier > settings.retrain_brier_threshold:
+                            trigger_reason = f"brier_degradation_{avg_brier:.3f}"
+                except Exception:
+                    pass  # Non-fatal — skip Brier check on errors
+
+        if trigger_reason is not None:
+            logger.info(
+                "Triggering model retraining post-settlement",
+                extra={"data": {"reason": trigger_reason, "settled_count": settled_count}},
+            )
+            from backend.prediction.train_models import train_all_models
+
+            train_all_models.delay(
+                triggered_by="settlement",
+                trigger_reason=trigger_reason,
+            )
+        else:
+            logger.debug(
+                "No retraining trigger conditions met",
+                extra={"data": {"settled_count": settled_count}},
+            )
+
+    except Exception:
+        logger.warning(
+            "Failed to check retraining trigger — non-fatal",
+            exc_info=True,
+        )
 
 
 # ─── Helper Functions ───

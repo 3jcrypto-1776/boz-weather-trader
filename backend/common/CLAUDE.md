@@ -10,7 +10,7 @@ This module contains everything shared across all backend agents: Pydantic schem
 backend/common/
 ├── __init__.py
 ├── schemas.py        -> Pydantic models for ALL cross-module data (THE interface contracts)
-├── database.py       -> SQLAlchemy async engine, session factory, dependency injection
+├── database.py       -> SQLAlchemy async engine, session factory, dependency injection, async_session() helper
 ├── models.py         -> SQLAlchemy ORM models (all database tables)
 ├── logging.py        -> Structured logging setup with module tags, secret redaction + Redis log persistence
 ├── config.py         -> App settings via pydantic-settings (reads .env)
@@ -411,7 +411,9 @@ async def list_trades(db: AsyncSession = Depends(get_db_session)):
     return result.scalars().all()
 ```
 
-### Usage in Celery Tasks (Non-FastAPI Context)
+### async_session() Helper (Non-FastAPI Context)
+
+The `async_session()` helper function provides database sessions outside of FastAPI's dependency injection (e.g., in Celery tasks, training pipelines, or background workers). It creates a fresh session from the async session factory.
 
 ```python
 import asyncio
@@ -637,6 +639,9 @@ settings = Settings()
 | `default_consecutive_loss_limit`| int   | 3                        | Max consecutive losses before halting               |
 | `celery_broker_url`            | str    | redis://localhost:6379/1 | Celery task broker                                  |
 | `cors_origins`                 | str    | ""                       | Extra CORS origins (comma-separated) for reverse proxy/tunnel deployments |
+| `retrain_settlement_threshold` | int    | 50                       | Min settlements since last training to trigger auto-retrain |
+| `retrain_brier_threshold`      | float  | 0.35                     | Brier score above which retraining is triggered |
+| `retrain_max_days`             | int    | 30                       | Max days since last training before forced retrain |
 | `celery_result_backend`        | str    | redis://localhost:6379/2 | Celery result storage                               |
 
 ### Environment Variable Mapping
@@ -840,6 +845,8 @@ All Prometheus metric objects are module-level singletons. Import them wherever 
 | `ML_MODELS_AVAILABLE` | Gauge | — | Number of ML models currently loaded |
 | `PORTFOLIO_SYNC_TOTAL` | Counter | outcome | Portfolio sync results (success/error) |
 | `PORTFOLIO_SYNC_TRADES_CREATED` | Counter | — | Number of trades created via portfolio sync |
+| `ML_RETRAIN_TRIGGERS_TOTAL` | Counter | reason | ML retraining triggers (settlement_count/brier_degradation/time_elapsed) |
+| `ML_SOURCE_WEIGHTS_UPDATED_TOTAL` | Counter | — | Source weight recalculations after retraining |
 
 ### Usage
 

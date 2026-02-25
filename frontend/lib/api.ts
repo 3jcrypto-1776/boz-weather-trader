@@ -24,6 +24,7 @@ import type {
   SyncResult,
   TradeRecord,
   TradesPage,
+  TrainingReportList,
   UpdateStatus,
   UpdateTriggerResponse,
   UserSettings,
@@ -272,6 +273,23 @@ export async function triggerUpdate(): Promise<UpdateTriggerResponse> {
 
 export async function fetchUpdateStatus(): Promise<UpdateStatus> {
   return apiFetch<UpdateStatus>("/api/version/update/status");
+}
+
+// ─── Training Reports (2 endpoints) ───
+
+export async function fetchTrainingReports(
+  limit: number = 10,
+  offset: number = 0
+): Promise<TrainingReportList> {
+  return apiFetch<TrainingReportList>(
+    `/api/training/reports?limit=${limit}&offset=${offset}`
+  );
+}
+
+export async function triggerRetraining(): Promise<UpdateTriggerResponse> {
+  return apiFetch<UpdateTriggerResponse>("/api/training/trigger", {
+    method: "POST",
+  });
 }
 
 // ─── Calendar (1 endpoint) ───

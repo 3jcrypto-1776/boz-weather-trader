@@ -62,6 +62,11 @@ class Settings(BaseSettings):
     xgb_retrain_interval_days: int = 14  # Retrain frequency
     ml_ensemble_weight: float = 0.30  # ML ensemble weight in final blend (0.0 = disabled)
 
+    # ─── Retraining Triggers ───
+    retrain_settlement_threshold: int = 25  # Retrain every N settlements since last train
+    retrain_brier_threshold: float = 0.25  # Retrain if avg Brier score exceeds this
+    retrain_max_days: int = 7  # Retrain if more than N days since last training
+
     # ─── Celery ───
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"

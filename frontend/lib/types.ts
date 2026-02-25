@@ -352,6 +352,41 @@ export interface SyncResult {
   synced_at: string;
 }
 
+// ─── Training Reports ───
+
+export interface ModelMetrics {
+  model_name: string;
+  rmse: number | null;
+  mae: number | null;
+  accepted: boolean;
+  error: string | null;
+}
+
+export interface TrainingReport {
+  id: number;
+  triggered_by: string;
+  trigger_reason: string | null;
+  status: string;
+  training_samples: number;
+  test_samples: number;
+  date_range_start: string | null;
+  date_range_end: string | null;
+  model_metrics: ModelMetrics[];
+  weights_before: Record<string, number> | null;
+  weights_after: Record<string, number> | null;
+  source_weights_before: Record<string, number> | null;
+  source_weights_after: Record<string, number> | null;
+  brier_score_before: number | null;
+  brier_score_after: number | null;
+  duration_seconds: number;
+  completed_at: string;
+}
+
+export interface TrainingReportList {
+  reports: TrainingReport[];
+  total: number;
+}
+
 // ─── Notifications ───
 
 export interface PushSubscriptionPayload {

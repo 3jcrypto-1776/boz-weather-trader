@@ -266,3 +266,45 @@ class UpdateStatus(BaseModel):
     step: str | None = None
     error: str | None = None
     started_at: str | None = None
+
+
+# ─── Training Reports ───
+
+
+class ModelMetricsResponse(BaseModel):
+    """Per-model training metrics in a training report."""
+
+    model_name: str
+    rmse: float | None = None
+    mae: float | None = None
+    accepted: bool = False
+    error: str | None = None
+
+
+class TrainingReportResponse(BaseModel):
+    """A single training report for the frontend Training Log."""
+
+    id: int
+    triggered_by: str
+    trigger_reason: str | None = None
+    status: str
+    training_samples: int
+    test_samples: int
+    date_range_start: str | None = None
+    date_range_end: str | None = None
+    model_metrics: list[ModelMetricsResponse]
+    weights_before: dict[str, float] | None = None
+    weights_after: dict[str, float] | None = None
+    source_weights_before: dict[str, float] | None = None
+    source_weights_after: dict[str, float] | None = None
+    brier_score_before: float | None = None
+    brier_score_after: float | None = None
+    duration_seconds: float
+    completed_at: str
+
+
+class TrainingReportListResponse(BaseModel):
+    """Paginated list of training reports."""
+
+    reports: list[TrainingReportResponse]
+    total: int

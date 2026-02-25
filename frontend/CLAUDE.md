@@ -23,11 +23,12 @@ frontend/
 │   ├── charts/             → P&L charts, calibration chart, source accuracy chart
 │   ├── calendar/           → Calendar grid + day detail panel
 │   ├── trade-card/         → Trade display with post-mortem expandable
+│   ├── training-log/       → Training report log display on Performance page
 │   └── bracket-view/       → Visual bracket probability display
 ├── lib/                    → Utilities, API client, types
-│   ├── api.ts              → Backend API client (fetch wrapper) + getWsUrl() helper + fetchVersion() + triggerUpdate() + fetchUpdateStatus()
-│   ├── types.ts            → TypeScript types matching backend schemas + VersionInfo + UpdateTriggerResponse + UpdateStatus
-│   ├── hooks.ts            → SWR data fetching hooks + useVersion()
+│   ├── api.ts              → Backend API client (fetch wrapper) + getWsUrl() helper + fetchVersion() + triggerUpdate() + fetchUpdateStatus() + fetchTrainingReports() + triggerRetrain()
+│   ├── types.ts            → TypeScript types matching backend schemas + VersionInfo + UpdateTriggerResponse + UpdateStatus + TrainingReport
+│   ├── hooks.ts            → SWR data fetching hooks + useVersion() + useTrainingReports()
 │   ├── trade-grouping.ts   → Frontend-only trade grouping: groupTrades() + groupByMarket()
 │   ├── websocket-types.ts  → WebSocket event types + EVENT_TO_SWR_KEYS mapping
 │   ├── websocket.ts        → useWebSocket() hook, WebSocketProvider, exponential backoff reconnection
@@ -1678,6 +1679,7 @@ Your tests go in `frontend/__tests__/`:
 - `hooks.test.ts` — SWR hooks return correct data, handle errors
 - `version-info.test.tsx` — version display, update notification, loading/error states
 - `update-button.test.tsx` — update trigger, progress states, error handling, success display (5 tests)
+- `training-log.test.tsx` — training report display, trigger retrain, loading/error states (11 tests)
 - `utils.test.ts` — centsToDollars, formatPnL, formatProbability, date formatting
 
 ### Critical Test Cases

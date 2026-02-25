@@ -210,6 +210,20 @@ PORTFOLIO_SYNC_TRADES_CREATED = Counter(
 )
 
 
+# ─── Retraining Metrics ───
+
+ML_RETRAIN_TRIGGERS_TOTAL = Counter(
+    "boz_ml_retrain_triggers_total",
+    "Model retraining triggers",
+    labelnames=["triggered_by", "reason"],
+)
+
+ML_SOURCE_WEIGHTS_UPDATED_TOTAL = Counter(
+    "boz_ml_source_weights_updated_total",
+    "Source ensemble weight updates after retraining",
+)
+
+
 def set_app_info(version: str, environment: str) -> None:
     """Set the app_info metric values. Called once at startup."""
     APP_INFO.info({"version": version, "environment": environment})

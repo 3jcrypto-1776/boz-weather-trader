@@ -292,3 +292,50 @@ class LogEntry(Base):
     module_tag = Column(String, nullable=False, index=True)
     message = Column(Text, nullable=False)
     data = Column(JSON, nullable=True)
+
+
+class TrainingReport(Base):
+    """Persisted record of an ML model training run.
+
+    Created each time train_all_models runs (scheduled, post-settlement, or manual).
+    Captures per-model metrics, weight changes, source weight updates, and Brier
+    score snapshots so the user can see what the model learned over time.
+    """
+
+    __tablename__ = "training_reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    triggered_by = Column(String, nullable=False)  # "schedule" | "settlement" | "manual"
+    trigger_reason = Column(String, nullable=True)  # e.g. "weekly", "settlement_count_25"
+    status = Column(String, nullable=False)  # "completed" | "skipped" | "error"
+
+    # Data stats
+    training_samples = Column(Integer, default=0)
+    test_samples = Column(Integer, default=0)
+    date_range_start = Column(TZNaiveDateTime, nullable=True)
+    date_range_end = Column(TZNaiveDateTime, nullable=True)
+
+    # Per-model metrics (JSON): {"XGBoost": {"rmse": 2.1, "mae": 1.7, "accepted": true}}
+    model_metrics = Column(JSON, nullable=False)
+
+    # ML model weights before and after training
+    weights_before = Column(JSON, nullable=True)
+    weights_after = Column(JSON, nullable=True)
+
+    # Ensemble source weights before and after
+    source_weights_before = Column(JSON, nullable=True)
+    source_weights_after = Column(JSON, nullable=True)
+
+    # Calibration snapshot
+    brier_score_before = Column(Float, nullable=True)
+    brier_score_after = Column(Float, nullable=True)
+
+    # Timing
+    duration_seconds = Column(Float, default=0.0)
+    started_at = Column(TZNaiveDateTime, nullable=False)
+    completed_at = Column(TZNaiveDateTime, default=_utcnow)
+
+    # Error info (populated when status="error")
+    error_message = Column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_training_report_completed", "completed_at"),)

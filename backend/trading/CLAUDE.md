@@ -17,7 +17,7 @@ backend/trading/
 ├── executor.py        -> Trade execution orchestrator (auto + manual modes)
 ├── postmortem.py      -> Generate full trade post-mortem after settlement
 ├── sync.py            -> Kalshi portfolio sync (reconciles app Trade records with actual Kalshi filled orders)
-├── scheduler.py       -> Celery tasks for trading cycle (passes Kelly params, auto-sync)
+├── scheduler.py       -> Celery tasks for trading cycle (passes Kelly params, auto-sync, post-settlement retraining trigger)
 ├── notifications.py   -> Web push notifications via VAPID
 └── exceptions.py      -> Trading-specific exceptions (or import from common)
 ```

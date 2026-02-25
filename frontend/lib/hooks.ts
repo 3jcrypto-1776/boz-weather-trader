@@ -26,6 +26,7 @@ import {
   fetchSettings,
   fetchSourceAccuracy,
   fetchTrades,
+  fetchTrainingReports,
   fetchVersion,
 } from "./api";
 import type {
@@ -42,6 +43,7 @@ import type {
   PerformanceData,
   SourceAccuracy,
   TradesPage,
+  TrainingReportList,
   UserSettings,
   VersionInfo,
 } from "./types";
@@ -244,5 +246,21 @@ export function useCalendar(
     `/api/trades/calendar?year=${year}&month=${month}`,
     () => fetchCalendar(year, month),
     { refreshInterval: 0, ...config }
+  );
+}
+
+// ─── Training Reports ───
+
+export function useTrainingReports(
+  limit: number = 10,
+  config?: SWRConfiguration
+) {
+  return useSWR<TrainingReportList>(
+    `/api/training/reports?limit=${limit}`,
+    () => fetchTrainingReports(limit),
+    {
+      refreshInterval: 0,
+      ...config,
+    }
   );
 }

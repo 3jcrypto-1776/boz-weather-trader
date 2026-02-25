@@ -18,7 +18,8 @@ backend/prediction/
 ├── ml_models.py        -> RF + Ridge model managers (joblib serialization, NaN imputation)
 ├── model_ensemble.py   -> Multi-model orchestrator (XGBoost + RF + Ridge, inverse-RMSE weights)
 ├── train_xgb.py        -> XGBoost training Celery task (kept for backward compat)
-├── train_models.py     -> Multi-model training Celery task (weekly retraining, all 3 models)
+├── train_models.py     -> Multi-model training Celery task (weekly retraining, all 3 models, persists TrainingReport + source weights)
+├── source_weights.py   -> Source weight persistence (load/save/compute from accuracy data)
 ├── brackets.py         -> Bracket probability calculator (scipy CDF)
 ├── error_dist.py       -> Historical forecast error distribution analysis
 ├── accuracy.py         -> Per-source forecast accuracy (MAE, RMSE, bias) + error trends

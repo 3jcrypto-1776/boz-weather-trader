@@ -7,6 +7,7 @@ import CalibrationChart from "@/components/charts/calibration-chart";
 import CityPerformanceChart from "@/components/charts/city-performance-chart";
 import PnlChart from "@/components/charts/pnl-chart";
 import SourceAccuracyChart from "@/components/charts/source-accuracy-chart";
+import TrainingLog from "@/components/charts/training-log";
 import EmptyState from "@/components/ui/empty-state";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
@@ -15,6 +16,7 @@ import {
   useCalibration,
   usePerformance,
   useSourceAccuracy,
+  useTrainingReports,
 } from "@/lib/hooks";
 import type { CityCode } from "@/lib/types";
 import { centsToDollars, formatPnL, formatProbability } from "@/lib/utils";
@@ -26,6 +28,8 @@ export default function PerformancePage() {
   const [accuracyCity, setAccuracyCity] = useState<CityCode>("NYC");
   const { data: calibration } = useCalibration(accuracyCity);
   const { data: sources } = useSourceAccuracy(accuracyCity);
+  const { data: trainingReports, mutate: mutateTraining } =
+    useTrainingReports();
 
   if (isLoading) {
     return (
@@ -221,6 +225,11 @@ export default function PerformancePage() {
 
           {sources && <SourceAccuracyChart sources={sources} />}
         </div>
+
+        {/* Training Log */}
+        {trainingReports && (
+          <TrainingLog data={trainingReports} onMutate={mutateTraining} />
+        )}
 
         {/* Accuracy Over Time */}
         {data.accuracy_over_time.length > 0 && (

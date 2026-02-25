@@ -15,7 +15,7 @@ backend/
   ├── celery_app.py → Celery config, beat schedule, task signal instrumentation
   ├── weather/     → Agent 1: NWS + Open-Meteo data pipeline
   ├── kalshi/      → Agent 2: Kalshi API client (auth, orders, markets, WS feed, Redis cache)
-  ├── prediction/  → Agent 3: Statistical ensemble + multi-model ML (XGBoost+RF+Ridge) + bracket probabilities + accuracy tracking
+  ├── prediction/  → Agent 3: Statistical ensemble + multi-model ML (XGBoost+RF+Ridge) + bracket probabilities + accuracy tracking + auto-retrain
   ├── trading/     → Agent 4: EV calculator, Kelly sizing, risk controls, trade queue
   ├── backtesting/ → Backtesting engine: day-by-day simulation, synthetic prices, metrics
   ├── websocket/   → Real-time event push (Redis pub/sub → WebSocket → SWR revalidation)
@@ -30,14 +30,15 @@ monitoring/
   └── grafana/     → Grafana provisioning + dashboard JSON files
       ├── provisioning/  → Auto-provisioned datasources + dashboard provider
       └── dashboards/    → API Overview (8 panels) + Trading & Weather (10 panels) + Kalshi WS Feed (6 panels)
-tests/                   → 1347 backend + 189 frontend = 1536 tests (all passing)
+tests/                   → 1396 backend + 204 frontend = 1600 tests (1 known failure)
   ├── common/      → Shared module tests: config, schemas, models, logging, encryption, middleware, metrics (123)
+  ├── training/    → Training API endpoint tests (11)
   ├── weather/     → Weather pipeline: NWS, Open-Meteo, normalizer, stations, CLI parser, scheduler (140)
   ├── kalshi/      → Kalshi client: auth, REST, WS, markets, orders, models, cache, market feed (143)
-  ├── prediction/  → Prediction engine: ensemble, multi-model ML, brackets, error dist, accuracy, calibration, pipeline (217)
-  ├── trading/     → Trading engine: EV calc, Kelly sizing, risk, cooldowns, queue, executor, scheduler, safety, sync (247)
+  ├── prediction/  → Prediction engine: ensemble, multi-model ML, brackets, error dist, accuracy, calibration, pipeline, source weights, retraining (266)
+  ├── trading/     → Trading engine: EV calc, Kelly sizing, risk, cooldowns, queue, executor, scheduler, safety, sync, retraining trigger (255)
   ├── backtesting/ → Backtesting engine: schemas, risk sim, data loader, engine, metrics, integration (95)
-  ├── api/         → API endpoints: auth, dashboard, dashboard stats, health, markets, queue, settings, trades, trades/sync, accuracy, optimization, calendar, version, update (143)
+  ├── api/         → API endpoints: auth, dashboard, dashboard stats, health, markets, queue, settings, trades, trades/sync, accuracy, optimization, calendar, version, update, training (154)
   ├── websocket/   → WebSocket: events, manager, subscriber, router (40)
   ├── e2e/         → End-to-end smoke tests (35)
   ├── integration/ → Cross-module integration tests (47)

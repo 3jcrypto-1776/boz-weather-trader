@@ -39,6 +39,10 @@ logger = get_logger("MODEL")
 # ─── Multi-model ensemble singleton (lazy-loaded on first use) ───
 _ml_ensemble: MultiModelEnsemble | None = None
 
+# ─── Source weights singleton (lazy-loaded from disk) ───
+_source_weights: dict[str, float] | None = None
+_source_weights_loaded: bool = False
+
 
 def _get_ml_ensemble() -> MultiModelEnsemble:
     """Get or initialize the multi-model ensemble singleton."""
@@ -56,6 +60,36 @@ def _get_ml_ensemble() -> MultiModelEnsemble:
         else:
             logger.info("No ML models available — ensemble-only mode")
     return _ml_ensemble
+
+
+def _get_source_weights() -> dict[str, float] | None:
+    """Get saved source weights from disk, or None to use defaults."""
+    global _source_weights, _source_weights_loaded  # noqa: PLW0603
+    if not _source_weights_loaded:
+        from backend.prediction.source_weights import load_source_weights
+
+        settings = get_settings()
+        _source_weights = load_source_weights(settings.xgb_model_dir)
+        _source_weights_loaded = True
+        if _source_weights is not None:
+            logger.info(
+                "Source weights loaded from disk",
+                extra={"data": {"weights": _source_weights}},
+            )
+    return _source_weights
+
+
+def reload_models() -> None:
+    """Invalidate cached models and source weights, forcing reload on next use.
+
+    Called after retraining completes (from train_models.py) so the
+    prediction pipeline picks up fresh model weights.
+    """
+    global _ml_ensemble, _source_weights, _source_weights_loaded  # noqa: PLW0603
+    _ml_ensemble = None
+    _source_weights = None
+    _source_weights_loaded = False
+    logger.info("ML model cache invalidated — will reload on next prediction")
 
 
 def _try_multi_model_prediction(
@@ -126,10 +160,11 @@ async def generate_prediction(
     Returns:
         A complete BracketPrediction ready for the trading engine.
     """
-    # Step 1: Ensemble forecast
+    # Step 1: Ensemble forecast (use saved source weights if available)
+    effective_weights = model_weights or _get_source_weights()
     ensemble_temp, spread, sources = calculate_ensemble_forecast(
         forecasts,
-        weights=model_weights,
+        weights=effective_weights,
     )
 
     # Step 1b: Multi-model ML prediction (blended with ensemble, graceful degradation)
