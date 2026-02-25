@@ -52,8 +52,8 @@ class TestCalculateEnsembleForecast:
         ]
         temp, spread, sources = calculate_ensemble_forecast(forecasts)
 
-        # Weighted average: (55*0.35 + 53*0.30 + 54*0.20) / (0.35+0.30+0.20)
-        expected = (55.0 * 0.35 + 53.0 * 0.30 + 54.0 * 0.20) / (0.35 + 0.30 + 0.20)
+        # Weighted average: (55*0.40 + 53*0.15 + 54*0.10) / (0.40+0.15+0.10)
+        expected = (55.0 * 0.40 + 53.0 * 0.15 + 54.0 * 0.10) / (0.40 + 0.15 + 0.10)
         assert abs(temp - expected) < 1e-9
         assert spread == pytest.approx(2.0)
         assert len(sources) == 3
@@ -86,15 +86,15 @@ class TestCalculateEnsembleForecast:
         ]
         temp, spread, sources = calculate_ensemble_forecast(forecasts)
 
-        # (55 * 0.35 + 60 * 0.05) / (0.35 + 0.05)
-        expected = (55.0 * 0.35 + 60.0 * 0.05) / 0.40
+        # (55 * 0.40 + 60 * 0.05) / (0.40 + 0.05)
+        expected = (55.0 * 0.40 + 60.0 * 0.05) / 0.45
         assert temp == pytest.approx(expected, abs=1e-9)
         assert "SomeNewSource" in sources
 
     def test_known_source_weights_applied(self) -> None:
-        """NWS gets 0.35, ECMWF gets 0.30 from the default table."""
-        assert DEFAULT_MODEL_WEIGHTS["NWS"] == pytest.approx(0.35)
-        assert DEFAULT_MODEL_WEIGHTS["Open-Meteo:ECMWF"] == pytest.approx(0.30)
+        """NWS gets 0.40, ECMWF gets 0.15 from the default table."""
+        assert DEFAULT_MODEL_WEIGHTS["NWS"] == pytest.approx(0.40)
+        assert DEFAULT_MODEL_WEIGHTS["Open-Meteo:ECMWF"] == pytest.approx(0.15)
 
         forecasts = [
             _make_forecast("NWS", 60.0),
@@ -102,7 +102,7 @@ class TestCalculateEnsembleForecast:
         ]
         temp, _spread, _sources = calculate_ensemble_forecast(forecasts)
 
-        expected = (60.0 * 0.35 + 50.0 * 0.30) / (0.35 + 0.30)
+        expected = (60.0 * 0.40 + 50.0 * 0.15) / (0.40 + 0.15)
         assert temp == pytest.approx(expected, abs=1e-9)
 
     def test_spread_calculation(self) -> None:

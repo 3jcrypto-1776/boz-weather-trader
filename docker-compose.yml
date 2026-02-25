@@ -49,6 +49,8 @@ services:
       redis:
         condition: service_healthy
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - modeldata:/app/models
     # Dev bind mount (./backend:/app/backend) lives in docker-compose.override.yml
     # so it's auto-loaded for dev but NOT used by the updater sidecar.
     healthcheck:
@@ -71,6 +73,8 @@ services:
     # Skip migrations — backend entrypoint handles them
     entrypoint: []
     command: celery -A backend.celery_app worker --loglevel=info --concurrency=2
+    volumes:
+      - modeldata:/app/models
     healthcheck:
       test: ["CMD-SHELL", "celery -A backend.celery_app inspect ping --timeout 10"]
       interval: 30s
@@ -171,3 +175,4 @@ volumes:
   redisdata:
   promdata:
   grafanadata:
+  modeldata:
