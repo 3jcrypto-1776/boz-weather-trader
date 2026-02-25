@@ -847,6 +847,7 @@ All Prometheus metric objects are module-level singletons. Import them wherever 
 | `PORTFOLIO_SYNC_TRADES_CREATED` | Counter | — | Number of trades created via portfolio sync |
 | `ML_RETRAIN_TRIGGERS_TOTAL` | Counter | reason | ML retraining triggers (settlement_count/brier_degradation/time_elapsed) |
 | `ML_SOURCE_WEIGHTS_UPDATED_TOTAL` | Counter | — | Source weight recalculations after retraining |
+| `BRACKET_CAP_BLOCKED_TOTAL` | Counter | city | Trades blocked by per-bracket position cap |
 
 ### Usage
 

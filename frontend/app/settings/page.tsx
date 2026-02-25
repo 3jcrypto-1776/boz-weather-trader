@@ -32,6 +32,8 @@ export default function SettingsPage() {
   const [minEv, setMinEv] = useState(0.05);
   const [cooldown, setCooldown] = useState(60);
   const [consecutiveLossLimit, setConsecutiveLossLimit] = useState(3);
+  const [enableConsecutiveLossLimit, setEnableConsecutiveLossLimit] = useState(true);
+  const [maxContractsPerBracket, setMaxContractsPerBracket] = useState(3);
   const [activeCities, setActiveCities] = useState<CityCode[]>(ALL_CITIES);
   const [notifications, setNotifications] = useState(true);
 
@@ -53,6 +55,8 @@ export default function SettingsPage() {
       setMinEv(settings.min_ev_threshold);
       setCooldown(settings.cooldown_per_loss_minutes);
       setConsecutiveLossLimit(settings.consecutive_loss_limit);
+      setEnableConsecutiveLossLimit(settings.enable_consecutive_loss_limit);
+      setMaxContractsPerBracket(settings.max_contracts_per_bracket);
       setActiveCities(settings.active_cities);
       setNotifications(settings.notifications_enabled);
     }
@@ -78,6 +82,8 @@ export default function SettingsPage() {
         min_ev_threshold: minEv,
         cooldown_per_loss_minutes: cooldown,
         consecutive_loss_limit: consecutiveLossLimit,
+        enable_consecutive_loss_limit: enableConsecutiveLossLimit,
+        max_contracts_per_bracket: maxContractsPerBracket,
         active_cities: activeCities,
         notifications_enabled: notifications,
       };
@@ -337,18 +343,62 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label className="flex justify-between text-xs mb-1">
-                      <span>Consecutive Loss Limit</span>
-                      <span className="font-medium">{consecutiveLossLimit}</span>
+                      <span className="flex items-center gap-2">
+                        <button
+                          onClick={() => setEnableConsecutiveLossLimit(!enableConsecutiveLossLimit)}
+                          className={`relative w-8 h-5 rounded-full transition-colors flex-shrink-0 ${
+                            enableConsecutiveLossLimit ? "bg-boz-primary" : "bg-gray-300"
+                          }`}
+                          data-testid="consecutive-loss-toggle"
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow ${
+                              enableConsecutiveLossLimit ? "translate-x-3" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                        Consecutive Loss Limit
+                      </span>
+                      <span className="font-medium">
+                        {enableConsecutiveLossLimit ? consecutiveLossLimit : "Off"}
+                      </span>
                     </label>
                     <input
                       type="range"
-                      min={0}
+                      min={1}
                       max={10}
                       step={1}
                       value={consecutiveLossLimit}
                       onChange={(e) => setConsecutiveLossLimit(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                      disabled={!enableConsecutiveLossLimit}
+                      className={`w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary ${
+                        !enableConsecutiveLossLimit ? "opacity-40 cursor-not-allowed" : ""
+                      }`}
                     />
+                    <p className="text-xs text-boz-neutral mt-1">
+                      {enableConsecutiveLossLimit
+                        ? `Pauses trading for the rest of the day after ${consecutiveLossLimit} consecutive losses`
+                        : "Rest-of-day cooldown disabled — per-loss cooldown still applies"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Max Contracts Per Bracket</span>
+                      <span className="font-medium">{maxContractsPerBracket}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={1}
+                      max={20}
+                      step={1}
+                      value={maxContractsPerBracket}
+                      onChange={(e) => setMaxContractsPerBracket(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                      data-testid="bracket-cap-slider"
+                    />
+                    <p className="text-xs text-boz-neutral mt-1">
+                      Hard cap on open contracts per bracket per market — prevents buying the same bracket repeatedly
+                    </p>
                   </div>
                 </div>
               </section>

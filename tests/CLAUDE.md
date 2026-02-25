@@ -66,22 +66,23 @@ tests/
 │   ├── test_error_dist.py    → Season detection + error std calculation (12 tests)
 │   ├── test_postmortem.py    → Post-mortem narrative generation (8 tests)
 │   └── test_pipeline.py      → Full prediction pipeline orchestration + multi-model integration (11 tests)
-├── trading/             → Unit tests + safety tests for backend/trading/ (255 tests)
+├── trading/             → Unit tests + safety tests for backend/trading/ (276 tests)
 │   ├── conftest.py      → Trading fixtures (mock Kalshi client, sample predictions)
 │   ├── test_ev_calculator.py      → EV math, fees, bracket scanning, Kelly integration (45 tests)
-│   ├── test_scheduler.py          → Celery tasks: trading cycle, expiry, settlement w/ market_date, Kelly params (40 tests)
+│   ├── test_scheduler.py          → Celery tasks: trading cycle, expiry, settlement w/ market_date, Kelly params, bracket cap (46 tests)
 │   ├── test_kelly.py              → Kelly Criterion: sizing, fractional, fees, caps, edge cases (35 tests)
 │   ├── test_postmortem.py         → Settlement matching, P&L, rich narratives w/ sections, market_date queries (24 tests)
 │   ├── test_sync.py               → Portfolio sync: ticker parsing, reconciliation, sentinel values, market_date, fill price, NO side conversion (27 tests)
 │   ├── test_retraining_trigger.py → Post-settlement retraining trigger: 3 conditions, cooldown, metrics (8 tests)
+│   ├── test_bracket_cap.py        → Per-bracket position cap: _get_open_bracket_qty, cap blocking, Prometheus metric (~15 tests)
 │   ├── test_celery_hardening.py   → Task timeout configs (15 tests)
 │   ├── test_risk_manager.py       → Risk check ordering + enforcement (12 tests)
 │   ├── test_performance.py        → Performance analytics: trade stats, P&L tracking (12 tests)
 │   ├── test_trade_queue.py        → Queue state machine (11 tests)
 │   ├── test_executor.py           → Order placement + DB recording + market_date + fill price + NO side conversion (16 tests)
-│   ├── test_cooldown.py           → Per-loss + consecutive cooldowns (9 tests)
+│   ├── test_cooldown.py           → Per-loss + consecutive cooldowns + toggle guard (15 tests)
 │   └── test_notifications.py      → Web push via VAPID (5 tests)
-├── api/                 → API endpoint tests (154 tests)
+├── api/                 → API endpoint tests (157 tests)
 │   ├── conftest.py      → API fixtures (api_engine, client, mock_kalshi, factories)
 │   ├── test_training.py    → Training reports endpoint + manual retrain trigger (11 tests)
 │   ├── test_accuracy.py    → Forecast accuracy endpoints: sources, calibration, trends (17 tests)
@@ -97,7 +98,7 @@ tests/
 │   ├── test_optimization.py → Dashboard batch query + performance SQL aggregation (7 tests)
 │   ├── test_performance.py  → Performance analytics endpoint + cost_by_city (7 tests)
 │   ├── test_queue.py        → Trade queue approve/reject/list (8 tests)
-│   ├── test_settings.py     → Settings read/update (5 tests)
+│   ├── test_settings.py     → Settings read/update + bracket cap + loss toggle (8 tests)
 │   ├── test_trades.py       → Trade history endpoint + date filter + SETTLED pseudo-filter (8 tests)
 │   ├── test_trades_sync.py  → Portfolio sync API endpoint: sync result, auth, WS events (5 tests)
 │   ├── test_update.py       → Self-update trigger + status polling + auth + error handling (10 tests)
@@ -1144,8 +1145,8 @@ jobs:
 | Job | What It Does | Failure Blocks Merge? |
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
-| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1396 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
-| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 204 tests) | Yes |
+| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1421 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
+| `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 209 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 
 **Key design decisions:**

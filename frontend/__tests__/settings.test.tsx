@@ -48,6 +48,8 @@ const MOCK_SETTINGS: UserSettings = {
   consecutive_loss_limit: 3,
   active_cities: ["NYC", "CHI", "MIA", "AUS"],
   notifications_enabled: true,
+  max_contracts_per_bracket: 3,
+  enable_consecutive_loss_limit: true,
 };
 
 describe("SettingsPage", () => {
@@ -382,5 +384,86 @@ describe("SettingsPage", () => {
     // Settings content should be visible again
     expect(screen.getByText("Trading Mode")).toBeInTheDocument();
     expect(screen.getByText("Save Settings")).toBeInTheDocument();
+  });
+
+  // ─── Phase 38: Bracket cap + consecutive loss toggle tests ───
+
+  it("renders bracket cap slider with default value", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+    expect(screen.getByText("Max Contracts Per Bracket")).toBeInTheDocument();
+    const slider = screen.getByTestId("bracket-cap-slider");
+    expect(slider).toBeInTheDocument();
+    expect(slider).toHaveValue("3");
+  });
+
+  it("renders consecutive loss toggle", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+    const toggle = screen.getByTestId("consecutive-loss-toggle");
+    expect(toggle).toBeInTheDocument();
+    // Toggle should be "on" by default (blue bg)
+    expect(toggle.className).toContain("bg-boz-primary");
+  });
+
+  it("disables consecutive loss slider when toggle is off", () => {
+    mockUseSettings.mockReturnValue({
+      data: { ...MOCK_SETTINGS, enable_consecutive_loss_limit: false },
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+
+    // Should show "Off" instead of the number
+    expect(screen.getByText("Off")).toBeInTheDocument();
+
+    // The toggle should have gray bg
+    const toggle = screen.getByTestId("consecutive-loss-toggle");
+    expect(toggle.className).toContain("bg-gray-300");
+  });
+
+  it("saves new bracket cap and toggle fields", async () => {
+    mockUpdateSettings.mockResolvedValue(MOCK_SETTINGS);
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByText("Save Settings"));
+
+    await waitFor(() => {
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          max_contracts_per_bracket: 3,
+          enable_consecutive_loss_limit: true,
+        })
+      );
+    });
+  });
+
+  it("bracket cap slider changes value", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+    const slider = screen.getByTestId("bracket-cap-slider");
+    fireEvent.change(slider, { target: { value: "10" } });
+    expect(screen.getByText("10")).toBeInTheDocument();
   });
 });

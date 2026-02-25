@@ -9,14 +9,14 @@ Free, open-source automated trading bot for [Kalshi](https://kalshi.com) weather
 - **Automated +EV trading** — Compares model probabilities to market prices, trades when edge exceeds threshold
 - **Kelly Criterion sizing** — Optimal position sizing based on edge and bankroll
 - **Two trading modes** — Full Auto (hands-off) or Manual Approval (review each trade)
-- **Risk controls** — Max position size, daily loss limit, cooldown periods, exposure limits
+- **Risk controls** — Max position size, daily loss limit, cooldown periods, exposure limits, per-bracket position caps
 - **Real-time dashboard** — PWA installable on phone/desktop with live WebSocket updates
 - **Trade post-mortems** — Auto-generated reports explaining why each trade won or lost
 - **Backtesting** — Day-by-day historical simulation with Sharpe ratio, drawdown, ROI metrics
 - **Forecast accuracy tracking** — Brier score calibration, per-source MAE/RMSE/bias
 - **Demo mode** — Safe sandbox for new users (no real trades)
 - **Monitoring** — Prometheus metrics, Grafana dashboards, Alertmanager (optional)
-- **1,301 tests** — Comprehensive test suite across backend and frontend
+- **1,630 tests** — Comprehensive test suite across backend and frontend
 
 ## Quick Start (Docker Compose)
 
@@ -129,13 +129,13 @@ When monitoring is enabled:
 ## Development
 
 ```bash
-# Backend tests (1,191 tests)
+# Backend tests (1,421 tests)
 python -m pytest tests/ -x -q --tb=short
 
 # Backend lint
 ruff check backend/ tests/ && ruff format --check backend/ tests/
 
-# Frontend tests (110 tests)
+# Frontend tests (209 tests)
 cd frontend && npm test
 
 # Frontend lint

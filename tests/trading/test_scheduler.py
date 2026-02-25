@@ -498,6 +498,7 @@ class TestRunTradingCycle:
                 return_value={"55-56°F": "KXHIGHNY-B3"},
             ),
             patch("backend.trading.ev_calculator.scan_all_brackets", return_value=[signal]),
+            patch("backend.trading.scheduler._get_open_bracket_qty", AsyncMock(return_value=0)),
             patch("backend.trading.executor.execute_trade", mock_execute),
         ):
             await _run_trading_cycle()
@@ -553,6 +554,7 @@ class TestRunTradingCycle:
                 "backend.trading.ev_calculator.scan_all_brackets",
                 return_value=[signal_ok, signal_fail],
             ),
+            patch("backend.trading.scheduler._get_open_bracket_qty", AsyncMock(return_value=0)),
             patch("backend.trading.executor.execute_trade", mock_execute),
         ):
             await _run_trading_cycle()
@@ -599,6 +601,7 @@ class TestRunTradingCycle:
                 return_value={"55-56°F": "KXHIGHNY-B3"},
             ),
             patch("backend.trading.ev_calculator.scan_all_brackets", return_value=[signal]),
+            patch("backend.trading.scheduler._get_open_bracket_qty", AsyncMock(return_value=0)),
             patch("backend.trading.trade_queue.queue_trade", mock_queue),
             patch("backend.trading.trade_queue.has_pending_duplicate", return_value=False),
             patch("backend.trading.scheduler._get_notification_service", return_value=None),
@@ -644,6 +647,7 @@ class TestRunTradingCycle:
                 return_value={"55-56°F": "KXHIGHNY-B3"},
             ),
             patch("backend.trading.ev_calculator.scan_all_brackets", return_value=[signal]),
+            patch("backend.trading.scheduler._get_open_bracket_qty", AsyncMock(return_value=0)),
             patch("backend.trading.executor.execute_trade", mock_execute),
             patch("backend.trading.trade_queue.queue_trade", mock_queue),
         ):
@@ -1150,6 +1154,7 @@ class TestTradingCycleKellyIntegration:
                 return_value={"55-56°F": "KXHIGHNY-B3"},
             ),
             patch("backend.trading.ev_calculator.scan_all_brackets", return_value=[signal]),
+            patch("backend.trading.scheduler._get_open_bracket_qty", AsyncMock(return_value=0)),
             patch("backend.trading.executor.execute_trade", AsyncMock()),
             patch("backend.trading.scheduler._get_bankroll_cents", mock_bankroll),
         ):
@@ -1200,6 +1205,7 @@ class TestTradingCycleKellyIntegration:
                 return_value={"55-56°F": "KXHIGHNY-B3"},
             ),
             patch("backend.trading.ev_calculator.scan_all_brackets", return_value=[signal]),
+            patch("backend.trading.scheduler._get_open_bracket_qty", AsyncMock(return_value=0)),
             patch("backend.trading.executor.execute_trade", AsyncMock()),
             patch("backend.trading.scheduler._get_bankroll_cents", mock_bankroll),
         ):

@@ -303,6 +303,8 @@ export interface UserSettings {
   min_ev_threshold: number;           // 0.0 to 1.0 — minimum EV to trigger trade
   cooldown_per_loss_minutes: number;  // minutes to wait after a loss
   consecutive_loss_limit: number;     // halt after N consecutive losses
+  enable_consecutive_loss_limit: boolean; // on/off toggle for rest-of-day cooldown
+  max_contracts_per_bracket: number;  // hard cap on open contracts per bracket (1-20)
   active_cities: City[];              // which cities to trade
   notifications_enabled: boolean;
 }
@@ -1602,6 +1604,9 @@ See "Onboarding Flow Implementation" section above. Six steps:
 - Cooldown settings:
   - Per-loss cooldown: slider showing minutes (range: 15 to 240)
   - Consecutive loss limit: number input (range: 1 to 10)
+  - Consecutive loss limit toggle: on/off switch (enable/disable rest-of-day cooldown)
+- Position limits:
+  - Max contracts per bracket: slider (range: 1 to 20, default 5)
 - City selection: checkboxes for NYC, CHI, MIA, AUS (at least one must be checked)
 - Notifications toggle
 - API key management section:
@@ -1674,7 +1679,7 @@ Your tests go in `frontend/__tests__/`:
 - `dashboard.test.tsx` — renders with mock data, handles loading/error states
 - `trade-queue.test.tsx` — approve/reject flow, expiration display, empty state
 - `trade-card.test.tsx` — post-mortem expansion, win/loss styling
-- `settings.test.tsx` — form validation, range limits on inputs
+- `settings.test.tsx` — form validation, range limits on inputs, bracket cap slider, consecutive loss toggle
 - `api.test.ts` — API client error handling, auth token inclusion
 - `hooks.test.ts` — SWR hooks return correct data, handle errors
 - `version-info.test.tsx` — version display, update notification, loading/error states

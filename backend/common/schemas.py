@@ -222,6 +222,12 @@ class UserSettings(BaseModel):
     max_bankroll_pct_per_trade: float = Field(default=0.05, ge=0.01, le=0.25)  # 5%
     max_contracts_per_trade: int = Field(default=10, ge=1, le=100)
 
+    # ─── Per-Bracket Position Cap ───
+    max_contracts_per_bracket: int = Field(default=3, ge=1, le=20)
+
+    # ─── Consecutive Loss Toggle ───
+    enable_consecutive_loss_limit: bool = True
+
 
 # ─── Portfolio Sync ───
 

@@ -113,6 +113,20 @@ def user_to_settings(user: User) -> UserSettings:
         active_cities=active_cities,
         demo_mode=demo,
         notifications_enabled=notifs,
+        use_kelly_sizing=user.use_kelly_sizing if user.use_kelly_sizing is not None else False,
+        kelly_fraction=user.kelly_fraction if user.kelly_fraction is not None else 0.25,
+        max_bankroll_pct_per_trade=user.max_bankroll_pct_per_trade
+        if user.max_bankroll_pct_per_trade is not None
+        else 0.05,
+        max_contracts_per_trade=user.max_contracts_per_trade
+        if user.max_contracts_per_trade is not None
+        else 10,
+        max_contracts_per_bracket=user.max_contracts_per_bracket
+        if user.max_contracts_per_bracket is not None
+        else 3,
+        enable_consecutive_loss_limit=user.enable_consecutive_loss_limit
+        if user.enable_consecutive_loss_limit is not None
+        else True,
     )
 
 

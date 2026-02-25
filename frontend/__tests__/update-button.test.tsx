@@ -47,6 +47,8 @@ const MOCK_SETTINGS: UserSettings = {
   consecutive_loss_limit: 3,
   active_cities: ["NYC", "CHI", "MIA", "AUS"],
   notifications_enabled: true,
+  max_contracts_per_bracket: 3,
+  enable_consecutive_loss_limit: true,
 };
 
 describe("Update Button on Settings Page", () => {

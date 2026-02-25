@@ -127,6 +127,12 @@ class User(Base):
     max_bankroll_pct_per_trade = Column(Float, default=0.05)  # 5%
     max_contracts_per_trade = Column(Integer, default=10)
 
+    # Per-bracket position cap
+    max_contracts_per_bracket = Column(Integer, default=3)
+
+    # Consecutive loss limit toggle
+    enable_consecutive_loss_limit = Column(Boolean, default=True)
+
     created_at = Column(TZNaiveDateTime, default=_utcnow)
     updated_at = Column(TZNaiveDateTime, default=_utcnow, onupdate=_utcnow)
 

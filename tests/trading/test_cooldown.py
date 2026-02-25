@@ -172,6 +172,128 @@ class TestOnTradeLoss:
         assert mock_state.cooldown_until is None
 
 
+class TestOnTradeLossToggle:
+    """Tests for enable_consecutive_loss_limit toggle in on_trade_loss."""
+
+    @pytest.mark.asyncio
+    async def test_toggle_off_no_rest_of_day_cooldown(self, user_settings: UserSettings) -> None:
+        """When toggle is off, rest-of-day cooldown is NOT triggered even at limit."""
+        settings = user_settings.model_copy(
+            update={"enable_consecutive_loss_limit": False, "cooldown_per_loss_minutes": 0}
+        )
+        mock_state = MagicMock(spec=DailyRiskState)
+        mock_state.cooldown_until = None
+        mock_state.consecutive_losses = 2  # Will become 3, which == limit
+
+        cm = _make_cm(settings, state=mock_state)
+        with patch.object(cm, "_get_or_create_daily_state", return_value=mock_state):
+            await cm.on_trade_loss()
+
+        assert mock_state.consecutive_losses == 3
+        # No rest-of-day cooldown because toggle is off and per-loss is 0
+        assert mock_state.cooldown_until is None
+
+    @pytest.mark.asyncio
+    async def test_toggle_off_counter_still_increments(self, user_settings: UserSettings) -> None:
+        """When toggle is off, consecutive_losses counter still increases."""
+        settings = user_settings.model_copy(
+            update={"enable_consecutive_loss_limit": False, "cooldown_per_loss_minutes": 0}
+        )
+        mock_state = MagicMock(spec=DailyRiskState)
+        mock_state.cooldown_until = None
+        mock_state.consecutive_losses = 5
+
+        cm = _make_cm(settings, state=mock_state)
+        with patch.object(cm, "_get_or_create_daily_state", return_value=mock_state):
+            await cm.on_trade_loss()
+
+        assert mock_state.consecutive_losses == 6
+
+    @pytest.mark.asyncio
+    async def test_toggle_off_per_loss_cooldown_still_works(
+        self, user_settings: UserSettings
+    ) -> None:
+        """When toggle is off, per-loss cooldown is still set (only rest-of-day is gated)."""
+        settings = user_settings.model_copy(
+            update={"enable_consecutive_loss_limit": False, "cooldown_per_loss_minutes": 30}
+        )
+        mock_state = MagicMock(spec=DailyRiskState)
+        mock_state.cooldown_until = None
+        mock_state.consecutive_losses = 2  # Will become 3 == limit
+
+        cm = _make_cm(settings, state=mock_state)
+        with patch.object(cm, "_get_or_create_daily_state", return_value=mock_state):
+            await cm.on_trade_loss()
+
+        # Per-loss cooldown IS set
+        assert mock_state.cooldown_until is not None
+        # But it's NOT end-of-day (23:59:59), it's ~30 min from now
+        if hasattr(mock_state.cooldown_until, "hour"):
+            assert mock_state.cooldown_until.hour != 23 or mock_state.cooldown_until.minute != 59
+
+    @pytest.mark.asyncio
+    async def test_toggle_on_rest_of_day_triggered(self, user_settings: UserSettings) -> None:
+        """When toggle is on (default), rest-of-day cooldown IS triggered at limit."""
+        settings = user_settings.model_copy(update={"enable_consecutive_loss_limit": True})
+        mock_state = MagicMock(spec=DailyRiskState)
+        mock_state.cooldown_until = None
+        mock_state.consecutive_losses = 2
+
+        cm = _make_cm(settings, state=mock_state)
+        with patch.object(cm, "_get_or_create_daily_state", return_value=mock_state):
+            await cm.on_trade_loss()
+
+        assert mock_state.consecutive_losses == 3
+        assert mock_state.cooldown_until is not None
+        if hasattr(mock_state.cooldown_until, "hour"):
+            assert mock_state.cooldown_until.hour == 23
+            assert mock_state.cooldown_until.minute == 59
+
+
+class TestIsCooldownActiveToggle:
+    """Tests for is_cooldown_active when enable_consecutive_loss_limit is toggled."""
+
+    @pytest.mark.asyncio
+    async def test_clears_stale_rest_of_day_when_toggle_off(
+        self, user_settings: UserSettings
+    ) -> None:
+        """When toggle is off and a rest-of-day cooldown exists, it is cleared."""
+        from backend.trading.cooldown import _get_end_of_trading_day
+
+        settings = user_settings.model_copy(update={"enable_consecutive_loss_limit": False})
+        end_of_day = _get_end_of_trading_day()
+        mock_state = MagicMock(spec=DailyRiskState)
+        mock_state.cooldown_until = end_of_day
+        mock_state.consecutive_losses = 5
+
+        cm = _make_cm(settings, state=mock_state)
+        with patch.object(cm, "_get_daily_state", return_value=mock_state):
+            is_active, reason = await cm.is_cooldown_active()
+
+        assert is_active is False
+        assert reason == ""
+        # cooldown_until was cleared
+        assert mock_state.cooldown_until is None
+
+    @pytest.mark.asyncio
+    async def test_per_loss_cooldown_still_active_when_toggle_off(
+        self, user_settings: UserSettings
+    ) -> None:
+        """When toggle is off, per-loss cooldowns (non rest-of-day) still work."""
+        settings = user_settings.model_copy(update={"enable_consecutive_loss_limit": False})
+        future = datetime.now(ET) + timedelta(minutes=30)
+        mock_state = MagicMock(spec=DailyRiskState)
+        mock_state.cooldown_until = future
+        mock_state.consecutive_losses = 1
+
+        cm = _make_cm(settings, state=mock_state)
+        with patch.object(cm, "_get_daily_state", return_value=mock_state):
+            is_active, reason = await cm.is_cooldown_active()
+
+        assert is_active is True
+        assert "per-loss" in reason.lower()
+
+
 class TestOnTradeWin:
     """Tests for on_trade_win -- resetting consecutive loss counter."""
 

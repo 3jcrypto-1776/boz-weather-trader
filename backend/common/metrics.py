@@ -73,6 +73,12 @@ TRADES_RISK_BLOCKED_TOTAL = Counter(
     labelnames=["reason"],
 )
 
+BRACKET_CAP_BLOCKED_TOTAL = Counter(
+    "boz_bracket_cap_blocked_total",
+    "Trades blocked or clamped by per-bracket position cap",
+    labelnames=["city"],
+)
+
 # ─── WebSocket Metrics ───
 
 WS_CONNECTIONS_ACTIVE = Gauge(

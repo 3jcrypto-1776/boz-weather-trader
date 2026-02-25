@@ -68,3 +68,42 @@ async def test_get_settings_unauthenticated(unauthed_client: AsyncClient) -> Non
     """GET /api/settings returns 401 when not authenticated."""
     response = await unauthed_client.get("/api/settings")
     assert response.status_code == 401
+
+
+async def test_get_settings_includes_bracket_cap_defaults(client: AsyncClient) -> None:
+    """GET /api/settings includes max_contracts_per_bracket and enable_consecutive_loss_limit."""
+    response = await client.get("/api/settings")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["max_contracts_per_bracket"] == 3
+    assert data["enable_consecutive_loss_limit"] is True
+
+
+async def test_patch_bracket_cap(client: AsyncClient) -> None:
+    """PATCH /api/settings can update max_contracts_per_bracket."""
+    response = await client.patch(
+        "/api/settings",
+        json={"max_contracts_per_bracket": 10},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["max_contracts_per_bracket"] == 10
+
+    # Verify it persists on GET
+    get_resp = await client.get("/api/settings")
+    assert get_resp.json()["max_contracts_per_bracket"] == 10
+
+
+async def test_patch_consecutive_loss_toggle(client: AsyncClient) -> None:
+    """PATCH /api/settings can toggle enable_consecutive_loss_limit."""
+    response = await client.patch(
+        "/api/settings",
+        json={"enable_consecutive_loss_limit": False},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["enable_consecutive_loss_limit"] is False
+
+    # Verify it persists on GET
+    get_resp = await client.get("/api/settings")
+    assert get_resp.json()["enable_consecutive_loss_limit"] is False

@@ -31,7 +31,7 @@ backend/
 ├── weather/             → Agent 1: Weather data pipeline
 ├── kalshi/              → Agent 2: Kalshi API client (auth, orders, markets, WS feed, cache)
 ├── prediction/          → Agent 3: Prediction engine (ensemble + multi-model ML + brackets + accuracy tracking + auto-retrain + source weights)
-├── trading/             → Agent 4: Trading engine (incl. portfolio sync)
+├── trading/             → Agent 4: Trading engine (incl. portfolio sync, bracket cap, consecutive loss toggle)
 ├── backtesting/         → Backtesting engine (sync simulation, reuses trading pure functions)
 │   ├── schemas.py       → BacktestConfig, BacktestResult, BacktestDay, SimulatedTrade, CityStats, KellyStats
 │   ├── risk_sim.py      → In-memory BacktestRiskManager (bankroll, daily limits, consecutive losses)

@@ -218,6 +218,8 @@ class SettingsUpdate(BaseModel):
     active_cities: list[CityCode] | None = None
     notifications_enabled: bool | None = None
     demo_mode: bool | None = None
+    max_contracts_per_bracket: int | None = None
+    enable_consecutive_loss_limit: bool | None = None
 
 
 # ─── Current Weather (Ticker) ───

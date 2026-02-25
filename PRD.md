@@ -1,9 +1,9 @@
 # Product Requirements Document (PRD)
 # Boz Weather Trader
 
-**Version:** 1.4.7
-**Date:** February 24, 2026
-**Status:** All P0+P1 complete (37 phases + 7 hotfixes + deployment hardening, 1600 tests)
+**Version:** 1.5.0
+**Date:** February 25, 2026
+**Status:** All P0+P1 complete (38 phases + 7 hotfixes + deployment hardening, 1630 tests)
 
 ---
 
@@ -259,7 +259,8 @@ This makes adding new market types straightforward without touching the core tra
 - Maximum exposure across all markets (default: $25)
 - Minimum EV threshold to trigger a trade (default: 5%)
 - Cooldown after loss: pause trading after a loss (default: 60 minutes, adjustable from 0/off to 24 hours)
-- Cooldown after consecutive losses: pause for rest of day after N losses in a row (default: 3, adjustable from 0/off to 10)
+- Cooldown after consecutive losses: pause for rest of day after N losses in a row (default: 3, adjustable from 0/off to 10). Toggleable on/off — when off, counter still tracks but rest-of-day pause is disabled
+- Per-bracket position cap: maximum open contracts per bracket per market (default: 3, adjustable from 1 to 20). Prevents the bot from re-buying the same bracket every trading cycle
 - Conservative defaults for new users (small position sizes)
 
 #### 3.2.4 Backend API Server
@@ -488,11 +489,11 @@ Your Machine (homelab / cloud VPS)
 - [x] **Automated trade execution** (Full Auto mode) - Place limit orders on Kalshi when EV threshold is met (Phase 3)
 - [x] **Trade approval queue** (Manual mode) - Queue trades for user review with push notification (Phase 3, 5)
 - [x] **Basic PWA dashboard** - Show active markets, model predictions, current positions, P&L (Phase 5)
-- [x] **Risk controls** - Max position size, daily loss limit, min EV threshold, adjustable cooldown periods (Phase 3)
+- [x] **Risk controls** - Max position size, daily loss limit, min EV threshold, adjustable cooldown periods, per-bracket position cap (Phase 3, 38)
 - [x] **Trade logging** - Full audit trail of every trade placed with reasoning (Phase 4)
 - [x] **Trade post-mortems** - Auto-generated executive summary for each trade after settlement (Phase 3, 14)
 - [x] **Structured logging** - Module-tagged, leveled logs to stdout + database (Phase 1)
-- [x] **Unit + safety tests** - Every module ships with tests; 1396 backend + 204 frontend = 1600 tests (All phases)
+- [x] **Unit + safety tests** - Every module ships with tests; 1421 backend + 209 frontend = 1630 tests (All phases)
 - [x] **CI/CD pipeline** - GitHub Actions: 4 parallel jobs (backend-lint, backend-test w/ coverage, frontend, docker-build) (Phase 8, 22)
 - [x] **Docker Compose deployment** - 10-service Docker Compose (backend, frontend, postgres, redis, celery worker/beat, prometheus, grafana, alertmanager, updater) (Phase 6, 16, 19, 34)
 - [x] **Market type selector UI** - High Temp active, others show "Coming Soon" (Phase 5)
@@ -582,7 +583,8 @@ Your Machine (homelab / cloud VPS)
 | HF | Bracket label off-by-one | `parse_bracket_from_market()` bottom bracket formula changed from `int(cap)` to `math.ceil(cap) - 1` for Kalshi's inconsistent cap_strike format (72.99 vs 73.0), Alembic 0008 migration fixes existing trades/predictions | 4 |
 | HF | Cache zero-price fallback | `_fetch_market_prices()` cache validity check changed from `if prices:` to `if prices and any(v > 0 for v in prices.values())` to prevent all-zero WS cache from blocking REST fallback | 2 |
 | 37 | Auto-Retrain + Training Log | TrainingReport DB model + Alembic 0009, post-settlement retraining trigger (3 conditions), source weight persistence from accuracy data, pipeline cache invalidation, training reports API + manual trigger, Training Log on Performance page with expandable report cards | 49 backend + 15 frontend |
-| **Total** | | **1396 backend + 204 frontend = 1600 tests** | |
+| 38 | Per-Bracket Position Cap + Loss Toggle | `max_contracts_per_bracket` hard cap (1-20) in Settings, `enable_consecutive_loss_limit` on/off toggle, `_get_open_bracket_qty()` helper, `BRACKET_CAP_BLOCKED_TOTAL` Prometheus counter, Alembic 0010, `user_to_settings()` Kelly gap fix | 25 backend + 5 frontend |
+| **Total** | | **1421 backend + 209 frontend = 1630 tests** | |
 
 ---
 

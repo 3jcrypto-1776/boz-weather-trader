@@ -28,6 +28,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from backend.common.database import get_task_session, reset_engine
 from backend.common.logging import get_logger
 from backend.common.metrics import (
+    BRACKET_CAP_BLOCKED_TOTAL,
     TRADES_EXECUTED_TOTAL,
     TRADES_RISK_BLOCKED_TOTAL,
     TRADING_CYCLES_TOTAL,
@@ -368,6 +369,42 @@ async def _run_trading_cycle() -> None:
 
             # Risk check and execute/queue each signal
             for signal in signals:
+                # Per-bracket position cap: check existing open contracts
+                open_qty = await _get_open_bracket_qty(
+                    session, user_id, signal.city, signal.bracket, prediction.date
+                )
+                cap = user_settings.max_contracts_per_bracket
+                remaining = max(0, cap - open_qty)
+                if remaining <= 0:
+                    logger.info(
+                        "Bracket cap reached -- skipping",
+                        extra={
+                            "data": {
+                                "city": signal.city,
+                                "bracket": signal.bracket,
+                                "open_qty": open_qty,
+                                "cap": cap,
+                            }
+                        },
+                    )
+                    BRACKET_CAP_BLOCKED_TOTAL.labels(city=signal.city).inc()
+                    continue
+                if signal.quantity > remaining:
+                    logger.info(
+                        "Bracket cap -- clamping quantity",
+                        extra={
+                            "data": {
+                                "city": signal.city,
+                                "bracket": signal.bracket,
+                                "original_qty": signal.quantity,
+                                "clamped_qty": remaining,
+                                "open_qty": open_qty,
+                                "cap": cap,
+                            }
+                        },
+                    )
+                    signal = signal.model_copy(update={"quantity": remaining})
+
                 allowed, risk_reason = await risk_mgr.check_trade(signal)
                 if not allowed:
                     logger.info(
@@ -671,6 +708,44 @@ async def _check_retraining_trigger(
 # ─── Helper Functions ───
 
 
+async def _get_open_bracket_qty(
+    db,
+    user_id: str,
+    city: str,
+    bracket_label: str,
+    market_date,
+) -> int:
+    """Count OPEN contracts for a specific bracket on a given market date.
+
+    Used by the per-bracket position cap to prevent re-buying the same
+    bracket for the same market beyond the configured limit.
+
+    Args:
+        db: Async database session.
+        user_id: The user's ID.
+        city: City code (e.g., "NYC").
+        bracket_label: Bracket label (e.g., "39° to 40°F").
+        market_date: The market event date (date or datetime).
+
+    Returns:
+        Total quantity of OPEN contracts for this bracket/date.
+    """
+    from sqlalchemy import func, select
+
+    from backend.common.models import Trade, TradeStatus
+
+    result = await db.execute(
+        select(func.coalesce(func.sum(Trade.quantity), 0)).where(
+            Trade.user_id == user_id,
+            Trade.city == city,
+            Trade.bracket_label == bracket_label,
+            Trade.status == TradeStatus.OPEN,
+            func.date(Trade.market_date) == market_date,
+        )
+    )
+    return int(result.scalar())
+
+
 def _are_markets_open() -> bool:
     """Check if Kalshi weather markets are currently tradeable.
 
@@ -731,6 +806,12 @@ async def _load_user_settings(db) -> object | None:
         max_contracts_per_trade=user.max_contracts_per_trade
         if user.max_contracts_per_trade is not None
         else 10,
+        max_contracts_per_bracket=user.max_contracts_per_bracket
+        if user.max_contracts_per_bracket is not None
+        else 3,
+        enable_consecutive_loss_limit=user.enable_consecutive_loss_limit
+        if user.enable_consecutive_loss_limit is not None
+        else True,
     )
 
 

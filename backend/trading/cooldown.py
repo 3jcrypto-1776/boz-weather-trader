@@ -108,6 +108,12 @@ class CooldownManager:
                     is_rest_of_day = abs((cooldown_until - end_of_day).total_seconds()) < 60
 
                 if is_rest_of_day:
+                    # If the toggle is off, clear stale rest-of-day cooldown
+                    if not self.settings.enable_consecutive_loss_limit:
+                        state.cooldown_until = None
+                        await self.db.flush()
+                        return False, ""
+
                     reason = "Consecutive loss limit hit -- paused for rest of trading day"
                     logger.info(
                         "Cooldown active",
@@ -159,7 +165,8 @@ class CooldownManager:
         state.consecutive_losses += 1
 
         if (
-            self.settings.consecutive_loss_limit > 0
+            self.settings.enable_consecutive_loss_limit
+            and self.settings.consecutive_loss_limit > 0
             and state.consecutive_losses >= self.settings.consecutive_loss_limit
         ):
             # Rest of day cooldown: set cooldown_until to end of trading day

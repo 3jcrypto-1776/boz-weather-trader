@@ -136,6 +136,8 @@ export interface UserSettings {
   consecutive_loss_limit: number;
   active_cities: CityCode[];
   notifications_enabled: boolean;
+  max_contracts_per_bracket: number;
+  enable_consecutive_loss_limit: boolean;
 }
 
 export interface SettingsUpdate {
@@ -149,6 +151,8 @@ export interface SettingsUpdate {
   active_cities?: CityCode[];
   notifications_enabled?: boolean;
   demo_mode?: boolean;
+  max_contracts_per_bracket?: number;
+  enable_consecutive_loss_limit?: boolean;
 }
 
 // ─── Logs ───

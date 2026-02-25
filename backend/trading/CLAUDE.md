@@ -17,7 +17,7 @@ backend/trading/
 ├── executor.py        -> Trade execution orchestrator (auto + manual modes)
 ├── postmortem.py      -> Generate full trade post-mortem after settlement
 ├── sync.py            -> Kalshi portfolio sync (reconciles app Trade records with actual Kalshi filled orders)
-├── scheduler.py       -> Celery tasks for trading cycle (passes Kelly params, auto-sync, post-settlement retraining trigger)
+├── scheduler.py       -> Celery tasks for trading cycle (passes Kelly params, auto-sync, post-settlement retraining trigger, bracket cap via _get_open_bracket_qty)
 ├── notifications.py   -> Web push notifications via VAPID
 └── exceptions.py      -> Trading-specific exceptions (or import from common)
 ```
@@ -449,6 +449,8 @@ All limits are user-configurable with safe defaults:
 | Min EV threshold | 5% ($0.05) | 1% - 50% | Minimum expected value to trigger a trade |
 | Cooldown per loss | 60 min | 0 (off) - 1440 min (24h) | Pause after each losing trade |
 | Consecutive loss limit | 3 | 0 (off) - 10 | Pause for rest of day after N losses in a row |
+| Consecutive loss toggle | on | on/off | Enable/disable rest-of-day cooldown (counter still increments, per-loss still fires) |
+| Max contracts per bracket | 5 | 1 - 20 | Hard cap on open contracts per bracket per market |
 
 **Risk checks happen BEFORE every trade, no exceptions:**
 1. Is cooldown active? -> BLOCK
@@ -456,7 +458,8 @@ All limits are user-configurable with safe defaults:
 3. Would this trade push daily exposure over limit? -> BLOCK
 4. Has daily loss limit been hit? -> BLOCK
 5. Is the EV above minimum threshold? -> If no, SKIP
-6. All checks pass -> PROCEED
+6. Would this trade exceed per-bracket position cap? -> BLOCK (via `_get_open_bracket_qty()` in scheduler.py)
+7. All checks pass -> PROCEED
 
 ### RiskManager Implementation (risk_manager.py)
 
@@ -843,7 +846,7 @@ Trade Loss:
   └── cooldown_per_loss > 0?
       └── YES: Set cooldown_until = now + cooldown_per_loss_minutes
   └── Increment consecutive_losses
-      └── >= consecutive_loss_limit?
+      └── enable_consecutive_loss_limit AND >= consecutive_loss_limit?
           └── YES: Set rest_of_day_cooldown = True (paused until midnight ET)
 
 Trade Win:
