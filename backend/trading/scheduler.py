@@ -594,9 +594,7 @@ async def _check_retraining_trigger(
     try:
         # Find the most recent training report
         last_report_result = await session.execute(
-            select(TrainingReport)
-            .order_by(TrainingReport.completed_at.desc())
-            .limit(1)
+            select(TrainingReport).order_by(TrainingReport.completed_at.desc()).limit(1)
         )
         last_report = last_report_result.scalar_one_or_none()
 
@@ -637,10 +635,7 @@ async def _check_retraining_trigger(
                     scores: list[float] = []
                     for city in ["NYC", "CHI", "MIA", "AUS"]:
                         report = await check_calibration(city, session, lookback_days=90)
-                        if (
-                            report.status == "ok"
-                            and report.brier_score is not None
-                        ):
+                        if report.status == "ok" and report.brier_score is not None:
                             scores.append(report.brier_score)
                     if scores:
                         avg_brier = sum(scores) / len(scores)

@@ -113,8 +113,7 @@ async def _train_all_async(
                 duration_seconds=round(time.monotonic() - train_start, 2),
                 started_at=started_at,
                 error_message=(
-                    f"Only {len(rows)} samples"
-                    f" (need {settings.xgb_min_training_samples})"
+                    f"Only {len(rows)} samples (need {settings.xgb_min_training_samples})"
                 ),
             )
             session.add(report)

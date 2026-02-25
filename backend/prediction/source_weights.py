@@ -129,9 +129,7 @@ async def compute_source_weights_from_accuracy(
             continue
 
     if not source_rmse_accum:
-        logger.info(
-            "Insufficient accuracy data for source weight computation — using defaults"
-        )
+        logger.info("Insufficient accuracy data for source weight computation — using defaults")
         return dict(DEFAULT_MODEL_WEIGHTS)
 
     # Average RMSE across cities for each source

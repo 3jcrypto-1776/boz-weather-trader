@@ -52,12 +52,8 @@ def _report_to_response(report: TrainingReport) -> TrainingReportResponse:
         status=report.status,
         training_samples=report.training_samples or 0,
         test_samples=report.test_samples or 0,
-        date_range_start=(
-            report.date_range_start.isoformat() if report.date_range_start else None
-        ),
-        date_range_end=(
-            report.date_range_end.isoformat() if report.date_range_end else None
-        ),
+        date_range_start=(report.date_range_start.isoformat() if report.date_range_start else None),
+        date_range_end=(report.date_range_end.isoformat() if report.date_range_end else None),
         model_metrics=metrics_list,
         weights_before=report.weights_before,
         weights_after=report.weights_after,
@@ -66,9 +62,7 @@ def _report_to_response(report: TrainingReport) -> TrainingReportResponse:
         brier_score_before=report.brier_score_before,
         brier_score_after=report.brier_score_after,
         duration_seconds=report.duration_seconds or 0.0,
-        completed_at=(
-            report.completed_at.isoformat() if report.completed_at else ""
-        ),
+        completed_at=(report.completed_at.isoformat() if report.completed_at else ""),
     )
 
 
@@ -81,9 +75,7 @@ async def get_training_reports(
 ) -> TrainingReportListResponse:
     """Get paginated training report history, newest first."""
     # Count total
-    total_result = await db.execute(
-        select(func.count()).select_from(TrainingReport)
-    )
+    total_result = await db.execute(select(func.count()).select_from(TrainingReport))
     total = total_result.scalar() or 0
 
     # Fetch page
