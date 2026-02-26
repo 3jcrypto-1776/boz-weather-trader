@@ -257,6 +257,11 @@ else
   echo -e "  Recreating app containers..."
   $REMOTE "cd ${SHIP_HOMELAB_DIR} && docker compose up -d backend celery-worker celery-beat frontend"
   ok "Containers recreated"
+
+  # Prune old images + buildx cache to prevent disk bloat
+  echo -e "  Cleaning up old images and build cache..."
+  PRUNE_SAVED=$($REMOTE "docker image prune -f 2>/dev/null | tail -1; docker buildx prune -f --keep-storage=2GB 2>/dev/null | tail -1" || true)
+  ok "Cleanup done (${PRUNE_SAVED})"
 fi
 
 # ═══════════════════════════════════════════════════════════════

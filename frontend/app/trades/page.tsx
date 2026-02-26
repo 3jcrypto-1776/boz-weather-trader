@@ -11,7 +11,7 @@ import {
 import { useCallback, useMemo, useState } from "react";
 
 import CalendarGrid from "@/components/calendar/calendar-grid";
-import DayDetailPanel from "@/components/calendar/day-detail-panel";
+import DayDetailModal from "@/components/calendar/day-detail-modal";
 import TradeCard from "@/components/trade-card/trade-card";
 import EmptyState from "@/components/ui/empty-state";
 import ErrorBoundary from "@/components/ui/error-boundary";
@@ -60,15 +60,44 @@ function nextPeriod(current: StatsPeriod, cycle: StatsPeriod[]): StatsPeriod {
 
 // ─── Open Positions Section ───
 
+const ALL_CITIES: CityCode[] = ["NYC", "CHI", "MIA", "AUS"];
+
 function OpenPositionsSection() {
   const { data, isLoading } = useTrades(1, undefined, "OPEN");
   const { data: weather } = useCurrentWeather();
+  const [activeCities, setActiveCities] = useState<Set<CityCode>>(
+    new Set(ALL_CITIES),
+  );
+
   const tempByCity = useMemo(() => {
     const map: Partial<Record<CityCode, number>> = {};
     weather?.cities.forEach((c) => { map[c.city] = c.current_temp_f; });
     return map;
   }, [weather]);
+
   const markets = useMemo(() => groupByMarket(data?.trades ?? []), [data]);
+
+  const filteredMarkets = useMemo(
+    () => markets.filter((m) => activeCities.has(m.city)),
+    [markets, activeCities],
+  );
+
+  const filteredCount = filteredMarkets.reduce(
+    (sum, m) => sum + m.groups.length,
+    0,
+  );
+
+  const toggleCity = useCallback((city: CityCode) => {
+    setActiveCities((prev) => {
+      const next = new Set(prev);
+      if (next.has(city)) {
+        if (next.size > 1) next.delete(city);
+      } else {
+        next.add(city);
+      }
+      return next;
+    });
+  }, []);
 
   if (isLoading) {
     return (
@@ -90,23 +119,61 @@ function OpenPositionsSection() {
           Open Positions
         </h2>
         <span className="bg-boz-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-          {data.total}
+          {filteredCount < data.total
+            ? `${filteredCount}/${data.total}`
+            : data.total}
         </span>
       </div>
-      <div className="space-y-4">
-        {markets.map((market) => (
-          <div key={market.marketKey}>
-            <h3 className="text-xs font-medium text-boz-neutral mb-2">
-              {market.label}
-            </h3>
-            <div className="space-y-2">
-              {market.groups.map((group) => (
-                <TradeCard key={group.groupKey} group={group} currentTempF={tempByCity[group.city]} />
-              ))}
-            </div>
-          </div>
-        ))}
+
+      {/* City toggle buttons */}
+      <div className="flex items-center gap-2 mb-3" data-testid="city-toggles">
+        <span className="text-[10px] font-semibold text-boz-neutral uppercase tracking-wide">
+          Markets
+        </span>
+        <div className="flex gap-1">
+          {ALL_CITIES.map((city) => (
+            <button
+              key={city}
+              onClick={() => toggleCity(city)}
+              data-testid={`toggle-${city}`}
+              className={`min-h-[32px] px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                activeCities.has(city)
+                  ? "bg-boz-primary text-white"
+                  : "bg-white border border-gray-200 text-boz-neutral hover:bg-gray-50"
+              }`}
+            >
+              {city}
+              {tempByCity[city] != null && activeCities.has(city) && (
+                <span className="ml-1 text-[10px] opacity-75">
+                  {Math.round(tempByCity[city]!)}°
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Filtered market groups */}
+      {filteredMarkets.length === 0 ? (
+        <p className="text-xs text-boz-neutral text-center py-4">
+          No open positions for selected markets.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {filteredMarkets.map((market) => (
+            <div key={market.marketKey}>
+              <h3 className="text-xs font-medium text-boz-neutral mb-2">
+                {market.label}
+              </h3>
+              <div className="space-y-2">
+                {market.groups.map((group) => (
+                  <TradeCard key={group.groupKey} group={group} currentTempF={tempByCity[group.city]} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -271,9 +338,9 @@ function CalendarView() {
       {/* Open Positions */}
       <OpenPositionsSection />
 
-      {/* Day Detail Panel */}
+      {/* Day Detail Modal */}
       {selectedDate && selectedDayStats && (
-        <DayDetailPanel
+        <DayDetailModal
           date={selectedDate}
           dayStats={selectedDayStats}
           onClose={() => setSelectedDate(null)}

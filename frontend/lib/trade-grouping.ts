@@ -201,3 +201,67 @@ export function groupByMarket(trades: TradeRecord[]): MarketGroup[] {
 
   return markets;
 }
+
+// ─── Sorting ───
+
+export type DaySortOption = "time" | "pnl" | "city" | "status";
+
+const STATUS_RANK: Record<string, number> = {
+  OPEN: 0,
+  WON: 1,
+  LOST: 2,
+  CANCELED: 3,
+};
+
+/**
+ * Sort MarketGroup[] by a chosen criterion. Returns a new array (no mutation).
+ */
+export function sortMarketGroups(
+  markets: MarketGroup[],
+  sortBy: DaySortOption,
+): MarketGroup[] {
+  const sorted = [...markets];
+
+  switch (sortBy) {
+    case "time":
+      // Default: newest date first
+      sorted.sort((a, b) => b.date.localeCompare(a.date));
+      break;
+
+    case "pnl":
+      // Highest aggregate P&L first
+      sorted.sort((a, b) => {
+        const aPnl = a.groups.reduce(
+          (s, g) => s + (g.totalPnlCents ?? 0),
+          0,
+        );
+        const bPnl = b.groups.reduce(
+          (s, g) => s + (g.totalPnlCents ?? 0),
+          0,
+        );
+        return bPnl - aPnl;
+      });
+      break;
+
+    case "city":
+      // Alphabetical by city, then date descending
+      sorted.sort(
+        (a, b) =>
+          a.city.localeCompare(b.city) || b.date.localeCompare(a.date),
+      );
+      break;
+
+    case "status": {
+      // Best (lowest rank) status in each market group
+      const bestRank = (m: MarketGroup) =>
+        Math.min(...m.groups.map((g) => STATUS_RANK[g.status] ?? 99));
+      sorted.sort(
+        (a, b) =>
+          bestRank(a) - bestRank(b) || b.date.localeCompare(a.date),
+      );
+      break;
+    }
+  }
+
+  return sorted;
+}
