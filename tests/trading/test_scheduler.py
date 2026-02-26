@@ -704,39 +704,52 @@ class TestExpirePendingTrades:
 
 
 class TestSettleAndPostmortem:
-    """Tests for _settle_and_postmortem -- settles OPEN trades."""
+    """Tests for _settle_and_postmortem -- settles OPEN trades via Kalshi."""
+
+    def _make_kalshi_client(self, settlements=None):
+        """Create a mock Kalshi client with settlements."""
+        client = AsyncMock()
+        client.get_settlements.return_value = settlements or []
+        client.close.return_value = None
+        return client
 
     @pytest.mark.asyncio
-    async def test_settles_trade_with_matching_settlement(self) -> None:
-        """When an open trade has matching settlement data, settle_trade is called."""
+    async def test_settles_trade_with_matching_kalshi_settlement(self) -> None:
+        """When Kalshi has settled a market, settle_from_kalshi is called."""
         from backend.common.models import TradeStatus
+        from backend.kalshi.models import KalshiSettlement
         from backend.trading.scheduler import _settle_and_postmortem
 
         mock_session = _make_mock_db_session()
+        ticker = "KXHIGHNY-26FEB18-T52"
 
-        # Mock Trade query — market_date takes precedence over trade_date
         mock_trade = MagicMock()
         mock_trade.city = "NYC"
-        mock_trade.trade_date = datetime(2026, 2, 17, 22, 0, 0)  # Evening before
-        mock_trade.market_date = datetime(2026, 2, 18, 0, 0, 0)  # Market event day
-        mock_trade.market_ticker = "KXHIGHNY-26FEB18-T52"
+        mock_trade.trade_date = datetime(2026, 2, 17, 22, 0, 0)
+        mock_trade.market_date = datetime(2026, 2, 18, 0, 0, 0)
+        mock_trade.market_ticker = ticker
         mock_trade.user_id = "user-1"
-        mock_trade.status = TradeStatus.WON  # After settlement
+        mock_trade.status = TradeStatus.WON
 
-        # Mock Settlement query
-        mock_settlement = MagicMock()
-        mock_settlement.city = "NYC"
-        mock_settlement.settlement_date = date(2026, 2, 18)
-        mock_settlement.actual_high_f = 55.0
-
-        # First execute returns open trades, second returns settlement
         trade_result = MagicMock()
         trade_result.scalars.return_value.all.return_value = [mock_trade]
 
-        settlement_result = MagicMock()
-        settlement_result.scalar_one_or_none.return_value = mock_settlement
+        # NWS settlement for temp display
+        nws_result = MagicMock()
+        nws_result.scalar_one_or_none.return_value = MagicMock()
 
-        mock_session.execute.side_effect = [trade_result, settlement_result]
+        mock_session.execute.side_effect = [trade_result, nws_result]
+
+        kalshi_client = self._make_kalshi_client(
+            [
+                KalshiSettlement(
+                    ticker=ticker,
+                    market_result="yes",
+                    revenue=90,
+                    settled_time=datetime(2026, 2, 19, 14, 0, 0),
+                ),
+            ]
+        )
 
         mock_settle = AsyncMock()
         mock_user_settings = _make_user_settings()
@@ -746,7 +759,9 @@ class TestSettleAndPostmortem:
 
         with (
             patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
-            patch("backend.trading.postmortem.settle_trade", mock_settle),
+            patch("backend.trading.scheduler._get_user_id", return_value="user-1"),
+            patch("backend.trading.scheduler._get_kalshi_client", return_value=kalshi_client),
+            patch("backend.trading.postmortem.settle_from_kalshi", mock_settle),
             patch("backend.trading.scheduler._load_user_settings", return_value=mock_user_settings),
             patch("backend.trading.cooldown.CooldownManager", return_value=mock_cm),
         ):
@@ -756,31 +771,30 @@ class TestSettleAndPostmortem:
         mock_session.commit.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_skips_trade_without_settlement(self) -> None:
-        """When no settlement data exists, settle_trade is not called."""
+    async def test_skips_trade_not_settled_on_kalshi(self) -> None:
+        """When Kalshi hasn't settled the market, trade is not settled."""
         from backend.trading.scheduler import _settle_and_postmortem
 
         mock_session = _make_mock_db_session()
 
         mock_trade = MagicMock()
-        mock_trade.city = "NYC"
-        mock_trade.trade_date = datetime(2026, 2, 18, 12, 0, 0)
-        mock_trade.market_date = datetime(2026, 2, 18, 0, 0, 0)
         mock_trade.market_ticker = "KXHIGHNY-26FEB18-T52"
 
         trade_result = MagicMock()
         trade_result.scalars.return_value.all.return_value = [mock_trade]
 
-        settlement_result = MagicMock()
-        settlement_result.scalar_one_or_none.return_value = None  # No settlement
+        mock_session.execute.side_effect = [trade_result]
 
-        mock_session.execute.side_effect = [trade_result, settlement_result]
+        # Kalshi returns no settlements for this ticker
+        kalshi_client = self._make_kalshi_client([])
 
         mock_settle = AsyncMock()
 
         with (
             patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
-            patch("backend.trading.postmortem.settle_trade", mock_settle),
+            patch("backend.trading.scheduler._get_user_id", return_value="user-1"),
+            patch("backend.trading.scheduler._get_kalshi_client", return_value=kalshi_client),
+            patch("backend.trading.postmortem.settle_from_kalshi", mock_settle),
         ):
             await _settle_and_postmortem()
 
@@ -790,27 +804,38 @@ class TestSettleAndPostmortem:
     async def test_calls_cooldown_on_win(self) -> None:
         """CooldownManager.on_trade_win is called when trade WON."""
         from backend.common.models import TradeStatus
+        from backend.kalshi.models import KalshiSettlement
         from backend.trading.scheduler import _settle_and_postmortem
 
         mock_session = _make_mock_db_session()
+        ticker = "KXHIGHNY-26FEB18-T52"
 
         mock_trade = MagicMock()
         mock_trade.city = "NYC"
         mock_trade.trade_date = datetime(2026, 2, 18, 12, 0, 0)
         mock_trade.market_date = datetime(2026, 2, 18, 0, 0, 0)
-        mock_trade.market_ticker = "KXHIGHNY-26FEB18-T52"
+        mock_trade.market_ticker = ticker
         mock_trade.user_id = "user-1"
         mock_trade.status = TradeStatus.WON
-
-        mock_settlement = MagicMock()
 
         trade_result = MagicMock()
         trade_result.scalars.return_value.all.return_value = [mock_trade]
 
-        settlement_result = MagicMock()
-        settlement_result.scalar_one_or_none.return_value = mock_settlement
+        nws_result = MagicMock()
+        nws_result.scalar_one_or_none.return_value = None
 
-        mock_session.execute.side_effect = [trade_result, settlement_result]
+        mock_session.execute.side_effect = [trade_result, nws_result]
+
+        kalshi_client = self._make_kalshi_client(
+            [
+                KalshiSettlement(
+                    ticker=ticker,
+                    market_result="yes",
+                    revenue=90,
+                    settled_time=datetime(2026, 2, 19, 14, 0, 0),
+                ),
+            ]
+        )
 
         mock_cm = MagicMock()
         mock_cm.on_trade_win = AsyncMock()
@@ -818,7 +843,9 @@ class TestSettleAndPostmortem:
 
         with (
             patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
-            patch("backend.trading.postmortem.settle_trade", AsyncMock()),
+            patch("backend.trading.scheduler._get_user_id", return_value="user-1"),
+            patch("backend.trading.scheduler._get_kalshi_client", return_value=kalshi_client),
+            patch("backend.trading.postmortem.settle_from_kalshi", AsyncMock()),
             patch(
                 "backend.trading.scheduler._load_user_settings", return_value=_make_user_settings()
             ),
@@ -830,142 +857,40 @@ class TestSettleAndPostmortem:
         mock_cm.on_trade_loss.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_uses_market_date_not_trade_date_for_settlement(self) -> None:
-        """Settlement matching uses market_date, so evening trades match next-day settlement."""
-        from backend.common.models import TradeStatus
+    async def test_skips_when_no_kalshi_client(self) -> None:
+        """Settlement is skipped when Kalshi client can't be created."""
         from backend.trading.scheduler import _settle_and_postmortem
 
         mock_session = _make_mock_db_session()
-
-        # Trade placed evening of Feb 22 for Feb 23 market
-        mock_trade = MagicMock()
-        mock_trade.city = "AUS"
-        mock_trade.trade_date = datetime(2026, 2, 22, 21, 12, 0)  # 9:12 PM Feb 22
-        mock_trade.market_date = datetime(2026, 2, 23, 0, 0, 0)  # Feb 23 market
-        mock_trade.market_ticker = "KXHIGHAUS-26FEB23-T63"
-        mock_trade.user_id = "user-1"
-        mock_trade.status = TradeStatus.WON
-
-        mock_settlement = MagicMock()
-
-        trade_result = MagicMock()
-        trade_result.scalars.return_value.all.return_value = [mock_trade]
-
-        settlement_result = MagicMock()
-        settlement_result.scalar_one_or_none.return_value = mock_settlement
-
-        mock_session.execute.side_effect = [trade_result, settlement_result]
-
         mock_settle = AsyncMock()
 
         with (
             patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
-            patch("backend.trading.postmortem.settle_trade", mock_settle),
-            patch(
-                "backend.trading.scheduler._load_user_settings",
-                return_value=_make_user_settings(),
-            ),
-            patch(
-                "backend.trading.cooldown.CooldownManager",
-                return_value=MagicMock(on_trade_win=AsyncMock(), on_trade_loss=AsyncMock()),
-            ),
+            patch("backend.trading.scheduler._get_user_id", return_value="user-1"),
+            patch("backend.trading.scheduler._get_kalshi_client", return_value=None),
+            patch("backend.trading.postmortem.settle_from_kalshi", mock_settle),
         ):
             await _settle_and_postmortem()
 
-        # settle_trade should be called — settlement matched via market_date (Feb 23),
-        # NOT trade_date (Feb 22)
-        mock_settle.assert_awaited_once()
+        mock_settle.assert_not_awaited()
+        mock_session.close.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_fallback_to_ticker_when_market_date_is_none(self) -> None:
-        """If market_date is None, parse from market_ticker as fallback."""
-        from backend.common.models import TradeStatus
+    async def test_skips_when_no_user(self) -> None:
+        """Settlement is skipped when no user is configured."""
         from backend.trading.scheduler import _settle_and_postmortem
 
         mock_session = _make_mock_db_session()
-
-        # Trade without market_date (pre-migration trade)
-        mock_trade = MagicMock()
-        mock_trade.city = "AUS"
-        mock_trade.trade_date = datetime(2026, 2, 22, 21, 0, 0)
-        mock_trade.market_date = None  # Not set (pre-migration)
-        mock_trade.market_ticker = "KXHIGHAUS-26FEB23-T63"
-        mock_trade.user_id = "user-1"
-        mock_trade.status = TradeStatus.WON
-
-        mock_settlement = MagicMock()
-
-        trade_result = MagicMock()
-        trade_result.scalars.return_value.all.return_value = [mock_trade]
-
-        settlement_result = MagicMock()
-        settlement_result.scalar_one_or_none.return_value = mock_settlement
-
-        mock_session.execute.side_effect = [trade_result, settlement_result]
-
         mock_settle = AsyncMock()
 
         with (
             patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
-            patch("backend.trading.postmortem.settle_trade", mock_settle),
-            patch(
-                "backend.trading.scheduler._load_user_settings",
-                return_value=_make_user_settings(),
-            ),
-            patch(
-                "backend.trading.cooldown.CooldownManager",
-                return_value=MagicMock(on_trade_win=AsyncMock(), on_trade_loss=AsyncMock()),
-            ),
+            patch("backend.trading.scheduler._get_user_id", return_value=None),
+            patch("backend.trading.postmortem.settle_from_kalshi", mock_settle),
         ):
             await _settle_and_postmortem()
 
-        # Should still settle (parsed date from ticker as fallback)
-        mock_settle.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_fallback_to_trade_date_when_no_market_date_or_ticker(self) -> None:
-        """If market_date is None and ticker can't be parsed, use trade_date."""
-        from backend.common.models import TradeStatus
-        from backend.trading.scheduler import _settle_and_postmortem
-
-        mock_session = _make_mock_db_session()
-
-        mock_trade = MagicMock()
-        mock_trade.city = "NYC"
-        mock_trade.trade_date = datetime(2026, 2, 18, 12, 0, 0)
-        mock_trade.market_date = None
-        mock_trade.market_ticker = "BADTICKER"  # Can't be parsed
-        mock_trade.user_id = "user-1"
-        mock_trade.status = TradeStatus.WON
-
-        mock_settlement = MagicMock()
-
-        trade_result = MagicMock()
-        trade_result.scalars.return_value.all.return_value = [mock_trade]
-
-        settlement_result = MagicMock()
-        settlement_result.scalar_one_or_none.return_value = mock_settlement
-
-        mock_session.execute.side_effect = [trade_result, settlement_result]
-
-        mock_settle = AsyncMock()
-
-        with (
-            patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
-            patch("backend.trading.postmortem.settle_trade", mock_settle),
-            patch(
-                "backend.trading.scheduler._load_user_settings",
-                return_value=_make_user_settings(),
-            ),
-            patch(
-                "backend.trading.cooldown.CooldownManager",
-                return_value=MagicMock(on_trade_win=AsyncMock(), on_trade_loss=AsyncMock()),
-            ),
-        ):
-            await _settle_and_postmortem()
-
-        # Falls back to trade_date — should still settle
-        mock_settle.assert_awaited_once()
+        mock_settle.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_rollback_on_exception(self) -> None:
@@ -973,18 +898,22 @@ class TestSettleAndPostmortem:
         from backend.trading.scheduler import _settle_and_postmortem
 
         mock_session = _make_mock_db_session()
+        kalshi_client = self._make_kalshi_client()
 
-        # Make the trade query itself raise
-        mock_session.execute.side_effect = RuntimeError("DB error")
+        # Make the trade query raise after Kalshi client is created
+        kalshi_client.get_settlements.side_effect = RuntimeError("API error")
 
         with (
             patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
-            pytest.raises(RuntimeError, match="DB error"),
+            patch("backend.trading.scheduler._get_user_id", return_value="user-1"),
+            patch("backend.trading.scheduler._get_kalshi_client", return_value=kalshi_client),
+            pytest.raises(RuntimeError, match="API error"),
         ):
             await _settle_and_postmortem()
 
         mock_session.rollback.assert_awaited_once()
         mock_session.close.assert_awaited_once()
+        kalshi_client.close.assert_awaited_once()
 
 
 # ─── Celery Task Wrapper Tests ───

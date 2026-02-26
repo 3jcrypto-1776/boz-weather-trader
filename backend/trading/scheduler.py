@@ -526,22 +526,51 @@ async def _expire_pending_trades() -> int:
 
 
 async def _settle_and_postmortem() -> None:
-    """Settle trades and generate post-mortem narratives.
+    """Settle trades using Kalshi's authoritative market results.
 
-    Finds all OPEN trades that have matching settlement data and
-    settles them with P&L and narrative generation.
+    Fetches settlement data from the Kalshi API (which side won each market),
+    then settles all OPEN trades whose market_ticker appears in the results.
+    NWS temperature data is fetched separately for display only.
     """
     reset_engine()
 
     from sqlalchemy import func, select
 
     from backend.common.models import Settlement, Trade, TradeStatus
-    from backend.kalshi.markets import parse_market_date_from_ticker
     from backend.trading.cooldown import CooldownManager
-    from backend.trading.postmortem import settle_trade
+    from backend.trading.postmortem import settle_from_kalshi
 
     session = await get_task_session()
+    kalshi_client = None
     try:
+        # Get user ID and create Kalshi client
+        user_id = await _get_user_id(session)
+        if user_id is None:
+            logger.info(
+                "Settlement skipped: no user configured",
+                extra={"data": {}},
+            )
+            return
+
+        kalshi_client = await _get_kalshi_client(session, user_id)
+        if kalshi_client is None:
+            logger.warning(
+                "Settlement skipped: could not create Kalshi client",
+                extra={"data": {}},
+            )
+            return
+
+        # Fetch Kalshi settlements (authoritative win/loss source)
+        kalshi_settlements = await kalshi_client.get_settlements()
+        ticker_results = {s.ticker: s.market_result for s in kalshi_settlements}
+
+        if not ticker_results:
+            logger.info(
+                "Settlement skipped: no Kalshi settlements available",
+                extra={"data": {}},
+            )
+            return
+
         # Find trades that need settlement
         open_trades_result = await session.execute(
             select(Trade).where(Trade.status == TradeStatus.OPEN)
@@ -549,33 +578,24 @@ async def _settle_and_postmortem() -> None:
 
         settled_count = 0
         for trade in open_trades_result.scalars().all():
-            # Match settlement using the market event date (from ticker),
-            # NOT trade_date which is when the order was placed. This prevents
-            # evening trades for next-day markets from settling against
-            # the wrong day's data.
-            settle_date = trade.market_date
-            if settle_date is None:
-                # Fallback: parse from ticker for trades created before migration
-                parsed = parse_market_date_from_ticker(trade.market_ticker)
-                if parsed is not None:
-                    from datetime import datetime
+            # Check if Kalshi has settled this market
+            market_result = ticker_results.get(trade.market_ticker)
+            if market_result is None:
+                continue  # Market not settled on Kalshi yet
 
-                    settle_date = datetime(parsed.year, parsed.month, parsed.day)
-                else:
-                    # Last resort: use trade_date (original behavior)
-                    settle_date = trade.trade_date
-
-            settlement_result = await session.execute(
-                select(Settlement).where(
-                    Settlement.city == trade.city,
-                    func.date(Settlement.settlement_date) == func.date(settle_date),
+            # Optionally fetch NWS temp for display
+            nws_settlement = None
+            settle_date = trade.market_date or trade.trade_date
+            if settle_date is not None:
+                nws_result = await session.execute(
+                    select(Settlement).where(
+                        Settlement.city == trade.city,
+                        func.date(Settlement.settlement_date) == func.date(settle_date),
+                    )
                 )
-            )
-            settlement = settlement_result.scalar_one_or_none()
-            if settlement is None:
-                continue  # NWS CLI not published yet for this date
+                nws_settlement = nws_result.scalar_one_or_none()
 
-            await settle_trade(trade, settlement, session)
+            await settle_from_kalshi(trade, market_result, session, nws_settlement)
             settled_count += 1
 
             # Update cooldown based on win/loss
@@ -604,6 +624,8 @@ async def _settle_and_postmortem() -> None:
         await session.rollback()
         raise
     finally:
+        if kalshi_client is not None:
+            await kalshi_client.close()
         await session.close()
 
 

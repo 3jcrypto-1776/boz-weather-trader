@@ -66,12 +66,12 @@ tests/
 │   ├── test_error_dist.py    → Season detection + error std calculation (12 tests)
 │   ├── test_postmortem.py    → Post-mortem narrative generation (22 tests)
 │   └── test_pipeline.py      → Full prediction pipeline orchestration + multi-model integration (11 tests)
-├── trading/             → Unit tests + safety tests for backend/trading/ (276 tests)
+├── trading/             → Unit tests + safety tests for backend/trading/ (301 tests)
 │   ├── conftest.py      → Trading fixtures (mock Kalshi client, sample predictions)
 │   ├── test_ev_calculator.py      → EV math, fees, bracket scanning, Kelly integration (45 tests)
-│   ├── test_scheduler.py          → Celery tasks: trading cycle, expiry, settlement w/ market_date, Kelly params, bracket cap (46 tests)
+│   ├── test_scheduler.py          → Celery tasks: trading cycle, expiry, Kalshi-based settlement, Kelly params, bracket cap (46 tests)
 │   ├── test_kelly.py              → Kelly Criterion: sizing, fractional, fees, caps, edge cases (35 tests)
-│   ├── test_postmortem.py         → Settlement matching, P&L, rich narratives w/ sections, market_date queries (24 tests)
+│   ├── test_postmortem.py         → Settlement matching, P&L, rich narratives, Kalshi-based settlement (settle_from_kalshi) (49 tests)
 │   ├── test_sync.py               → Portfolio sync: ticker parsing, reconciliation, sentinel values, market_date, fill price, NO side conversion (27 tests)
 │   ├── test_retraining_trigger.py → Post-settlement retraining trigger: 3 conditions, cooldown, metrics (8 tests)
 │   ├── test_bracket_cap.py        → Per-bracket position cap: _get_open_bracket_qty, cap blocking, Prometheus metric (~15 tests)
@@ -82,7 +82,7 @@ tests/
 │   ├── test_executor.py           → Order placement + DB recording + market_date + fill price + NO side conversion (16 tests)
 │   ├── test_cooldown.py           → Per-loss + consecutive cooldowns + toggle guard (15 tests)
 │   └── test_notifications.py      → Web push via VAPID (5 tests)
-├── api/                 → API endpoint tests (157 tests)
+├── api/                 → API endpoint tests (158 tests)
 │   ├── conftest.py      → API fixtures (api_engine, client, mock_kalshi, factories)
 │   ├── test_training.py    → Training reports endpoint + manual retrain trigger (11 tests)
 │   ├── test_accuracy.py    → Forecast accuracy endpoints: sources, calibration, trends (17 tests)
@@ -99,7 +99,7 @@ tests/
 │   ├── test_performance.py  → Performance analytics endpoint + cost_by_city (7 tests)
 │   ├── test_queue.py        → Trade queue approve/reject/list (8 tests)
 │   ├── test_settings.py     → Settings read/update + bracket cap + loss toggle (8 tests)
-│   ├── test_trades.py       → Trade history endpoint + date filter + SETTLED pseudo-filter + resettle (9 tests)
+│   ├── test_trades.py       → Trade history endpoint + date filter + SETTLED pseudo-filter + Kalshi resettle (10 tests)
 │   ├── test_trades_sync.py  → Portfolio sync API endpoint: sync result, auth, WS events (5 tests)
 │   ├── test_update.py       → Self-update trigger + status polling + auth + error handling (10 tests)
 │   └── test_version.py      → Version endpoint: current version, update check, Redis cache (10 tests)
@@ -1145,7 +1145,7 @@ jobs:
 | Job | What It Does | Failure Blocks Merge? |
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
-| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1435 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
+| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1447 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
 | `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 220 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 

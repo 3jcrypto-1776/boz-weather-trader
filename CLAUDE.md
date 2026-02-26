@@ -16,7 +16,7 @@ backend/
   ├── weather/     → Agent 1: NWS + Open-Meteo data pipeline
   ├── kalshi/      → Agent 2: Kalshi API client (auth, orders, markets, WS feed, Redis cache)
   ├── prediction/  → Agent 3: Statistical ensemble + multi-model ML (XGBoost+RF+Ridge) + bracket probabilities + accuracy tracking + auto-retrain
-  ├── trading/     → Agent 4: EV calculator, Kelly sizing, risk controls, trade queue, bracket cap
+  ├── trading/     → Agent 4: EV calculator, Kelly sizing, risk controls, trade queue, bracket cap, Kalshi-based settlement
   ├── backtesting/ → Backtesting engine: day-by-day simulation, synthetic prices, metrics
   ├── websocket/   → Real-time event push (Redis pub/sub → WebSocket → SWR revalidation)
   └── common/      → Shared schemas, config, database, logging, middleware, metrics
@@ -30,7 +30,7 @@ monitoring/
   └── grafana/     → Grafana provisioning + dashboard JSON files
       ├── provisioning/  → Auto-provisioned datasources + dashboard provider
       └── dashboards/    → API Overview (8 panels) + Trading & Weather (10 panels) + Kalshi WS Feed (6 panels)
-tests/                   → 1435 backend + 220 frontend = 1655 tests (1 known failure)
+tests/                   → 1447 backend + 220 frontend = 1667 tests
   ├── common/      → Shared module tests: config, schemas, models, logging, encryption, middleware, metrics (123)
   ├── training/    → Training API endpoint tests (11)
   ├── weather/     → Weather pipeline: NWS, Open-Meteo, normalizer, stations, CLI parser, scheduler (140)
@@ -114,7 +114,7 @@ tests/                   → 1435 backend + 220 frontend = 1655 tests (1 known f
 - 4 cities: NYC (Central Park), Chicago (Midway), Miami (MIA), Austin (AUS)
 - 6 brackets per city per day (middle 4 are 2°F wide, top/bottom are catch-alls)
 - Markets launch 10:00 AM ET the day before the event
-- Settlement: NWS Daily Climate Report (CLI), published the morning after
+- Settlement authority: Kalshi API (`/portfolio/settlements`) — win/loss from `market_result`; NWS CLI temps used for display only
 - Measurement period: 12:00 AM - 11:59 PM LOCAL STANDARD TIME (not DST)
 - Contract pays $1 if temp lands in bracket, $0 otherwise
 

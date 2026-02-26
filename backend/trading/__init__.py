@@ -29,7 +29,11 @@ from backend.trading.ev_calculator import (
 from backend.trading.exceptions import TradingError, TradingHaltedError
 from backend.trading.executor import execute_trade
 from backend.trading.notifications import NotificationService
-from backend.trading.postmortem import generate_postmortem_narrative, settle_trade
+from backend.trading.postmortem import (
+    generate_postmortem_narrative,
+    settle_from_kalshi,
+    settle_trade,
+)
 from backend.trading.risk_manager import RiskManager, get_trading_day, is_new_trading_day
 from backend.trading.trade_queue import approve_trade, queue_trade, reject_trade
 
@@ -50,6 +54,7 @@ __all__ = [
     "reject_trade",
     "scan_all_brackets",
     "scan_bracket",
+    "settle_from_kalshi",
     "settle_trade",
     "validate_market_prices",
     "validate_predictions",

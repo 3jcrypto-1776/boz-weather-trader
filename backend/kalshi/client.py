@@ -402,23 +402,39 @@ class KalshiClient:
     async def get_settlements(self, limit: int = 100) -> list[KalshiSettlement]:
         """Get settlement history.
 
+        Paginates through all pages using Kalshi's cursor-based pagination.
+
         Args:
-            limit: Maximum number of settlements to return (default: 100).
+            limit: Maximum settlements per page (1-100, default 100).
 
         Returns:
             List of KalshiSettlement models with outcomes and revenue.
         """
-        data = await self._request(
-            "GET",
-            "/portfolio/settlements",
-            params={"limit": limit},
-        )
-        settlements = [KalshiSettlement(**s) for s in data.get("settlements", [])]
+        all_settlements: list[KalshiSettlement] = []
+        cursor: str | None = None
+
+        while True:
+            params: dict[str, str] = {"limit": str(limit)}
+            if cursor is not None:
+                params["cursor"] = cursor
+
+            data = await self._request(
+                "GET",
+                "/portfolio/settlements",
+                params=params,
+            )
+            page = [KalshiSettlement(**s) for s in data.get("settlements", [])]
+            all_settlements.extend(page)
+
+            cursor = data.get("cursor")
+            if not cursor or len(page) < limit:
+                break
+
         logger.info(
             "Settlements fetched",
-            extra={"data": {"count": len(settlements)}},
+            extra={"data": {"count": len(all_settlements)}},
         )
-        return settlements
+        return all_settlements
 
     # ─── Lifecycle ───
 

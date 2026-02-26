@@ -84,6 +84,7 @@ def mock_kalshi() -> AsyncMock:
     """Create a mock KalshiClient with default return values."""
     mock = AsyncMock()
     mock.get_balance.return_value = 500.0  # $500 = 50000 cents
+    mock.get_settlements.return_value = []  # No settlements by default
     mock.close.return_value = None
     return mock
 

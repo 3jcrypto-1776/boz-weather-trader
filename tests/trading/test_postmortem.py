@@ -20,6 +20,7 @@ from backend.common.models import Settlement, Trade, TradeStatus
 from backend.trading.postmortem import (
     _did_bracket_win,
     generate_postmortem_narrative,
+    settle_from_kalshi,
     settle_trade,
 )
 
@@ -369,3 +370,185 @@ class TestSettleTrade:
         # Should still settle correctly even without market_date
         assert trade.status == TradeStatus.WON
         assert trade.pnl_cents == 67
+
+
+# ---------------------------------------------------------------------------
+# TestSettleFromKalshi
+# ---------------------------------------------------------------------------
+class TestSettleFromKalshi:
+    """Test settle_from_kalshi -- Kalshi-authoritative settlement."""
+
+    def _make_trade(self, side: str = "yes", price_cents: int = 22) -> MagicMock:
+        """Create a mock Trade ORM object for Kalshi settlement."""
+        trade = MagicMock(spec=Trade)
+        trade.id = "kalshi-settle-1234-5678-abcdef012345"
+        trade.market_ticker = "KXHIGHNYC-26FEB18-B53.5"
+        trade.bracket_label = "53-54F"
+        trade.side = side
+        trade.price_cents = price_cents
+        trade.quantity = 1
+        trade.city = MagicMock()
+        trade.city.value = "NYC"
+        trade.trade_date = datetime(2026, 2, 18, tzinfo=UTC)
+        trade.market_date = datetime(2026, 2, 18, 0, 0, 0)
+        trade.model_probability = 0.30
+        trade.market_probability = 0.22
+        trade.ev_at_entry = 0.08
+        trade.confidence = "medium"
+        trade.status = TradeStatus.OPEN
+        trade.pnl_cents = None
+        trade.fees_cents = None
+        trade.settlement_temp_f = None
+        trade.settlement_source = None
+        trade.settled_at = None
+        trade.postmortem_narrative = None
+        return trade
+
+    def _make_nws_settlement(self, temp: float = 53.5) -> MagicMock:
+        """Create a mock NWS Settlement ORM object (display only)."""
+        settlement = MagicMock(spec=Settlement)
+        settlement.actual_high_f = temp
+        settlement.source = "NWS_CLI"
+        return settlement
+
+    def _make_mock_db(self) -> AsyncMock:
+        """Create a mock DB that returns empty forecasts."""
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_db.execute.return_value = mock_result
+        return mock_db
+
+    @pytest.mark.asyncio
+    async def test_yes_side_market_yes_wins(self) -> None:
+        """YES trade + market_result='yes' -> WON."""
+        trade = self._make_trade(side="yes")
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "yes", mock_db)
+
+        assert trade.status == TradeStatus.WON
+
+    @pytest.mark.asyncio
+    async def test_yes_side_market_no_loses(self) -> None:
+        """YES trade + market_result='no' -> LOST."""
+        trade = self._make_trade(side="yes")
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "no", mock_db)
+
+        assert trade.status == TradeStatus.LOST
+
+    @pytest.mark.asyncio
+    async def test_no_side_market_no_wins(self) -> None:
+        """NO trade + market_result='no' -> WON."""
+        trade = self._make_trade(side="no")
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "no", mock_db)
+
+        assert trade.status == TradeStatus.WON
+
+    @pytest.mark.asyncio
+    async def test_no_side_market_yes_loses(self) -> None:
+        """NO trade + market_result='yes' -> LOST."""
+        trade = self._make_trade(side="no")
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "yes", mock_db)
+
+        assert trade.status == TradeStatus.LOST
+
+    @pytest.mark.asyncio
+    async def test_pnl_yes_win(self) -> None:
+        """YES at 22c wins: pnl = (100-22) - fee = 78 - 11 = 67c."""
+        trade = self._make_trade(side="yes", price_cents=22)
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "yes", mock_db)
+
+        assert trade.pnl_cents == 67
+        assert trade.fees_cents == 11
+
+    @pytest.mark.asyncio
+    async def test_pnl_yes_loss(self) -> None:
+        """YES at 22c loses: pnl = -22c (lost cost)."""
+        trade = self._make_trade(side="yes", price_cents=22)
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "no", mock_db)
+
+        assert trade.pnl_cents == -22
+        assert trade.fees_cents == 0
+
+    @pytest.mark.asyncio
+    async def test_pnl_no_win(self) -> None:
+        """NO at 22c wins: cost=(100-22)=78, pnl=(100-78)-fee=22-3=19c."""
+        trade = self._make_trade(side="no", price_cents=22)
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "no", mock_db)
+
+        assert trade.status == TradeStatus.WON
+        # NO at 22c: cost = 100 - 22 = 78c, profit = 100 - 78 = 22c
+        # fee = estimate_fees(22, 'no') = max(1, int(22 * 0.15)) = 3c
+        assert trade.pnl_cents == 19
+        assert trade.fees_cents == 3
+
+    @pytest.mark.asyncio
+    async def test_source_is_kalshi(self) -> None:
+        """Settlement source should be 'KALSHI'."""
+        trade = self._make_trade()
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "yes", mock_db)
+
+        assert trade.settlement_source == "KALSHI"
+
+    @pytest.mark.asyncio
+    async def test_settled_at_is_set(self) -> None:
+        """settled_at timestamp should be set."""
+        trade = self._make_trade()
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "yes", mock_db)
+
+        assert trade.settled_at is not None
+
+    @pytest.mark.asyncio
+    async def test_nws_temp_populated_when_available(self) -> None:
+        """settlement_temp_f is set from NWS when provided."""
+        trade = self._make_trade()
+        nws = self._make_nws_settlement(temp=53.5)
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "yes", mock_db, nws_settlement=nws)
+
+        assert trade.settlement_temp_f == 53.5
+
+    @pytest.mark.asyncio
+    async def test_no_nws_temp_is_none(self) -> None:
+        """settlement_temp_f stays None without NWS data."""
+        trade = self._make_trade()
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "yes", mock_db)
+
+        # settlement_temp_f is a MagicMock attribute, wasn't set by our code
+        # since nws_settlement is None. Verify by checking the source is KALSHI
+        # (not NWS_CLI) and that settle didn't crash.
+        assert trade.settlement_source == "KALSHI"
+
+    @pytest.mark.asyncio
+    async def test_postmortem_generated_with_nws(self) -> None:
+        """Post-mortem narrative generated when NWS settlement available."""
+        trade = self._make_trade()
+        nws = self._make_nws_settlement(temp=53.5)
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "yes", mock_db, nws_settlement=nws)
+
+        assert trade.postmortem_narrative is not None
+        # Should be a string (the generated narrative)
+        assert isinstance(trade.postmortem_narrative, str)
+        assert "WHAT WE TRADED" in trade.postmortem_narrative

@@ -145,19 +145,20 @@ async def sync_trades(
 async def settle_trades_now(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    kalshi_client=Depends(get_kalshi_client),
     resettle: bool = Query(False, description="Reset all settled trades and re-settle"),
 ) -> dict:
-    """Manually trigger settlement for all OPEN trades with matching settlement data.
+    """Manually trigger settlement using Kalshi's authoritative market results.
 
-    Fetches fresh CLI reports for all cities, creates Settlement records,
-    then settles any OPEN trades that have matching data. Useful for
-    catching up on missed scheduled settlements.
+    Fetches settlement data from Kalshi (which side won each market),
+    then settles any OPEN trades whose ticker matches. NWS CLI data is
+    fetched separately for display-only fields (actual temperature).
 
     If resettle=true, resets ALL WON/LOST trades back to OPEN first,
-    then re-runs settlement from scratch (useful after fixing settlement bugs).
+    then re-runs settlement from scratch.
     """
     from backend.common.models import Settlement, TradeStatus
-    from backend.trading.postmortem import settle_trade
+    from backend.trading.postmortem import settle_from_kalshi
     from backend.weather.cli_parser import parse_cli_text
     from backend.weather.nws import fetch_all_nws_cli
     from backend.weather.stations import VALID_CITIES
@@ -187,7 +188,11 @@ async def settle_trades_now(
             extra={"data": {"reset_count": reset_count}},
         )
 
-    # Step 1: Fetch ALL available CLI reports and create Settlement records
+    # Step 1: Fetch Kalshi settlements (authoritative win/loss source)
+    kalshi_settlements = await kalshi_client.get_settlements()
+    ticker_results = {s.ticker: s.market_result for s in kalshi_settlements}
+
+    # Step 2: Fetch NWS CLI reports for display-only temperature data
     cli_fetched = 0
     for city in VALID_CITIES:
         try:
@@ -198,7 +203,6 @@ async def settle_trades_now(
                 except Exception:
                     continue
 
-                # Check for existing settlement
                 existing = await db.execute(
                     select(Settlement).where(
                         Settlement.city == city,
@@ -227,26 +231,31 @@ async def settle_trades_now(
     if cli_fetched > 0:
         await db.commit()
 
-    # Step 2: Settle OPEN trades with matching settlement data
+    # Step 3: Settle OPEN trades using Kalshi market results
     open_trades_result = await db.execute(
         select(Trade).where(Trade.user_id == user.id, Trade.status == TradeStatus.OPEN)
     )
 
     settled_count = 0
     for trade in open_trades_result.scalars().all():
-        # Use market_date (event date), falling back to trade_date
-        settle_date = trade.market_date or trade.trade_date
-        settlement_result = await db.execute(
-            select(Settlement).where(
-                Settlement.city == trade.city,
-                func.date(Settlement.settlement_date) == func.date(settle_date),
-            )
-        )
-        settlement = settlement_result.scalar_one_or_none()
-        if settlement is None:
-            continue
+        # Check if Kalshi has settled this market
+        market_result = ticker_results.get(trade.market_ticker)
+        if market_result is None:
+            continue  # Market not settled on Kalshi yet
 
-        await settle_trade(trade, settlement, db)
+        # Optionally look up NWS temp for display
+        nws_settlement = None
+        settle_date = trade.market_date or trade.trade_date
+        if settle_date is not None:
+            nws_result = await db.execute(
+                select(Settlement).where(
+                    Settlement.city == trade.city,
+                    func.date(Settlement.settlement_date) == func.date(settle_date),
+                )
+            )
+            nws_settlement = nws_result.scalar_one_or_none()
+
+        await settle_from_kalshi(trade, market_result, db, nws_settlement)
         settled_count += 1
 
     await db.commit()
@@ -256,6 +265,7 @@ async def settle_trades_now(
         extra={
             "data": {
                 "cli_fetched": cli_fetched,
+                "kalshi_settlements": len(ticker_results),
                 "settled": settled_count,
                 "reset": reset_count,
             }
@@ -264,6 +274,7 @@ async def settle_trades_now(
 
     return {
         "cli_fetched": cli_fetched,
+        "kalshi_settlements": len(ticker_results),
         "settled_count": settled_count,
         "reset_count": reset_count,
     }

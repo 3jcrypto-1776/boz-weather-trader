@@ -1,23 +1,21 @@
 """Post-settlement trade analysis and narrative generation.
 
-After market settlement (NWS CLI report published), this module:
-1. Determines if a trade won or lost based on actual temperature
-2. Calculates final P&L in cents (including Kalshi fees)
-3. Generates a human-readable narrative explaining the outcome
-4. Updates the Trade record with settlement data
+Two settlement paths:
+
+1. **Kalshi-based (primary):** settle_from_kalshi() uses Kalshi's authoritative
+   market_result ("yes"/"no") to determine win/loss. NWS temperature data is
+   optional and used only for display (settlement_temp_f, post-mortem narratives).
+
+2. **NWS-based (legacy):** settle_trade() determines win/loss from NWS CLI
+   temperature data via _did_bracket_win(). Used by backtesting and as fallback.
 
 CRITICAL: All monetary calculations use CENTS (integers). The Trade ORM model
 uses pnl_cents (int) and fees_cents (int).
 
-Bracket label formats:
-    "53-54F"   -> standard 2-degree bracket (lower <= temp <= upper)
-    "<=52F"    -> bottom catch-all (temp <= bound)
-    ">=57F"    -> top catch-all (temp >= bound)
-
 Usage:
-    from backend.trading.postmortem import settle_trade
+    from backend.trading.postmortem import settle_from_kalshi
 
-    await settle_trade(trade, settlement, db)
+    await settle_from_kalshi(trade, market_result="yes", db=db, nws_settlement=s)
 """
 
 from __future__ import annotations
@@ -226,6 +224,86 @@ async def settle_trade(
                 "fees_cents": trade.fees_cents,
                 "actual_temp_f": actual_temp,
                 "bracket": trade.bracket_label,
+            }
+        },
+    )
+
+
+async def settle_from_kalshi(
+    trade: Trade,
+    market_result: str,
+    db: AsyncSession,
+    nws_settlement: Settlement | None = None,
+) -> None:
+    """Settle a trade using Kalshi's authoritative market result.
+
+    Uses Kalshi's market_result ("yes"/"no") to determine win/loss instead
+    of parsing bracket labels against NWS temperature data. This eliminates
+    bracket-parsing bugs and premature settlement issues.
+
+    P&L is calculated locally using the same math as settle_trade(), since
+    Kalshi's revenue field is per-ticker (entire position) rather than
+    per-order.
+
+    NWS settlement data is optional and used only for display fields
+    (settlement_temp_f) and post-mortem narrative generation.
+
+    Args:
+        trade: The Trade ORM record to settle (must be OPEN status).
+        market_result: Kalshi's market outcome — "yes" or "no".
+        db: Async database session.
+        nws_settlement: Optional NWS Settlement for temp display/narratives.
+    """
+    won = market_result == trade.side
+
+    # P&L calculation (same math as settle_trade)
+    cost_cents = trade.price_cents * trade.quantity
+    if trade.side == "no":
+        cost_cents = (100 - trade.price_cents) * trade.quantity
+
+    if won:
+        payout_cents = 100 * trade.quantity
+        profit_cents = payout_cents - cost_cents
+        fee_cents = estimate_fees(trade.price_cents, trade.side) * trade.quantity
+        pnl_cents = profit_cents - fee_cents
+        trade.status = TradeStatus.WON
+        trade.fees_cents = fee_cents
+    else:
+        pnl_cents = -cost_cents
+        trade.status = TradeStatus.LOST
+        trade.fees_cents = 0
+
+    trade.pnl_cents = pnl_cents
+    trade.settlement_source = "KALSHI"
+    trade.settled_at = datetime.now(UTC).replace(tzinfo=None)
+
+    # Fill display-only temperature from NWS if available
+    if nws_settlement is not None:
+        trade.settlement_temp_f = nws_settlement.actual_high_f
+
+        # Generate post-mortem narrative (requires NWS data for temp/forecasts)
+        forecast_date = trade.market_date if trade.market_date is not None else trade.trade_date
+        forecasts_result = await db.execute(
+            select(WeatherForecast).where(
+                WeatherForecast.city == trade.city,
+                WeatherForecast.forecast_date == forecast_date,
+            )
+        )
+        forecasts = list(forecasts_result.scalars().all())
+        trade.postmortem_narrative = generate_postmortem_narrative(trade, nws_settlement, forecasts)
+
+    await db.flush()
+
+    logger.info(
+        "Trade settled via Kalshi",
+        extra={
+            "data": {
+                "trade_id": trade.id,
+                "ticker": trade.market_ticker,
+                "market_result": market_result,
+                "side": trade.side,
+                "status": trade.status.value,
+                "pnl_cents": trade.pnl_cents,
             }
         },
     )

@@ -163,18 +163,20 @@ async def test_trades_unauthenticated(unauthed_client: AsyncClient) -> None:
     assert response.status_code == 401
 
 
-async def test_settle_resettle_fixes_mismarked_trades(
+async def test_settle_resettle_uses_kalshi_settlements(
     client: AsyncClient,
     db: AsyncSession,
+    mock_kalshi: AsyncMock,
 ) -> None:
-    """POST /api/trades/settle?resettle=true resets and re-settles all trades.
+    """POST /api/trades/settle?resettle=true uses Kalshi as settlement authority.
 
-    Simulates the bracket parsing bug fix: a trade that was incorrectly LOST
-    (bracket '71° to 72°F', actual 72°F) should become WON after re-settlement.
+    A LOST trade is reset to OPEN and re-settled using Kalshi's market_result.
+    Kalshi says market_result='yes', trade side='yes' -> should become WON.
     """
     market_date = date(2026, 2, 25)
+    ticker = "KXHIGHMIA-26FEB25-B71.5"
 
-    # Create a settlement record for the market date
+    # Create a NWS settlement record (display-only temperature data)
     settlement = Settlement(
         city=CityEnum.MIA,
         settlement_date=datetime(2026, 2, 25),
@@ -184,7 +186,7 @@ async def test_settle_resettle_fixes_mismarked_trades(
     )
     db.add(settlement)
 
-    # Create a trade that was incorrectly marked LOST (bracket parsing bug)
+    # Create a trade that was incorrectly marked LOST
     trade = make_trade(
         user_id="test-user-001",
         city="MIA",
@@ -196,7 +198,7 @@ async def test_settle_resettle_fixes_mismarked_trades(
         side="yes",
         price_cents=10,
         settlement_temp_f=72.0,
-        market_ticker="KXHIGHMIA-26FEB25-B71.5",
+        market_ticker=ticker,
     )
     db.add(trade)
     await db.commit()
@@ -204,6 +206,18 @@ async def test_settle_resettle_fixes_mismarked_trades(
     # Verify trade starts as LOST
     resp = await client.get("/api/trades", params={"status": "LOST"})
     assert resp.json()["total"] == 1
+
+    # Configure Kalshi mock to return settlement for this ticker
+    from backend.kalshi.models import KalshiSettlement
+
+    mock_kalshi.get_settlements.return_value = [
+        KalshiSettlement(
+            ticker=ticker,
+            market_result="yes",
+            revenue=90,
+            settled_time=datetime(2026, 2, 26, 14, 0, 0),
+        ),
+    ]
 
     # Trigger re-settlement (mock NWS fetch to avoid external calls)
     with patch(
@@ -217,10 +231,45 @@ async def test_settle_resettle_fixes_mismarked_trades(
     data = resp.json()
     assert data["reset_count"] == 1
     assert data["settled_count"] == 1
+    assert data["kalshi_settlements"] == 1
 
-    # Trade should now be WON (72°F is within 71-72°F bracket)
+    # Trade should now be WON (Kalshi says market_result='yes', trade side='yes')
     resp = await client.get("/api/trades", params={"status": "WON"})
     won_data = resp.json()
     assert won_data["total"] == 1
     assert won_data["trades"][0]["status"] == "WON"
     assert won_data["trades"][0]["pnl_cents"] > 0
+
+
+async def test_settle_skips_unsettled_markets(
+    client: AsyncClient,
+    db: AsyncSession,
+    mock_kalshi: AsyncMock,
+) -> None:
+    """POST /api/trades/settle skips trades whose market isn't settled on Kalshi."""
+    trade = make_trade(
+        user_id="test-user-001",
+        city="NYC",
+        status=TradeStatus.OPEN,
+        market_ticker="KXHIGHNYC-26FEB28-B55.5",
+    )
+    db.add(trade)
+    await db.commit()
+
+    # Kalshi returns no settlements (market not settled yet)
+    mock_kalshi.get_settlements.return_value = []
+
+    with patch(
+        "backend.weather.nws.fetch_all_nws_cli",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        resp = await client.post("/api/trades/settle")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["settled_count"] == 0
+
+    # Trade should still be OPEN
+    resp = await client.get("/api/trades", params={"status": "OPEN"})
+    assert resp.json()["total"] == 1
