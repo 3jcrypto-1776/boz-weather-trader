@@ -325,4 +325,19 @@ describe("DashboardPage", () => {
     expect(screen.getByText("$100.00")).toBeInTheDocument();
     expect(screen.getByText("+$0.00")).toBeInTheDocument();
   });
+
+  // --- Phase 42: Prediction timestamp ---
+
+  it("shows prediction last-updated timestamp", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<DashboardPage />);
+    const timestamp = screen.getByTestId("prediction-timestamp");
+    expect(timestamp).toBeInTheDocument();
+    expect(timestamp.textContent).toContain("Updated");
+  });
 });

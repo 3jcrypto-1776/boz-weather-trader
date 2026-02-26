@@ -14,7 +14,7 @@ import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import TradeCard from "@/components/trade-card/trade-card";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
-import { useDashboard, useDashboardStats } from "@/lib/hooks";
+import { useCurrentWeather, useDashboard, useDashboardStats } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
 import type { CityCode, DashboardData, DashboardStats, StatsPeriod } from "@/lib/types";
 import { centsToDollars, confidenceBadgeColor, formatPnL, shortBracketLabel, CITY_NAMES } from "@/lib/utils";
@@ -108,13 +108,22 @@ function PredictionsSection({
 
   return (
     <section className="mb-6">
-      {/* Title with market date */}
+      {/* Title with market date + last updated */}
       <div className="flex items-baseline gap-2 mb-3">
         <h2 className="text-sm font-semibold text-gray-900">
           Predictions
         </h2>
         {dateLabel && (
           <span className="text-xs text-boz-neutral">for {dateLabel}</span>
+        )}
+        {predictions[0]?.generated_at && (
+          <span className="text-[10px] text-boz-neutral" data-testid="prediction-timestamp">
+            · Updated{" "}
+            {new Date(predictions[0].generated_at).toLocaleTimeString("en-US", {
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </span>
         )}
       </div>
 
@@ -271,6 +280,14 @@ function DashboardContent({
   const wlLosses = stats ? stats[wlPeriod].losses : 0;
   const wlValue = stats ? `${wlWins}W / ${wlLosses}L` : "—";
 
+  // Current weather for live temp on OPEN trade cards
+  const { data: weather } = useCurrentWeather();
+  const tempByCity = useMemo(() => {
+    const map: Partial<Record<CityCode, number>> = {};
+    weather?.cities.forEach((c) => { map[c.city] = c.current_temp_f; });
+    return map;
+  }, [weather]);
+
   const positionMarkets = useMemo(
     () => groupByMarket(data.active_positions),
     [data.active_positions],
@@ -329,7 +346,7 @@ function DashboardContent({
                 </h3>
                 <div className="space-y-2">
                   {market.groups.map((group) => (
-                    <TradeCard key={group.groupKey} group={group} />
+                    <TradeCard key={group.groupKey} group={group} currentTempF={tempByCity[group.city]} />
                   ))}
                 </div>
               </div>
@@ -352,7 +369,7 @@ function DashboardContent({
                 </h3>
                 <div className="space-y-2">
                   {market.groups.map((group) => (
-                    <TradeCard key={group.groupKey} group={group} />
+                    <TradeCard key={group.groupKey} group={group} currentTempF={tempByCity[group.city]} />
                   ))}
                 </div>
               </div>

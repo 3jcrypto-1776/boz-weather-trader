@@ -19,6 +19,7 @@ import {
 
 interface TradeCardProps {
   group: GroupedTrade;
+  currentTempF?: number | null;
 }
 
 /**
@@ -26,7 +27,7 @@ interface TradeCardProps {
  * bracket/side/status, aggregated into a single card with total quantity.
  * Green for WON, red for LOST, blue for OPEN, gray for CANCELED.
  */
-export default function TradeCard({ group }: TradeCardProps) {
+export default function TradeCard({ group, currentTempF }: TradeCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   const isSettled = group.status === "WON" || group.status === "LOST";
@@ -83,6 +84,11 @@ export default function TradeCard({ group }: TradeCardProps) {
             {countdown && (
               <span className="text-xs font-medium text-boz-warning">
                 {countdown}
+              </span>
+            )}
+            {!isSettled && currentTempF != null && (
+              <span className="text-xs font-medium text-boz-primary" data-testid="current-temp">
+                Now: {Math.round(currentTempF)}°F
               </span>
             )}
             {isSettled && group.settlement_temp_f !== null && (

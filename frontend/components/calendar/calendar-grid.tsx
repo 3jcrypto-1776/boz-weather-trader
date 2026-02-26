@@ -30,8 +30,8 @@ function buildCalendarCells(year: number, month: number): (number | null)[] {
   // Days of the month
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
-  // Padding after last day (fill to 42 = 6 rows)
-  while (cells.length < 42) cells.push(null);
+  // Padding after last day (fill to complete the final row)
+  while (cells.length % 7 !== 0) cells.push(null);
 
   return cells;
 }

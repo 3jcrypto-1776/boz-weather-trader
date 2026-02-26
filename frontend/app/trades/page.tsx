@@ -19,7 +19,7 @@ import Skeleton from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { syncTrades } from "@/lib/api";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
-import { useCalendar, useDashboardStats, useTrades } from "@/lib/hooks";
+import { useCalendar, useCurrentWeather, useDashboardStats, useTrades } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
 import type { CityCode, StatsPeriod, SyncResult, TradeStatus } from "@/lib/types";
 import { formatPnL, formatProbability } from "@/lib/utils";
@@ -62,6 +62,12 @@ function nextPeriod(current: StatsPeriod, cycle: StatsPeriod[]): StatsPeriod {
 
 function OpenPositionsSection() {
   const { data, isLoading } = useTrades(1, undefined, "OPEN");
+  const { data: weather } = useCurrentWeather();
+  const tempByCity = useMemo(() => {
+    const map: Partial<Record<CityCode, number>> = {};
+    weather?.cities.forEach((c) => { map[c.city] = c.current_temp_f; });
+    return map;
+  }, [weather]);
   const markets = useMemo(() => groupByMarket(data?.trades ?? []), [data]);
 
   if (isLoading) {
@@ -95,7 +101,7 @@ function OpenPositionsSection() {
             </h3>
             <div className="space-y-2">
               {market.groups.map((group) => (
-                <TradeCard key={group.groupKey} group={group} />
+                <TradeCard key={group.groupKey} group={group} currentTempF={tempByCity[group.city]} />
               ))}
             </div>
           </div>

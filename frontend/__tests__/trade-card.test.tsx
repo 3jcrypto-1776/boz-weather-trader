@@ -345,4 +345,31 @@ describe("TradeCard", () => {
     );
     expect(screen.queryByText(/Actual:/)).not.toBeInTheDocument();
   });
+
+  // --- Phase 42: Current temp on OPEN trade cards ---
+
+  it("shows current temp on OPEN trade cards when provided", () => {
+    render(
+      <TradeCard
+        group={makeGroup({ status: "OPEN" })}
+        currentTempF={74.3}
+      />,
+    );
+    expect(screen.getByTestId("current-temp")).toHaveTextContent("Now: 74°F");
+  });
+
+  it("does not show current temp on settled trade cards", () => {
+    render(
+      <TradeCard
+        group={makeGroup({
+          status: "WON",
+          totalPnlCents: 75,
+          settlement_temp_f: 72,
+        })}
+        currentTempF={74.3}
+      />,
+    );
+    expect(screen.queryByTestId("current-temp")).not.toBeInTheDocument();
+    expect(screen.getByText("Actual: 72°F")).toBeInTheDocument();
+  });
 });
