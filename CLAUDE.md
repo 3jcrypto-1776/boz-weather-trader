@@ -30,7 +30,7 @@ monitoring/
   └── grafana/     → Grafana provisioning + dashboard JSON files
       ├── provisioning/  → Auto-provisioned datasources + dashboard provider
       └── dashboards/    → API Overview (8 panels) + Trading & Weather (10 panels) + Kalshi WS Feed (6 panels)
-tests/                   → 1421 backend + 209 frontend = 1630 tests (1 known failure)
+tests/                   → 1421 backend + 218 frontend = 1639 tests (1 known failure)
   ├── common/      → Shared module tests: config, schemas, models, logging, encryption, middleware, metrics (123)
   ├── training/    → Training API endpoint tests (11)
   ├── weather/     → Weather pipeline: NWS, Open-Meteo, normalizer, stations, CLI parser, scheduler (140)

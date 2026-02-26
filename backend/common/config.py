@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     xgb_model_dir: str = "models"
     xgb_ensemble_weight: float = 0.30  # Deprecated: use ml_ensemble_weight
     xgb_min_training_samples: int = 20  # Min forecast+settlement pairs to train
-    xgb_retrain_interval_days: int = 14  # Retrain frequency
+    xgb_retrain_interval_days: int = 7  # Retrain frequency
     ml_ensemble_weight: float = 0.30  # ML ensemble weight in final blend (0.0 = disabled)
 
     # ─── Retraining Triggers ───

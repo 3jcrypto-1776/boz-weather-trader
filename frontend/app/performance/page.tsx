@@ -8,6 +8,7 @@ import CityPerformanceChart from "@/components/charts/city-performance-chart";
 import PnlChart from "@/components/charts/pnl-chart";
 import SourceAccuracyChart from "@/components/charts/source-accuracy-chart";
 import TrainingLog from "@/components/charts/training-log";
+import ModelStatus from "@/components/model-status";
 import EmptyState from "@/components/ui/empty-state";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
@@ -225,6 +226,11 @@ export default function PerformancePage() {
 
           {sources && <SourceAccuracyChart sources={sources} />}
         </div>
+
+        {/* Current Model Status */}
+        {trainingReports && trainingReports.reports.length > 0 && (
+          <ModelStatus report={trainingReports.reports[0]} />
+        )}
 
         {/* Training Log */}
         {trainingReports && (

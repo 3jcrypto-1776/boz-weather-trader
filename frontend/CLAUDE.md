@@ -24,6 +24,7 @@ frontend/
 │   ├── calendar/           → Calendar grid + day detail panel
 │   ├── trade-card/         → Trade display with post-mortem expandable
 │   ├── training-log/       → Training report log display on Performance page
+│   ├── model-status/       → Current model performance + source weights display
 │   └── bracket-view/       → Visual bracket probability display
 ├── lib/                    → Utilities, API client, types
 │   ├── api.ts              → Backend API client (fetch wrapper) + getWsUrl() helper + fetchVersion() + triggerUpdate() + fetchUpdateStatus() + fetchTrainingReports() + triggerRetrain()
@@ -1685,6 +1686,7 @@ Your tests go in `frontend/__tests__/`:
 - `version-info.test.tsx` — version display, update notification, loading/error states
 - `update-button.test.tsx` — update trigger, progress states, error handling, success display (5 tests)
 - `training-log.test.tsx` — training report display, trigger retrain, loading/error states (11 tests)
+- `model-status.test.tsx` — model performance table, source weights, ensemble blend, null handling (9 tests)
 - `utils.test.ts` — centsToDollars, formatPnL, formatProbability, date formatting
 
 ### Critical Test Cases
