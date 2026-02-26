@@ -85,6 +85,11 @@ export default function TradeCard({ group }: TradeCardProps) {
                 {countdown}
               </span>
             )}
+            {isSettled && group.settlement_temp_f !== null && (
+              <span className="text-xs font-medium text-boz-neutral">
+                Actual: {group.settlement_temp_f}°F
+              </span>
+            )}
           </div>
         </div>
 

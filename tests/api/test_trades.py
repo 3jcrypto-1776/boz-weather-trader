@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.common.models import TradeStatus
+from backend.common.models import CityEnum, Settlement, TradeStatus
 from tests.api.conftest import make_trade
 
 pytestmark = pytest.mark.asyncio
@@ -160,3 +161,66 @@ async def test_trades_unauthenticated(unauthed_client: AsyncClient) -> None:
     """GET /api/trades returns 401 when not authenticated."""
     response = await unauthed_client.get("/api/trades")
     assert response.status_code == 401
+
+
+async def test_settle_resettle_fixes_mismarked_trades(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    """POST /api/trades/settle?resettle=true resets and re-settles all trades.
+
+    Simulates the bracket parsing bug fix: a trade that was incorrectly LOST
+    (bracket '71° to 72°F', actual 72°F) should become WON after re-settlement.
+    """
+    market_date = date(2026, 2, 25)
+
+    # Create a settlement record for the market date
+    settlement = Settlement(
+        city=CityEnum.MIA,
+        settlement_date=datetime(2026, 2, 25),
+        actual_high_f=72.0,
+        actual_low_f=60.0,
+        source="NWS_CLI",
+    )
+    db.add(settlement)
+
+    # Create a trade that was incorrectly marked LOST (bracket parsing bug)
+    trade = make_trade(
+        user_id="test-user-001",
+        city="MIA",
+        status=TradeStatus.LOST,
+        pnl_cents=-10,
+        trade_date=date(2026, 2, 24),
+        market_date=market_date,
+        bracket_label="71\u00b0 to 72\u00b0F",
+        side="yes",
+        price_cents=10,
+        settlement_temp_f=72.0,
+        market_ticker="KXHIGHMIA-26FEB25-B71.5",
+    )
+    db.add(trade)
+    await db.commit()
+
+    # Verify trade starts as LOST
+    resp = await client.get("/api/trades", params={"status": "LOST"})
+    assert resp.json()["total"] == 1
+
+    # Trigger re-settlement (mock NWS fetch to avoid external calls)
+    with patch(
+        "backend.weather.nws.fetch_all_nws_cli",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        resp = await client.post("/api/trades/settle", params={"resettle": "true"})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["reset_count"] == 1
+    assert data["settled_count"] == 1
+
+    # Trade should now be WON (72°F is within 71-72°F bracket)
+    resp = await client.get("/api/trades", params={"status": "WON"})
+    won_data = resp.json()
+    assert won_data["total"] == 1
+    assert won_data["trades"][0]["status"] == "WON"
+    assert won_data["trades"][0]["pnl_cents"] > 0

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -145,18 +145,47 @@ async def sync_trades(
 async def settle_trades_now(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    resettle: bool = Query(False, description="Reset all settled trades and re-settle"),
 ) -> dict:
     """Manually trigger settlement for all OPEN trades with matching settlement data.
 
     Fetches fresh CLI reports for all cities, creates Settlement records,
     then settles any OPEN trades that have matching data. Useful for
     catching up on missed scheduled settlements.
+
+    If resettle=true, resets ALL WON/LOST trades back to OPEN first,
+    then re-runs settlement from scratch (useful after fixing settlement bugs).
     """
     from backend.common.models import Settlement, TradeStatus
     from backend.trading.postmortem import settle_trade
     from backend.weather.cli_parser import parse_cli_text
     from backend.weather.nws import fetch_all_nws_cli
     from backend.weather.stations import VALID_CITIES
+
+    # Step 0 (optional): Reset settled trades back to OPEN for re-settlement
+    reset_count = 0
+    if resettle:
+        settled_result = await db.execute(
+            select(Trade).where(
+                Trade.user_id == user.id,
+                Trade.status.in_([TradeStatus.WON, TradeStatus.LOST]),
+            )
+        )
+        for trade in settled_result.scalars().all():
+            trade.status = TradeStatus.OPEN
+            trade.settlement_temp_f = None
+            trade.settlement_source = None
+            trade.pnl_cents = None
+            trade.fees_cents = None
+            trade.settled_at = None
+            trade.postmortem_narrative = None
+            reset_count += 1
+        if reset_count > 0:
+            await db.commit()
+        logger.info(
+            "Re-settlement: reset trades to OPEN",
+            extra={"data": {"reset_count": reset_count}},
+        )
 
     # Step 1: Fetch ALL available CLI reports and create Settlement records
     cli_fetched = 0
@@ -205,10 +234,12 @@ async def settle_trades_now(
 
     settled_count = 0
     for trade in open_trades_result.scalars().all():
+        # Use market_date (event date), falling back to trade_date
+        settle_date = trade.market_date or trade.trade_date
         settlement_result = await db.execute(
             select(Settlement).where(
                 Settlement.city == trade.city,
-                func.date(Settlement.settlement_date) == func.date(trade.trade_date),
+                func.date(Settlement.settlement_date) == func.date(settle_date),
             )
         )
         settlement = settlement_result.scalar_one_or_none()
@@ -222,10 +253,20 @@ async def settle_trades_now(
 
     logger.info(
         "Manual settlement triggered",
-        extra={"data": {"cli_fetched": cli_fetched, "settled": settled_count}},
+        extra={
+            "data": {
+                "cli_fetched": cli_fetched,
+                "settled": settled_count,
+                "reset": reset_count,
+            }
+        },
     )
 
-    return {"cli_fetched": cli_fetched, "settled_count": settled_count}
+    return {
+        "cli_fetched": cli_fetched,
+        "settled_count": settled_count,
+        "reset_count": reset_count,
+    }
 
 
 @router.post("/regenerate-postmortems")

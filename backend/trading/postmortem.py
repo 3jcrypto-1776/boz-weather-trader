@@ -257,7 +257,7 @@ def _did_bracket_win(
     label = bracket_label.replace("\u00b0", "").replace(" ", "").strip()
     bracket_hit = False
 
-    if label.startswith("<=") or label.lower().startswith("below"):
+    if label.startswith("<=") or label.lower().endswith("below"):
         # Bottom catch-all bracket
         match = re.search(r"[\d.]+", label)
         if match:
@@ -274,6 +274,8 @@ def _did_bracket_win(
         # Remove trailing F if present
         clean = label.rstrip("Ff")
         parts = clean.split("-")
+        if len(parts) != 2 and "to" in clean.lower():
+            parts = clean.lower().split("to")
         if len(parts) == 2:
             try:
                 lower = float(parts[0])

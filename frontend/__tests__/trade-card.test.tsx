@@ -317,4 +317,32 @@ describe("TradeCard", () => {
       screen.getByText("Simple one-line post-mortem without sections."),
     ).toBeInTheDocument();
   });
+
+  // --- Actual temperature in card header ---
+
+  it("shows actual temp on header for settled trades", () => {
+    render(
+      <TradeCard
+        group={makeGroup({
+          status: "WON",
+          totalPnlCents: 75,
+          settlement_temp_f: 72,
+        })}
+      />,
+    );
+    // Actual temp visible without expanding
+    expect(screen.getByText("Actual: 72°F")).toBeInTheDocument();
+  });
+
+  it("does not show actual temp on header for open trades", () => {
+    render(
+      <TradeCard
+        group={makeGroup({
+          status: "OPEN",
+          settlement_temp_f: null,
+        })}
+      />,
+    );
+    expect(screen.queryByText(/Actual:/)).not.toBeInTheDocument();
+  });
 });

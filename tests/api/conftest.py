@@ -119,19 +119,27 @@ def make_trade(
     status: TradeStatus = TradeStatus.OPEN,
     pnl_cents: int | None = None,
     trade_date: date | None = None,
+    market_date: date | None = None,
     settled_at: datetime | None = None,
+    bracket_label: str = "55-56\u00b0F",
+    side: str = "yes",
+    price_cents: int = 25,
+    settlement_temp_f: float | None = None,
+    market_ticker: str | None = None,
 ) -> Trade:
     """Create a Trade ORM model with realistic defaults."""
+    c = city
     return Trade(
         id=str(uuid4()),
         user_id=user_id,
         kalshi_order_id=f"order-{uuid4().hex[:8]}",
         city=CityEnum(city),
         trade_date=trade_date or date.today(),
-        market_ticker=f"KXHIGH{city}-26FEB18-B3",
-        bracket_label="55-56°F",
-        side="yes",
-        price_cents=25,
+        market_date=market_date,
+        market_ticker=market_ticker or f"KXHIGH{c}-26FEB18-B3",
+        bracket_label=bracket_label,
+        side=side,
+        price_cents=price_cents,
         quantity=1,
         model_probability=0.30,
         market_probability=0.25,
@@ -139,6 +147,8 @@ def make_trade(
         confidence="medium",
         status=status,
         pnl_cents=pnl_cents,
+        fees_cents=0 if pnl_cents is not None else None,
+        settlement_temp_f=settlement_temp_f,
         settled_at=settled_at,
     )
 

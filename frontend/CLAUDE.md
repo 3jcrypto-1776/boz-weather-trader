@@ -1679,7 +1679,7 @@ Your tests go in `frontend/__tests__/`:
 - `onboarding.test.tsx` — step transitions, form validation, API key format validation
 - `dashboard.test.tsx` — renders with mock data, handles loading/error states
 - `trade-queue.test.tsx` — approve/reject flow, expiration display, empty state
-- `trade-card.test.tsx` — post-mortem expansion, win/loss styling
+- `trade-card.test.tsx` — post-mortem expansion, win/loss styling, actual temp header display
 - `settings.test.tsx` — form validation, range limits on inputs, bracket cap slider, consecutive loss toggle
 - `api.test.ts` — API client error handling, auth token inclusion
 - `hooks.test.ts` — SWR hooks return correct data, handle errors

@@ -63,6 +63,63 @@ class TestDidBracketWin:
         assert _did_bracket_win("53-54\u00b0F", 53.5, "yes") is True
         assert _did_bracket_win("53-54\u00b0F", 55.0, "yes") is False
 
+    # -- Production bracket label formats ("X° to Y°F", "X°F or below/above") --
+
+    def test_to_separator_hit_upper_boundary(self) -> None:
+        """'71° to 72°F', temp=72 -> bracket hit (YES wins). Exact upper bound."""
+        assert _did_bracket_win("71\u00b0 to 72\u00b0F", 72.0, "yes") is True
+
+    def test_to_separator_hit_lower_boundary(self) -> None:
+        """'71° to 72°F', temp=71 -> bracket hit (YES wins). Exact lower bound."""
+        assert _did_bracket_win("71\u00b0 to 72\u00b0F", 71.0, "yes") is True
+
+    def test_to_separator_miss_above(self) -> None:
+        """'71° to 72°F', temp=73 -> bracket miss (YES loses)."""
+        assert _did_bracket_win("71\u00b0 to 72\u00b0F", 73.0, "yes") is False
+
+    def test_to_separator_miss_below(self) -> None:
+        """'71° to 72°F', temp=70 -> bracket miss (YES loses)."""
+        assert _did_bracket_win("71\u00b0 to 72\u00b0F", 70.0, "yes") is False
+
+    def test_to_separator_no_side(self) -> None:
+        """'71° to 72°F', temp=72, side='no' -> bracket hit, NO loses."""
+        assert _did_bracket_win("71\u00b0 to 72\u00b0F", 72.0, "no") is False
+        assert _did_bracket_win("71\u00b0 to 72\u00b0F", 73.0, "no") is True
+
+    def test_to_separator_single_degree(self) -> None:
+        """'65° to 65°F', temp=65 -> bracket hit (1-degree bracket)."""
+        assert _did_bracket_win("65\u00b0 to 65\u00b0F", 65.0, "yes") is True
+        assert _did_bracket_win("65\u00b0 to 65\u00b0F", 66.0, "yes") is False
+
+    def test_or_below_hit(self) -> None:
+        """'32°F or below', temp=30 -> bracket hit (YES wins)."""
+        assert _did_bracket_win("32\u00b0F or below", 30.0, "yes") is True
+
+    def test_or_below_miss(self) -> None:
+        """'32°F or below', temp=35 -> bracket miss (YES loses)."""
+        assert _did_bracket_win("32\u00b0F or below", 35.0, "yes") is False
+
+    def test_or_below_boundary(self) -> None:
+        """'32°F or below', temp=32 -> bracket hit at exact boundary."""
+        assert _did_bracket_win("32\u00b0F or below", 32.0, "yes") is True
+
+    def test_or_below_no_side(self) -> None:
+        """'32°F or below', temp=30, side='no' -> bracket hit, NO loses."""
+        assert _did_bracket_win("32\u00b0F or below", 30.0, "no") is False
+        assert _did_bracket_win("32\u00b0F or below", 35.0, "no") is True
+
+    def test_or_above_hit(self) -> None:
+        """'91°F or above', temp=95 -> bracket hit (YES wins)."""
+        assert _did_bracket_win("91\u00b0F or above", 95.0, "yes") is True
+
+    def test_or_above_boundary(self) -> None:
+        """'91°F or above', temp=91 -> bracket hit at exact boundary."""
+        assert _did_bracket_win("91\u00b0F or above", 91.0, "yes") is True
+
+    def test_or_above_miss(self) -> None:
+        """'91°F or above', temp=88 -> bracket miss (YES loses)."""
+        assert _did_bracket_win("91\u00b0F or above", 88.0, "yes") is False
+
 
 # ---------------------------------------------------------------------------
 # TestGeneratePostmortemNarrative
