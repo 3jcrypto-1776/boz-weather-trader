@@ -133,6 +133,11 @@ class User(Base):
     # Consecutive loss limit toggle
     enable_consecutive_loss_limit = Column(Boolean, default=True)
 
+    # Trading engine guardrails
+    model_weight = Column(Float, default=0.4)
+    max_model_market_divergence = Column(Float, default=0.25)
+    min_market_prob_for_yes = Column(Float, default=0.15)
+
     created_at = Column(TZNaiveDateTime, default=_utcnow)
     updated_at = Column(TZNaiveDateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -203,6 +208,7 @@ class Trade(Base):
     price_cents = Column(Integer, nullable=False)
     quantity = Column(Integer, nullable=False, default=1)
     model_probability = Column(Float, nullable=False)
+    blended_probability = Column(Float, nullable=True)  # Post-guardrail probability
     market_probability = Column(Float, nullable=False)
     ev_at_entry = Column(Float, nullable=False)
     confidence = Column(String, nullable=False)

@@ -43,6 +43,9 @@ def _make_user_settings(**overrides) -> UserSettings:
         "consecutive_loss_limit": 3,
         "active_cities": ["NYC", "CHI", "MIA", "AUS"],
         "notifications_enabled": True,
+        "model_weight": 0.4,
+        "max_model_market_divergence": 0.25,
+        "min_market_prob_for_yes": 0.15,
     }
     defaults.update(overrides)
     return UserSettings(**defaults)
@@ -70,6 +73,13 @@ def _make_mock_user(**overrides) -> MagicMock:
     user.max_bankroll_pct_per_trade = overrides.get("max_bankroll_pct_per_trade")
     user.max_contracts_per_trade = overrides.get("max_contracts_per_trade")
     user.demo_mode = overrides.get("demo_mode", True)
+    # Per-bracket cap + consecutive loss toggle
+    user.max_contracts_per_bracket = overrides.get("max_contracts_per_bracket")
+    user.enable_consecutive_loss_limit = overrides.get("enable_consecutive_loss_limit")
+    # Trading engine guardrails
+    user.model_weight = overrides.get("model_weight")
+    user.max_model_market_divergence = overrides.get("max_model_market_divergence")
+    user.min_market_prob_for_yes = overrides.get("min_market_prob_for_yes")
     return user
 
 

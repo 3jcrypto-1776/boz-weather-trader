@@ -350,6 +350,15 @@ async def _run_trading_cycle() -> None:
                     max_contracts_per_trade=user_settings.max_contracts_per_trade,
                 )
 
+            # Build GuardrailSettings from user settings
+            from backend.trading.ev_calculator import GuardrailSettings
+
+            guardrail_settings = GuardrailSettings(
+                model_weight=user_settings.model_weight,
+                max_model_market_divergence=user_settings.max_model_market_divergence,
+                min_market_prob_for_yes=user_settings.min_market_prob_for_yes,
+            )
+
             # Scan for opportunities
             signals = scan_all_brackets(
                 prediction,
@@ -359,6 +368,7 @@ async def _run_trading_cycle() -> None:
                 kelly_settings=kelly_settings,
                 bankroll_cents=bankroll_cents,
                 max_trade_size_cents=user_settings.max_trade_size_cents,
+                guardrail_settings=guardrail_settings,
             )
             if not signals:
                 logger.debug(
@@ -834,6 +844,13 @@ async def _load_user_settings(db) -> object | None:
         enable_consecutive_loss_limit=user.enable_consecutive_loss_limit
         if user.enable_consecutive_loss_limit is not None
         else True,
+        model_weight=user.model_weight if user.model_weight is not None else 0.4,
+        max_model_market_divergence=user.max_model_market_divergence
+        if user.max_model_market_divergence is not None
+        else 0.25,
+        min_market_prob_for_yes=user.min_market_prob_for_yes
+        if user.min_market_prob_for_yes is not None
+        else 0.15,
     )
 
 

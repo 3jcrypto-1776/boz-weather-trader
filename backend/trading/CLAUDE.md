@@ -9,7 +9,7 @@ Build the trading decision engine: EV calculation, risk management, cooldown log
 ```
 backend/trading/
 ├── __init__.py
-├── ev_calculator.py   -> Expected value calculation + Kelly-sized signals for each bracket
+├── ev_calculator.py   -> Expected value calculation + Kelly-sized signals for each bracket + guardrails (divergence cap, probability blending, YES market floor)
 ├── kelly.py           -> Kelly Criterion position sizing (fractional Kelly, fee-adjusted, safety caps)
 ├── risk_manager.py    -> Position limits, daily loss, exposure tracking
 ├── cooldown.py        -> Cooldown timer logic (per-loss and consecutive)
@@ -17,7 +17,7 @@ backend/trading/
 ├── executor.py        -> Trade execution orchestrator (auto + manual modes)
 ├── postmortem.py      -> Generate full trade post-mortem after settlement
 ├── sync.py            -> Kalshi portfolio sync (reconciles app Trade records with actual Kalshi filled orders)
-├── scheduler.py       -> Celery tasks for trading cycle (passes Kelly params, auto-sync, post-settlement retraining trigger, bracket cap via _get_open_bracket_qty)
+├── scheduler.py       -> Celery tasks for trading cycle (passes Kelly params, GuardrailSettings, auto-sync, post-settlement retraining trigger, bracket cap via _get_open_bracket_qty)
 ├── notifications.py   -> Web push notifications via VAPID
 └── exceptions.py      -> Trading-specific exceptions (or import from common)
 ```
@@ -355,6 +355,41 @@ def _generate_signal_reasoning(
 
 ---
 
+## Trading Engine Guardrails (ev_calculator.py)
+
+Three guardrails are applied inside `scan_bracket()` and `scan_all_brackets()` BEFORE EV calculation:
+
+### 1. Divergence Cap
+If the absolute difference between model probability and market-implied probability exceeds `max_model_market_divergence`, the bracket is blocked. This prevents the bot from trading on extreme model-market disagreements that may indicate a model error.
+
+### 2. Probability Blending
+Instead of using raw model probability, the EV calculation uses a blended probability: `blended = model_weight * model_prob + (1 - model_weight) * market_prob`. This anchors the model to market consensus and reduces overconfidence. The `blended_probability` is stored on both `TradeSignal` and the `Trade` database record.
+
+### 3. YES Market Floor
+For YES-side trades, if the market-implied probability (price/100) is below `min_market_prob_for_yes`, the trade is blocked. This prevents buying YES on brackets the market considers extremely unlikely.
+
+### Implementation
+
+```python
+@dataclass(frozen=True)
+class GuardrailSettings:
+    model_weight: float = 0.7
+    max_model_market_divergence: float = 0.30
+    min_market_prob_for_yes: float = 0.05
+
+def apply_guardrails(
+    model_prob: float,
+    market_price_cents: int,
+    side: str,
+    gs: GuardrailSettings,
+) -> tuple[float, bool, str]:
+    """Apply guardrails and return (blended_prob, blocked, reason)."""
+```
+
+The `GuardrailSettings` is constructed from User columns in `scheduler.py` and passed through `scan_bracket()` / `scan_all_brackets()`. Blocked trades increment the `GUARDRAIL_BLOCKED_TOTAL` Prometheus counter.
+
+---
+
 ## Input Validation (Defensive Programming)
 
 The trading engine must **NEVER** trust upstream data blindly. Validate before every trading cycle.
@@ -451,6 +486,9 @@ All limits are user-configurable with safe defaults:
 | Consecutive loss limit | 3 | 0 (off) - 10 | Pause for rest of day after N losses in a row |
 | Consecutive loss toggle | on | on/off | Enable/disable rest-of-day cooldown (counter still increments, per-loss still fires) |
 | Max contracts per bracket | 5 | 1 - 20 | Hard cap on open contracts per bracket per market |
+| Model weight (guardrail) | 0.7 | 0.0 - 1.0 | Weight given to model probability vs market in blended probability |
+| Max model-market divergence (guardrail) | 0.30 | 0.05 - 1.0 | Block trades where model and market disagree by more than this |
+| Min market prob for YES (guardrail) | 0.05 | 0.0 - 0.50 | Block YES trades where market probability is below this floor |
 
 **Risk checks happen BEFORE every trade, no exceptions:**
 1. Is cooldown active? -> BLOCK

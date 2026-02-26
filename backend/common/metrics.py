@@ -78,6 +78,11 @@ BRACKET_CAP_BLOCKED_TOTAL = Counter(
     "Trades blocked or clamped by per-bracket position cap",
     labelnames=["city"],
 )
+GUARDRAIL_BLOCKED_TOTAL = Counter(
+    "boz_guardrail_blocked_total",
+    "Trades blocked or modified by trading engine guardrails",
+    labelnames=["reason"],
+)
 
 # ─── WebSocket Metrics ───
 

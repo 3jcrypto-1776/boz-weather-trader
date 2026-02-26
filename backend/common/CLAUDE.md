@@ -75,6 +75,7 @@ class TradeSignal(BaseModel):
     side: Literal["yes", "no"]
     market_price: float
     model_probability: float
+    blended_probability: float | None  # guardrail-blended prob (model_weight * model + (1-model_weight) * market)
     ev: float
     confidence: str
     reasoning: str
@@ -112,6 +113,10 @@ class UserSettings(BaseModel):
     cooldown_per_loss_minutes: int
     consecutive_loss_limit: int
     cities: list[str]              # which cities to trade
+    # Guardrail settings (Phase 41)
+    model_weight: float            # 0.0-1.0, weight for model vs market in blended probability
+    max_model_market_divergence: float  # max allowed abs diff between model and market prob
+    min_market_prob_for_yes: float      # min market probability to allow YES trades
 ```
 
 ---
@@ -158,6 +163,10 @@ class User(Base):
     api_key_id = Column(String, nullable=False)
     encrypted_private_key = Column(Text, nullable=False)  # AES-256 encrypted
     settings = Column(JSON, nullable=False, default=dict)
+    # Guardrail columns (Phase 41)
+    model_weight = Column(Float, default=0.7)  # 0.0-1.0 weight for model vs market prob
+    max_model_market_divergence = Column(Float, default=0.30)  # max abs diff before blocking
+    min_market_prob_for_yes = Column(Float, default=0.05)  # min market prob for YES trades
     created_at = Column(DateTime, default=datetime.utcnow)
     trades = relationship("Trade", back_populates="user")
 ```
@@ -209,6 +218,7 @@ class Trade(Base):
     quantity = Column(Integer, nullable=False, default=1)
     model_probability = Column(Float, nullable=False)
     market_probability = Column(Float, nullable=False)
+    blended_probability = Column(Float)  # guardrail-blended probability (Phase 41)
     ev_at_entry = Column(Float, nullable=False)
     confidence = Column(String)
     kalshi_order_id = Column(String)
@@ -288,6 +298,10 @@ class User(Base):
     api_key_id = Column(String, nullable=False)
     encrypted_private_key = Column(Text, nullable=False)  # AES-256 encrypted
     settings = Column(JSON, nullable=False, default=dict)
+    # Guardrail columns (Phase 41)
+    model_weight = Column(Float, default=0.7)  # 0.0-1.0 weight for model vs market prob
+    max_model_market_divergence = Column(Float, default=0.30)  # max abs diff before blocking
+    min_market_prob_for_yes = Column(Float, default=0.05)  # min market prob for YES trades
     created_at = Column(DateTime, default=datetime.utcnow)
     trades = relationship("Trade", back_populates="user")
 
@@ -330,6 +344,7 @@ class Trade(Base):
     quantity = Column(Integer, nullable=False, default=1)
     model_probability = Column(Float, nullable=False)
     market_probability = Column(Float, nullable=False)
+    blended_probability = Column(Float)  # guardrail-blended probability (Phase 41)
     ev_at_entry = Column(Float, nullable=False)
     confidence = Column(String)
     kalshi_order_id = Column(String)
@@ -848,6 +863,7 @@ All Prometheus metric objects are module-level singletons. Import them wherever 
 | `ML_RETRAIN_TRIGGERS_TOTAL` | Counter | reason | ML retraining triggers (settlement_count/brier_degradation/time_elapsed) |
 | `ML_SOURCE_WEIGHTS_UPDATED_TOTAL` | Counter | — | Source weight recalculations after retraining |
 | `BRACKET_CAP_BLOCKED_TOTAL` | Counter | city | Trades blocked by per-bracket position cap |
+| `GUARDRAIL_BLOCKED_TOTAL` | Counter | reason | Trades blocked by guardrails (divergence_cap, yes_floor) |
 
 ### Usage
 

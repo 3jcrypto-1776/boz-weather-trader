@@ -216,6 +216,7 @@ async def execute_trade(
         price_cents=fill_price_cents,
         quantity=filled_count,
         model_probability=signal.model_probability,
+        blended_probability=signal.blended_probability,
         market_probability=signal.market_probability,
         ev_at_entry=signal.ev,
         confidence=signal.confidence,

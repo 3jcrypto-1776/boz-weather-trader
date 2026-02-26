@@ -130,6 +130,7 @@ class TradeSignal(BaseModel):
     price_cents: int = Field(ge=1, le=99)  # Kalshi prices are always 1-99 cents
     quantity: int = Field(ge=1, default=1)
     model_probability: float = Field(ge=0.0, le=1.0)
+    blended_probability: float | None = None  # After guardrails, None if disabled
     market_probability: float = Field(ge=0.0, le=1.0)
     ev: float  # Expected value in dollars (positive = profitable)
     confidence: ConfidenceLevel
@@ -227,6 +228,11 @@ class UserSettings(BaseModel):
 
     # ─── Consecutive Loss Toggle ───
     enable_consecutive_loss_limit: bool = True
+
+    # ─── Trading Engine Guardrails ───
+    model_weight: float = Field(default=0.4, ge=0.0, le=1.0)  # Blend weight for model
+    max_model_market_divergence: float = Field(default=0.25, ge=0.0, le=0.50)
+    min_market_prob_for_yes: float = Field(default=0.15, ge=0.0, le=0.50)
 
 
 # ─── Portfolio Sync ───

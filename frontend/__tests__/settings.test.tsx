@@ -50,6 +50,9 @@ const MOCK_SETTINGS: UserSettings = {
   notifications_enabled: true,
   max_contracts_per_bracket: 3,
   enable_consecutive_loss_limit: true,
+  model_weight: 0.4,
+  max_model_market_divergence: 0.25,
+  min_market_prob_for_yes: 0.15,
 };
 
 describe("SettingsPage", () => {
@@ -465,5 +468,92 @@ describe("SettingsPage", () => {
     const slider = screen.getByTestId("bracket-cap-slider");
     fireEvent.change(slider, { target: { value: "10" } });
     expect(screen.getByText("10")).toBeInTheDocument();
+  });
+
+  // ─── Phase 41: Model Guardrails tests ───
+
+  it("renders model guardrails section with default values", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+    expect(screen.getByText("Model Guardrails")).toBeInTheDocument();
+    expect(screen.getByText("Model Weight in Blend")).toBeInTheDocument();
+    expect(screen.getByText("Max Model-Market Divergence")).toBeInTheDocument();
+    expect(screen.getByText("Min Market Prob for YES")).toBeInTheDocument();
+
+    // Default sliders present
+    expect(screen.getByTestId("model-weight-slider")).toHaveValue("0.4");
+    expect(screen.getByTestId("max-divergence-slider")).toHaveValue("0.25");
+    expect(screen.getByTestId("min-market-prob-slider")).toHaveValue("0.15");
+  });
+
+  it("model weight slider changes display value", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+    const slider = screen.getByTestId("model-weight-slider");
+    fireEvent.change(slider, { target: { value: "0.6" } });
+    // Should show "60% model / 40% market" in the description
+    expect(screen.getByText(/60% model/)).toBeInTheDocument();
+    expect(screen.getByText(/40% market/)).toBeInTheDocument();
+  });
+
+  it("max divergence slider changes display value", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+    const slider = screen.getByTestId("max-divergence-slider");
+    fireEvent.change(slider, { target: { value: "0.35" } });
+    // Should show 35% in the label and description (multiple elements)
+    const matches = screen.getAllByText(/35%/);
+    expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("saves guardrail settings on save", async () => {
+    mockUpdateSettings.mockResolvedValue(MOCK_SETTINGS);
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+    fireEvent.click(screen.getByText("Save Settings"));
+
+    await waitFor(() => {
+      expect(mockUpdateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model_weight: 0.4,
+          max_model_market_divergence: 0.25,
+          min_market_prob_for_yes: 0.15,
+        })
+      );
+    });
+  });
+
+  it("min market prob slider changes display value", () => {
+    mockUseSettings.mockReturnValue({
+      data: MOCK_SETTINGS,
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(<SettingsPage />);
+    const slider = screen.getByTestId("min-market-prob-slider");
+    fireEvent.change(slider, { target: { value: "0.2" } });
+    // Should show "Skip YES trades on brackets the market prices below 20%"
+    expect(screen.getByText(/below 20%/)).toBeInTheDocument();
   });
 });

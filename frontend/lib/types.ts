@@ -138,6 +138,10 @@ export interface UserSettings {
   notifications_enabled: boolean;
   max_contracts_per_bracket: number;
   enable_consecutive_loss_limit: boolean;
+  // Trading engine guardrails
+  model_weight: number;
+  max_model_market_divergence: number;
+  min_market_prob_for_yes: number;
 }
 
 export interface SettingsUpdate {
@@ -153,6 +157,10 @@ export interface SettingsUpdate {
   demo_mode?: boolean;
   max_contracts_per_bracket?: number;
   enable_consecutive_loss_limit?: boolean;
+  // Trading engine guardrails
+  model_weight?: number;
+  max_model_market_divergence?: number;
+  min_market_prob_for_yes?: number;
 }
 
 // ─── Logs ───

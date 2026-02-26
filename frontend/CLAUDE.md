@@ -306,6 +306,10 @@ export interface UserSettings {
   consecutive_loss_limit: number;     // halt after N consecutive losses
   enable_consecutive_loss_limit: boolean; // on/off toggle for rest-of-day cooldown
   max_contracts_per_bracket: number;  // hard cap on open contracts per bracket (1-20)
+  // Guardrail settings (Phase 41)
+  model_weight: number;               // 0.0-1.0 — weight for model vs market in blended probability
+  max_model_market_divergence: number; // 0.05-1.0 — max abs diff before blocking trade
+  min_market_prob_for_yes: number;     // 0.0-0.50 — min market probability for YES trades
   active_cities: City[];              // which cities to trade
   notifications_enabled: boolean;
 }
@@ -1608,11 +1612,16 @@ See "Onboarding Flow Implementation" section above. Six steps:
   - Consecutive loss limit toggle: on/off switch (enable/disable rest-of-day cooldown)
 - Position limits:
   - Max contracts per bracket: slider (range: 1 to 20, default 5)
+- Model Guardrails (Phase 41):
+  - Model Weight: slider (range: 0.0 to 1.0, default 0.7) — weight for model vs market in blended probability
+  - Max Model-Market Divergence: slider (range: 0.05 to 1.0, default 0.30) — block trades when model and market disagree by more than this
+  - Min Market Prob for YES: slider (range: 0.0 to 0.50, default 0.05) — block YES trades when market probability is below this floor
 - City selection: checkboxes for NYC, CHI, MIA, AUS (at least one must be checked)
 - Notifications toggle
 - API key management section:
   - "Disconnect" button (calls `/api/auth/disconnect`, redirects to onboarding)
 - Use `useSettings()` + `useAuthStatus()` hooks
+- Model guardrails sliders save via `updateSettings()` same as other risk controls
 
 ### 7. Log Viewer (`/logs`)
 - Near-real-time log streaming (poll backend every 2 seconds via `useLogs()`)
@@ -1680,7 +1689,7 @@ Your tests go in `frontend/__tests__/`:
 - `dashboard.test.tsx` — renders with mock data, handles loading/error states
 - `trade-queue.test.tsx` — approve/reject flow, expiration display, empty state
 - `trade-card.test.tsx` — post-mortem expansion, win/loss styling, actual temp header display
-- `settings.test.tsx` — form validation, range limits on inputs, bracket cap slider, consecutive loss toggle
+- `settings.test.tsx` — form validation, range limits on inputs, bracket cap slider, consecutive loss toggle, model guardrails (3 sliders)
 - `api.test.ts` — API client error handling, auth token inclusion
 - `hooks.test.ts` — SWR hooks return correct data, handle errors
 - `version-info.test.tsx` — version display, update notification, loading/error states

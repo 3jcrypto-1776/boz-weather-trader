@@ -221,6 +221,11 @@ class SettingsUpdate(BaseModel):
     max_contracts_per_bracket: int | None = None
     enable_consecutive_loss_limit: bool | None = None
 
+    # Trading engine guardrails
+    model_weight: float | None = None
+    max_model_market_divergence: float | None = None
+    min_market_prob_for_yes: float | None = None
+
 
 # ─── Current Weather (Ticker) ───
 

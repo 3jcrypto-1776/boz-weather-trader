@@ -27,6 +27,7 @@ Usage:
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -35,6 +36,76 @@ from backend.common.schemas import BracketPrediction, TradeSignal
 
 logger = get_logger("TRADING")
 ET = ZoneInfo("America/New_York")
+
+
+@dataclass
+class GuardrailSettings:
+    """Configuration for trading engine guardrails.
+
+    These settings prevent the model from overriding market consensus
+    by blending model probabilities with market prices and capping
+    extreme divergences.
+
+    Attributes:
+        model_weight: Weight for model prob in blend (0.0-1.0). Default 0.4
+            means 40% model, 60% market.
+        max_model_market_divergence: Maximum absolute difference allowed
+            between model prob and market prob before clamping (0.0-0.5).
+        min_market_prob_for_yes: Minimum market probability (YES price / 100)
+            required to consider a YES trade. Filters out cheap longshots.
+    """
+
+    model_weight: float = 0.4
+    max_model_market_divergence: float = 0.25
+    min_market_prob_for_yes: float = 0.15
+
+
+def apply_guardrails(
+    model_prob: float,
+    market_price_cents: int,
+    side: str,
+    settings: GuardrailSettings | None = None,
+) -> tuple[float | None, str | None]:
+    """Apply guardrails to model probability before EV calculation.
+
+    Three guardrails applied in order:
+    1. Market probability floor — skip YES trades on cheap brackets
+    2. Divergence cap — clamp model prob within ±max_divergence of market
+    3. Blending — weighted average of capped model and market probability
+
+    Args:
+        model_prob: Raw model probability for the bracket (0.0-1.0).
+        market_price_cents: Kalshi market YES price in cents (1-99).
+        side: "yes" or "no".
+        settings: Guardrail configuration. None disables all guardrails.
+
+    Returns:
+        Tuple of (blended_probability, skip_reason).
+        If skip_reason is not None, the trade should be skipped.
+    """
+    if settings is None:
+        return model_prob, None
+
+    market_prob_yes = market_price_cents / 100
+
+    # Guardrail 3: Minimum market probability floor for YES
+    if side == "yes" and market_prob_yes < settings.min_market_prob_for_yes:
+        return None, "market_floor"
+
+    # Guardrail 2: Cap model divergence from market
+    capped = max(
+        market_prob_yes - settings.max_model_market_divergence,
+        min(model_prob, market_prob_yes + settings.max_model_market_divergence),
+    )
+    # Clamp to valid probability range
+    capped = max(0.001, min(0.999, capped))
+
+    # Guardrail 1: Blend capped model with market
+    blended = settings.model_weight * capped + (1.0 - settings.model_weight) * market_prob_yes
+    # Clamp final result
+    blended = max(0.001, min(0.999, blended))
+
+    return round(blended, 6), None
 
 
 def estimate_fees(price_cents: int, side: str) -> int:
@@ -123,12 +194,15 @@ def scan_bracket(
     kelly_settings: object | None = None,
     bankroll_cents: int = 0,
     max_trade_size_cents: int = 100,
+    guardrail_settings: GuardrailSettings | None = None,
 ) -> TradeSignal | None:
     """Scan a single bracket for trading opportunities on both YES and NO sides.
 
     Calculates EV for both sides and returns a TradeSignal for the better
-    side if it meets the minimum threshold. If Kelly sizing is enabled,
-    the signal's quantity is sized optimally based on edge and bankroll.
+    side if it meets the minimum threshold. If guardrails are enabled,
+    probabilities are blended with market prices to prevent overconfident
+    model bets. If Kelly sizing is enabled, the signal's quantity is sized
+    optimally based on edge and bankroll.
 
     Args:
         bracket_label: Bracket label string (e.g., "53-54F").
@@ -142,13 +216,33 @@ def scan_bracket(
         kelly_settings: KellySettings for position sizing (None = 1 contract).
         bankroll_cents: Total bankroll in cents for Kelly sizing.
         max_trade_size_cents: Max cost per trade from risk manager.
+        guardrail_settings: GuardrailSettings for probability guardrails (None = raw model).
 
     Returns:
         TradeSignal if a +EV opportunity exists, None otherwise.
     """
-    # Calculate EV for both sides
-    ev_yes = calculate_ev(bracket_probability, market_price_cents, "yes")
-    ev_no = calculate_ev(bracket_probability, market_price_cents, "no")
+    # Apply guardrails to get blended probabilities for both sides
+    blended_yes, skip_yes = apply_guardrails(
+        bracket_probability, market_price_cents, "yes", guardrail_settings
+    )
+    blended_no, skip_no = apply_guardrails(
+        bracket_probability, market_price_cents, "no", guardrail_settings
+    )
+
+    # Log guardrail blocks
+    if skip_yes is not None:
+        try:
+            from backend.common.metrics import GUARDRAIL_BLOCKED_TOTAL
+
+            GUARDRAIL_BLOCKED_TOTAL.labels(reason=skip_yes).inc()
+        except Exception:
+            pass
+
+    # Calculate EV using blended probabilities (or skip if blocked)
+    ev_yes = (
+        calculate_ev(blended_yes, market_price_cents, "yes") if blended_yes is not None else -999.0
+    )
+    ev_no = calculate_ev(blended_no, market_price_cents, "no") if blended_no is not None else -999.0
 
     logger.debug(
         "Bracket scan",
@@ -157,9 +251,12 @@ def scan_bracket(
                 "city": city,
                 "bracket": bracket_label,
                 "model_prob": round(bracket_probability, 4),
+                "blended_yes": round(blended_yes, 4) if blended_yes else None,
+                "blended_no": round(blended_no, 4) if blended_no else None,
                 "market_cents": market_price_cents,
                 "ev_yes": ev_yes,
                 "ev_no": ev_no,
+                "skip_yes": skip_yes,
             }
         },
     )
@@ -167,13 +264,16 @@ def scan_bracket(
     # Pick the better side if it meets the threshold
     best_side: str | None = None
     best_ev = 0.0
+    best_blended: float | None = None
 
     if ev_yes >= ev_no and ev_yes >= min_ev_threshold:
         best_side = "yes"
         best_ev = ev_yes
+        best_blended = blended_yes if guardrail_settings is not None else None
     elif ev_no > ev_yes and ev_no >= min_ev_threshold:
         best_side = "no"
         best_ev = ev_no
+        best_blended = blended_no if guardrail_settings is not None else None
 
     if best_side is None:
         return None  # No trade opportunity
@@ -185,6 +285,8 @@ def scan_bracket(
         market_prob = (100 - market_price_cents) / 100
 
     # Kelly Criterion position sizing (graceful degradation)
+    # Use blended probability for Kelly edge calculation when guardrails are active
+    kelly_prob = best_blended if best_blended is not None else bracket_probability
     quantity = 1
     if kelly_settings is not None and getattr(kelly_settings, "use_kelly_sizing", False):
         try:
@@ -192,7 +294,7 @@ def scan_bracket(
             from backend.trading.kelly import calculate_kelly_size
 
             result = calculate_kelly_size(
-                model_prob=bracket_probability,
+                model_prob=kelly_prob,
                 price_cents=market_price_cents,
                 side=best_side,
                 bankroll_cents=bankroll_cents,
@@ -229,12 +331,18 @@ def scan_bracket(
         price_cents=market_price_cents,
         quantity=quantity,
         model_probability=bracket_probability,
+        blended_probability=best_blended,
         market_probability=round(market_prob, 4),
         ev=best_ev,
         confidence=confidence,
         market_ticker=market_ticker,
         reasoning=_generate_signal_reasoning(
-            bracket_label, bracket_probability, market_price_cents, best_side, best_ev
+            bracket_label,
+            bracket_probability,
+            market_price_cents,
+            best_side,
+            best_ev,
+            best_blended,
         ),
     )
 
@@ -247,6 +355,7 @@ def scan_all_brackets(
     kelly_settings: object | None = None,
     bankroll_cents: int = 0,
     max_trade_size_cents: int = 100,
+    guardrail_settings: GuardrailSettings | None = None,
 ) -> list[TradeSignal]:
     """Scan all brackets for a city and return all +EV trade signals.
 
@@ -258,6 +367,7 @@ def scan_all_brackets(
         kelly_settings: KellySettings for position sizing (None = 1 contract).
         bankroll_cents: Total bankroll in cents for Kelly sizing.
         max_trade_size_cents: Max cost per trade from risk manager.
+        guardrail_settings: GuardrailSettings for probability guardrails (None = raw model).
 
     Returns:
         List of TradeSignal objects, sorted by EV descending (best first).
@@ -303,6 +413,7 @@ def scan_all_brackets(
             kelly_settings=kelly_settings,
             bankroll_cents=bankroll_cents,
             max_trade_size_cents=max_trade_size_cents,
+            guardrail_settings=guardrail_settings,
         )
         if signal is not None:
             signals.append(signal)
@@ -431,23 +542,34 @@ def _generate_signal_reasoning(
     market_price_cents: int,
     side: str,
     ev: float,
+    blended_prob: float | None = None,
 ) -> str:
     """Generate human-readable reasoning for a trade signal.
 
     Args:
         bracket_label: The bracket label (e.g., "53-54F").
-        bracket_prob: Model probability for the bracket.
+        bracket_prob: Raw model probability for the bracket.
         market_price_cents: Current YES price in cents.
         side: The trade side ("yes" or "no").
         ev: The calculated EV in dollars.
+        blended_prob: Post-guardrail blended probability, or None.
 
     Returns:
         A reasoning string suitable for display.
     """
     model_pct = bracket_prob * 100
     market_pct = market_price_cents if side == "yes" else 100 - market_price_cents
-    edge = model_pct - market_pct
 
+    if blended_prob is not None:
+        blended_pct = blended_prob * 100
+        edge = blended_pct - market_pct
+        return (
+            f"Model: {model_pct:.1f}% → Blended: {blended_pct:.1f}% vs Market: {market_pct}% "
+            f"({'+' if edge > 0 else ''}{edge:.1f}% edge). "
+            f"EV: ${ev:+.4f} per contract on {side.upper()} side."
+        )
+
+    edge = model_pct - market_pct
     return (
         f"Model: {model_pct:.1f}% vs Market: {market_pct}% "
         f"({'+' if edge > 0 else ''}{edge:.1f}% edge). "

@@ -37,6 +37,11 @@ export default function SettingsPage() {
   const [activeCities, setActiveCities] = useState<CityCode[]>(ALL_CITIES);
   const [notifications, setNotifications] = useState(true);
 
+  // Model guardrails
+  const [modelWeight, setModelWeight] = useState(0.4);
+  const [maxDivergence, setMaxDivergence] = useState(0.25);
+  const [minMarketProb, setMinMarketProb] = useState(0.15);
+
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -59,6 +64,9 @@ export default function SettingsPage() {
       setMaxContractsPerBracket(settings.max_contracts_per_bracket);
       setActiveCities(settings.active_cities);
       setNotifications(settings.notifications_enabled);
+      setModelWeight(settings.model_weight);
+      setMaxDivergence(settings.max_model_market_divergence);
+      setMinMarketProb(settings.min_market_prob_for_yes);
     }
   }, [settings]);
 
@@ -86,6 +94,9 @@ export default function SettingsPage() {
         max_contracts_per_bracket: maxContractsPerBracket,
         active_cities: activeCities,
         notifications_enabled: notifications,
+        model_weight: modelWeight,
+        max_model_market_divergence: maxDivergence,
+        min_market_prob_for_yes: minMarketProb,
       };
       await updateSettings(update);
       await mutate("/api/settings");
@@ -398,6 +409,74 @@ export default function SettingsPage() {
                     />
                     <p className="text-xs text-boz-neutral mt-1">
                       Hard cap on open contracts per bracket per market — prevents buying the same bracket repeatedly
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Model Guardrails */}
+              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <h2 className="text-sm font-semibold mb-1">Model Guardrails</h2>
+                <p className="text-xs text-boz-neutral mb-3">
+                  Prevent the model from overriding market consensus on trade decisions.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Model Weight in Blend</span>
+                      <span className="font-medium">{(modelWeight * 100).toFixed(0)}%</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={modelWeight}
+                      onChange={(e) => setModelWeight(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                      data-testid="model-weight-slider"
+                    />
+                    <p className="text-xs text-boz-neutral mt-1">
+                      {(modelWeight * 100).toFixed(0)}% model / {((1 - modelWeight) * 100).toFixed(0)}% market.
+                      Lower = more trust in market prices.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Max Model-Market Divergence</span>
+                      <span className="font-medium">{(maxDivergence * 100).toFixed(0)}%</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={0.05}
+                      max={0.50}
+                      step={0.05}
+                      value={maxDivergence}
+                      onChange={(e) => setMaxDivergence(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                      data-testid="max-divergence-slider"
+                    />
+                    <p className="text-xs text-boz-neutral mt-1">
+                      Clamps model probability within &plusmn;{(maxDivergence * 100).toFixed(0)}% of market price before blending
+                    </p>
+                  </div>
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Min Market Prob for YES</span>
+                      <span className="font-medium">{(minMarketProb * 100).toFixed(0)}%</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={0}
+                      max={0.50}
+                      step={0.05}
+                      value={minMarketProb}
+                      onChange={(e) => setMinMarketProb(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                      data-testid="min-market-prob-slider"
+                    />
+                    <p className="text-xs text-boz-neutral mt-1">
+                      Skip YES trades on brackets the market prices below {(minMarketProb * 100).toFixed(0)}%
                     </p>
                   </div>
                 </div>
