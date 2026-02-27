@@ -221,6 +221,15 @@ PORTFOLIO_SYNC_TRADES_CREATED = Counter(
 )
 
 
+# ─── Resting Order Metrics ───
+
+RESTING_ORDER_SYNCED_TOTAL = Counter(
+    "boz_resting_order_synced_total",
+    "Resting orders that transitioned (filled or expired)",
+    labelnames=["outcome"],
+)
+
+
 # ─── Retraining Metrics ───
 
 ML_RETRAIN_TRIGGERS_TOTAL = Counter(

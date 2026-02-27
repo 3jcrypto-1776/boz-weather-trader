@@ -41,7 +41,8 @@ async def get_trades(
 
     Args:
         city: Optional city code filter (NYC, CHI, MIA, AUS).
-        status: Optional status filter (OPEN, WON, LOST, CANCELED).
+        status: Optional status filter (OPEN, RESTING, WON, LOST, CANCELED,
+                ACTIVE=OPEN+RESTING, SETTLED=WON+LOST+CANCELED).
         trade_date: Optional date filter (YYYY-MM-DD) for calendar drill-down.
         page: Page number (1-indexed, defaults to 1).
         user: The authenticated user.
@@ -60,7 +61,12 @@ async def get_trades(
         count_query = count_query.where(Trade.city == city)
 
     if status is not None:
-        if status.upper() == "SETTLED":
+        if status.upper() == "ACTIVE":
+            # Pseudo-filter: active trades (OPEN + RESTING)
+            active = [TradeStatus.OPEN, TradeStatus.RESTING]
+            base_query = base_query.where(Trade.status.in_(active))
+            count_query = count_query.where(Trade.status.in_(active))
+        elif status.upper() == "SETTLED":
             # Pseudo-filter: all settled trades (WON + LOST + CANCELED)
             settled = [TradeStatus.WON, TradeStatus.LOST, TradeStatus.CANCELED]
             base_query = base_query.where(Trade.status.in_(settled))

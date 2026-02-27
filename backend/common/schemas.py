@@ -36,7 +36,7 @@ UTCDatetime = Annotated[datetime, PlainSerializer(_serialize_utc, return_type=st
 CityCode = Literal["NYC", "CHI", "MIA", "AUS"]
 TradeSide = Literal["yes", "no"]
 ConfidenceLevel = Literal["high", "medium", "low"]
-TradeStatusType = Literal["OPEN", "WON", "LOST", "CANCELED"]
+TradeStatusType = Literal["OPEN", "RESTING", "WON", "LOST", "CANCELED"]
 PendingTradeStatusType = Literal["PENDING", "APPROVED", "REJECTED", "EXPIRED", "EXECUTED"]
 
 

@@ -45,7 +45,9 @@ export default function TradeCard({ group, currentTempF }: TradeCardProps) {
         ? "border-l-boz-danger"
         : group.status === "OPEN"
           ? "border-l-boz-primary"
-          : "border-l-boz-neutral";
+          : group.status === "RESTING"
+            ? "border-l-boz-warning"
+            : "border-l-boz-neutral";
 
   return (
     <div

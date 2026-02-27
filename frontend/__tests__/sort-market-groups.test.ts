@@ -70,9 +70,21 @@ describe("sortMarketGroups", () => {
     expect(result.map((m) => m.city)).toEqual(["AUS", "CHI", "MIA", "NYC"]);
   });
 
-  it("sorts by status priority (OPEN → WON → LOST → CANCELED)", () => {
+  it("sorts by status priority (RESTING → OPEN → WON → LOST → CANCELED)", () => {
     const result = sortMarketGroups(markets, "status");
     expect(result.map((m) => m.city)).toEqual(["AUS", "NYC", "MIA", "CHI"]);
+  });
+
+  it("sorts RESTING before OPEN in status sort", () => {
+    const restingMarket = makeMarket({
+      city: "NYC",
+      date: "2026-02-24",
+      status: "RESTING",
+    });
+    const withResting = [...markets, restingMarket];
+    const result = sortMarketGroups(withResting, "status");
+    // RESTING (rank 0) should come first, then OPEN, WON, LOST, CANCELED
+    expect(result[0].groups[0].status).toBe("RESTING");
   });
 
   it("returns a new array without mutating input", () => {

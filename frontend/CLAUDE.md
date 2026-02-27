@@ -258,8 +258,8 @@ export interface TradeRecord {
   market_probability: number;
   ev: number;
   confidence: string;
-  status: 'OPEN' | 'WON' | 'LOST' | 'CANCELED';
-  pnl_cents: number | null;  // null while OPEN
+  status: 'OPEN' | 'RESTING' | 'WON' | 'LOST' | 'CANCELED';
+  pnl_cents: number | null;  // null while OPEN or RESTING
   placed_at: string;         // ISO datetime
   settled_at: string | null;
   postmortem: PostMortem | null;
@@ -1212,16 +1212,22 @@ export function TradeCard({ trade, expandable = true }: TradeCardProps) {
   const isWin = trade.status === 'WON';
   const isOpen = trade.status === 'OPEN';
 
-  const borderColor = isOpen
-    ? 'border-gray-200'
-    : isWin
-      ? 'border-green-200'
-      : 'border-red-200';
-  const bgColor = isOpen
-    ? 'bg-white'
-    : isWin
-      ? 'bg-green-50'
-      : 'bg-red-50';
+  const isResting = trade.status === 'RESTING';
+
+  const borderColor = isResting
+    ? 'border-amber-200'
+    : isOpen
+      ? 'border-gray-200'
+      : isWin
+        ? 'border-green-200'
+        : 'border-red-200';
+  const bgColor = isResting
+    ? 'bg-amber-50'
+    : isOpen
+      ? 'bg-white'
+      : isWin
+        ? 'bg-green-50'
+        : 'bg-red-50';
 
   return (
     <div className={`p-4 rounded-lg border ${borderColor} ${bgColor}`}>
@@ -1557,7 +1563,7 @@ See "Onboarding Flow Implementation" section above. Six steps:
 ### 2. Dashboard (`/`) — Home
 - Account balance (from Kalshi) — display as dollars: `$${centsToDollars(balance_cents)}`
 - Today's P&L (color-coded green/red)
-- Active positions with current market prices
+- Active positions with current market prices (OpenPositionsSection uses "ACTIVE" API filter to show OPEN + RESTING trades)
 - Next market launch countdown
 - Quick model predictions for upcoming markets
 - Recent trade results
@@ -1584,7 +1590,7 @@ See "Onboarding Flow Implementation" section above. Six steps:
 
 ### 5. Trade History (`/trades`)
 - Filterable list of all trades (by city, result, date, confidence)
-- Filter controls: city dropdown, status dropdown (All/Won/Lost/Open)
+- Filter controls: city dropdown, status dropdown (All/Won/Lost/Open/Resting)
 - Each trade rendered with `TradeCard` component, expandable post-mortem
 - Summary stats at top: total trades, win rate, total P&L
 - Pagination (10 trades per page)
@@ -1688,7 +1694,8 @@ Your tests go in `frontend/__tests__/`:
 - `onboarding.test.tsx` — step transitions, form validation, API key format validation
 - `dashboard.test.tsx` — renders with mock data, handles loading/error states
 - `trade-queue.test.tsx` — approve/reject flow, expiration display, empty state
-- `trade-card.test.tsx` — post-mortem expansion, win/loss styling, actual temp header display
+- `trade-card.test.tsx` — post-mortem expansion, win/loss styling, actual temp header display, RESTING amber styling
+- `trade-card-resting.test.tsx` — RESTING trade card amber/warning border, status display (4 tests)
 - `settings.test.tsx` — form validation, range limits on inputs, bracket cap slider, consecutive loss toggle, model guardrails (3 sliders)
 - `api.test.ts` — API client error handling, auth token inclusion
 - `hooks.test.ts` — SWR hooks return correct data, handle errors

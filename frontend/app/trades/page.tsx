@@ -30,6 +30,7 @@ const CITY_OPTIONS: (CityCode | "ALL")[] = ["ALL", "NYC", "CHI", "MIA", "AUS"];
 const STATUS_OPTIONS: (TradeStatus | "ALL" | "SETTLED")[] = [
   "SETTLED",
   "ALL",
+  "RESTING",
   "OPEN",
   "WON",
   "LOST",
@@ -58,12 +59,12 @@ function nextPeriod(current: StatsPeriod, cycle: StatsPeriod[]): StatsPeriod {
   return cycle[(idx + 1) % cycle.length];
 }
 
-// ─── Open Positions Section ───
+// ─── Active Positions Section (OPEN + RESTING) ───
 
 const ALL_CITIES: CityCode[] = ["NYC", "CHI", "MIA", "AUS"];
 
 function OpenPositionsSection() {
-  const { data, isLoading } = useTrades(1, undefined, "OPEN");
+  const { data, isLoading } = useTrades(1, undefined, "ACTIVE");
   const { data: weather } = useCurrentWeather();
   const [activeCities, setActiveCities] = useState<Set<CityCode>>(
     new Set(ALL_CITIES),

@@ -29,6 +29,7 @@ from backend.common.database import get_task_session, reset_engine
 from backend.common.logging import get_logger
 from backend.common.metrics import (
     BRACKET_CAP_BLOCKED_TOTAL,
+    RESTING_ORDER_SYNCED_TOTAL,
     TRADES_EXECUTED_TOTAL,
     TRADES_RISK_BLOCKED_TOTAL,
     TRADING_CYCLES_TOTAL,
@@ -291,6 +292,22 @@ async def _run_trading_cycle() -> None:
         except Exception as exc:
             logger.warning(
                 "Portfolio sync failed (non-fatal)",
+                extra={"data": {"error": str(exc)}},
+            )
+
+        # Sync resting orders: check if any RESTING trades have been filled
+        # or expired on Kalshi since last cycle.
+        try:
+            synced = await _sync_resting_orders(session, kalshi_client, user_id)
+            if synced > 0:
+                logger.info(
+                    "Synced resting orders",
+                    extra={"data": {"transitioned": synced}},
+                )
+                await session.commit()
+        except Exception as exc:
+            logger.warning(
+                "Resting order sync failed (non-fatal)",
                 extra={"data": {"error": str(exc)}},
             )
 
@@ -637,6 +654,131 @@ async def _settle_and_postmortem() -> None:
         if kalshi_client is not None:
             await kalshi_client.close()
         await session.close()
+
+
+async def _sync_resting_orders(
+    session: object,  # AsyncSession
+    kalshi_client: object,
+    user_id: str,
+) -> int:
+    """Check RESTING trades and update based on Kalshi order status.
+
+    Called at the start of each trading cycle. Fetches all orders from Kalshi
+    once, then matches against RESTING trades in the DB. Transitions:
+    - Kalshi "executed" → OPEN (filled)
+    - Kalshi "canceled" / not found → CANCELED (expired or manually canceled)
+    - Kalshi "resting" → no change (still waiting for fill)
+
+    Returns:
+        Count of trades that transitioned out of RESTING.
+    """
+    from sqlalchemy import select
+
+    from backend.common.models import Trade, TradeStatus
+
+    resting_result = await session.execute(
+        select(Trade).where(
+            Trade.user_id == user_id,
+            Trade.status == TradeStatus.RESTING,
+        )
+    )
+    resting_trades = resting_result.scalars().all()
+
+    if not resting_trades:
+        return 0
+
+    # Fetch all orders from Kalshi once and index by order_id
+    try:
+        all_orders = await kalshi_client.get_orders(status=None, limit=200)
+    except Exception as exc:
+        logger.warning(
+            "Failed to fetch orders for resting sync",
+            extra={"data": {"error": str(exc)}},
+        )
+        return 0
+
+    orders_by_id = {o.order_id: o for o in all_orders}
+
+    transitioned = 0
+    for trade in resting_trades:
+        try:
+            order = orders_by_id.get(trade.kalshi_order_id)
+
+            if order is None:
+                # Order not found — likely expired on Kalshi
+                trade.status = TradeStatus.CANCELED
+                transitioned += 1
+                RESTING_ORDER_SYNCED_TOTAL.labels(outcome="expired").inc()
+                logger.info(
+                    "Resting order expired (not found on Kalshi)",
+                    extra={
+                        "data": {
+                            "trade_id": trade.id,
+                            "order_id": trade.kalshi_order_id,
+                        }
+                    },
+                )
+                continue
+
+            if order.status == "executed":
+                # Filled! Update trade to OPEN with actual fill data
+                trade.status = TradeStatus.OPEN
+
+                # Update price to actual fill price
+                taker_fill_cost = order.taker_fill_cost or 0
+                if taker_fill_cost > 0 and order.fill_count > 0:
+                    fill_price = taker_fill_cost // order.fill_count
+                    if trade.side == "no":
+                        fill_price = 100 - fill_price
+                    trade.price_cents = fill_price
+
+                trade.quantity = order.fill_count
+                if order.taker_fees:
+                    trade.fees_cents = order.taker_fees
+
+                transitioned += 1
+                RESTING_ORDER_SYNCED_TOTAL.labels(outcome="filled").inc()
+                logger.info(
+                    "Resting order filled",
+                    extra={
+                        "data": {
+                            "trade_id": trade.id,
+                            "order_id": trade.kalshi_order_id,
+                            "fill_count": order.fill_count,
+                            "fill_price_cents": trade.price_cents,
+                        }
+                    },
+                )
+
+            elif order.status == "canceled":
+                trade.status = TradeStatus.CANCELED
+                transitioned += 1
+                RESTING_ORDER_SYNCED_TOTAL.labels(outcome="expired").inc()
+                logger.info(
+                    "Resting order canceled on Kalshi",
+                    extra={
+                        "data": {
+                            "trade_id": trade.id,
+                            "order_id": trade.kalshi_order_id,
+                        }
+                    },
+                )
+
+            # If still "resting", leave as-is (will expire on Kalshi eventually)
+
+        except Exception as exc:
+            RESTING_ORDER_SYNCED_TOTAL.labels(outcome="error").inc()
+            logger.warning(
+                "Failed to sync resting order",
+                extra={
+                    "data": {
+                        "trade_id": trade.id,
+                        "error": str(exc),
+                    }
+                },
+            )
+
+    return transitioned
 
 
 async def _check_retraining_trigger(

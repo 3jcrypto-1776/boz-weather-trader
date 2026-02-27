@@ -10,7 +10,7 @@
 export type CityCode = "NYC" | "CHI" | "MIA" | "AUS";
 export type TradeSide = "yes" | "no";
 export type ConfidenceLevel = "high" | "medium" | "low";
-export type TradeStatus = "OPEN" | "WON" | "LOST" | "CANCELED";
+export type TradeStatus = "OPEN" | "RESTING" | "WON" | "LOST" | "CANCELED";
 export type PendingTradeStatus =
   | "PENDING"
   | "APPROVED"

@@ -73,7 +73,7 @@ export function groupTrades(trades: TradeRecord[]): GroupedTrade[] {
 
     // P&L: null for OPEN trades, sum for settled
     let totalPnlCents: number | null = null;
-    if (first.status !== "OPEN") {
+    if (first.status !== "OPEN" && first.status !== "RESTING") {
       totalPnlCents = groupTrades.reduce(
         (sum, t) => sum + (t.pnl_cents ?? 0),
         0,
@@ -207,10 +207,11 @@ export function groupByMarket(trades: TradeRecord[]): MarketGroup[] {
 export type DaySortOption = "time" | "pnl" | "city" | "status";
 
 const STATUS_RANK: Record<string, number> = {
-  OPEN: 0,
-  WON: 1,
-  LOST: 2,
-  CANCELED: 3,
+  RESTING: 0,
+  OPEN: 1,
+  WON: 2,
+  LOST: 3,
+  CANCELED: 4,
 };
 
 /**

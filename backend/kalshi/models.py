@@ -137,6 +137,7 @@ class OrderRequest(BaseModel):
     type: str
     count: int = Field(ge=1)
     yes_price: int = Field(ge=1, le=99)
+    expiration_ts: int | None = None  # Unix timestamp in seconds for auto-expiry
 
     @field_validator("action")
     @classmethod
@@ -201,9 +202,10 @@ class OrderRequest(BaseModel):
         """Convert to the dict format expected by the Kalshi POST /portfolio/orders API.
 
         Returns:
-            Dict with keys: ticker, action, side, type, count, yes_price.
+            Dict with keys: ticker, action, side, type, count, yes_price,
+            and optionally expiration_ts.
         """
-        return {
+        d = {
             "ticker": self.ticker,
             "action": self.action,
             "side": self.side,
@@ -211,6 +213,9 @@ class OrderRequest(BaseModel):
             "count": self.count,
             "yes_price": self.yes_price,
         }
+        if self.expiration_ts is not None:
+            d["expiration_ts"] = self.expiration_ts
+        return d
 
 
 class OrderResponse(BaseModel):

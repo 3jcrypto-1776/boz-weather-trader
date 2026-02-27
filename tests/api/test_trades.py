@@ -157,6 +157,32 @@ async def test_trades_settled_status_filter(
     assert "CANCELED" in statuses
 
 
+async def test_trades_active_status_filter(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    """GET /api/trades?status=ACTIVE returns OPEN+RESTING, excludes settled."""
+    open_trade = make_trade(user_id="test-user-001", status=TradeStatus.OPEN)
+    resting_trade = make_trade(user_id="test-user-001", status=TradeStatus.RESTING)
+    won_trade = make_trade(user_id="test-user-001", status=TradeStatus.WON, pnl_cents=50)
+    lost_trade = make_trade(user_id="test-user-001", status=TradeStatus.LOST, pnl_cents=-25)
+    db.add(open_trade)
+    db.add(resting_trade)
+    db.add(won_trade)
+    db.add(lost_trade)
+    await db.flush()
+
+    response = await client.get("/api/trades", params={"status": "ACTIVE"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 2
+    statuses = {t["status"] for t in data["trades"]}
+    assert "OPEN" in statuses
+    assert "RESTING" in statuses
+    assert "WON" not in statuses
+    assert "LOST" not in statuses
+
+
 async def test_trades_unauthenticated(unauthed_client: AsyncClient) -> None:
     """GET /api/trades returns 401 when not authenticated."""
     response = await unauthed_client.get("/api/trades")

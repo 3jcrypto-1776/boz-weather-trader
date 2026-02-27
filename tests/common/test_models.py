@@ -40,7 +40,7 @@ class TestTradeStatus:
     def test_all_statuses(self):
         """All expected trade statuses are defined."""
         statuses = {s.value for s in TradeStatus}
-        assert statuses == {"OPEN", "WON", "LOST", "CANCELED"}
+        assert statuses == {"OPEN", "RESTING", "WON", "LOST", "CANCELED"}
 
 
 class TestUserModel:

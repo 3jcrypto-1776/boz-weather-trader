@@ -172,6 +172,8 @@ export function statusColor(status: string): string {
       return "text-boz-danger";
     case "OPEN":
       return "text-boz-primary";
+    case "RESTING":
+      return "text-boz-warning";
     case "CANCELED":
       return "text-boz-neutral";
     default:

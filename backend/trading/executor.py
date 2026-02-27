@@ -2,8 +2,8 @@
 
 Handles the full lifecycle of executing a trade signal:
 1. Build a validated OrderRequest from the TradeSignal
-2. Place the order via KalshiClient
-3. Handle the response (filled, partial fill, rejection)
+2. Place the order via KalshiClient (with 14-minute expiration)
+3. Handle the response (filled, partial fill, resting, rejection)
 4. Create a Trade ORM record in the database
 5. Return a TradeRecord schema
 
@@ -23,6 +23,7 @@ Usage:
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -39,6 +40,10 @@ from backend.kalshi.models import OrderRequest
 logger = get_logger("ORDER")
 ET = ZoneInfo("America/New_York")
 
+# Resting orders auto-expire after 14 minutes. This fits within the
+# 15-minute Celery beat cycle, ensuring no overlap with the next cycle.
+RESTING_EXPIRY_SECONDS = 14 * 60
+
 
 async def execute_trade(
     signal: TradeSignal,
@@ -49,10 +54,10 @@ async def execute_trade(
     """Execute a trade on Kalshi and record it in the database.
 
     Steps:
-    1. Build OrderRequest from the signal (validated at construction)
+    1. Build OrderRequest from the signal with 14-minute expiration
     2. Place order via kalshi_client.place_order()
-    3. Handle response: check status, partial fills
-    4. Create Trade ORM record
+    3. Handle response: check status, partial fills, resting
+    4. Create Trade ORM record (OPEN for filled, RESTING for unfilled)
     5. Return TradeRecord schema
 
     Args:
@@ -68,7 +73,9 @@ async def execute_trade(
         InvalidOrderError: If the order is rejected by Kalshi.
         Exception: If the Kalshi API call fails for any reason.
     """
-    # Build the order
+    # Build the order with auto-expiry
+    expiration_ts = int(time.time()) + RESTING_EXPIRY_SECONDS
+
     order = OrderRequest(
         ticker=signal.market_ticker,
         action="buy",
@@ -76,6 +83,7 @@ async def execute_trade(
         type="limit",
         count=signal.quantity,
         yes_price=signal.price_cents,
+        expiration_ts=expiration_ts,
     )
 
     logger.info(
@@ -86,6 +94,7 @@ async def execute_trade(
                 "side": signal.side,
                 "price_cents": signal.price_cents,
                 "quantity": signal.quantity,
+                "expiration_ts": expiration_ts,
             }
         },
     )
@@ -145,47 +154,81 @@ async def execute_trade(
             },
         )
 
-    # Handle unfilled orders — resting means limit order is on the book
-    # but nobody has taken the other side yet. Cancel it on Kalshi so it
-    # doesn't sit on the order book locking up cash, then raise an error.
+    # Handle fully resting orders (no fills) — record as RESTING.
+    # The order will auto-expire on Kalshi after 14 minutes. The next
+    # trading cycle will sync the status via _sync_resting_orders().
     if order_status == "resting" and filled_count == 0:
-        # Cancel the resting order on Kalshi to free up locked cash
-        try:
-            await kalshi_client.cancel_order(order_id)
-            logger.info(
-                "Cancelled unfilled resting order on Kalshi",
-                extra={
-                    "data": {
-                        "order_id": order_id,
-                        "ticker": signal.market_ticker,
-                    }
-                },
-            )
-        except Exception as cancel_exc:
-            logger.error(
-                "Failed to cancel resting order on Kalshi",
-                extra={
-                    "data": {
-                        "order_id": order_id,
-                        "ticker": signal.market_ticker,
-                        "error": str(cancel_exc),
-                    }
-                },
-            )
+        trade_id = str(uuid4())
+        now = datetime.now(UTC).replace(tzinfo=None)
+        market_date = parse_market_date_from_ticker(signal.market_ticker)
 
-        raise InvalidOrderError(
-            "Order not filled — no liquidity at this price. Order cancelled.",
-            context={
-                "order_id": order_id,
-                "ticker": signal.market_ticker,
-                "status": order_status,
+        trade = Trade(
+            id=trade_id,
+            user_id=user_id,
+            kalshi_order_id=order_id,
+            city=signal.city,
+            trade_date=now,
+            market_date=market_date,
+            market_ticker=signal.market_ticker,
+            bracket_label=signal.bracket,
+            side=signal.side,
+            price_cents=signal.price_cents,  # Limit price (not fill price)
+            quantity=signal.quantity,  # Requested quantity (not filled yet)
+            model_probability=signal.model_probability,
+            blended_probability=signal.blended_probability,
+            market_probability=signal.market_probability,
+            ev_at_entry=signal.ev,
+            confidence=signal.confidence,
+            status=TradeStatus.RESTING,
+            created_at=now,
+        )
+
+        db.add(trade)
+        await db.flush()
+
+        logger.info(
+            "Order resting on book — recorded as RESTING",
+            extra={
+                "data": {
+                    "trade_id": trade_id,
+                    "order_id": order_id,
+                    "ticker": signal.market_ticker,
+                    "side": signal.side,
+                    "price_cents": signal.price_cents,
+                    "quantity": signal.quantity,
+                    "expiration_ts": expiration_ts,
+                }
             },
         )
 
-    # Log partial fills (some filled, some still resting)
+        return TradeRecord(
+            id=trade_id,
+            kalshi_order_id=order_id,
+            city=signal.city,
+            date=now.date(),
+            market_ticker=signal.market_ticker,
+            bracket_label=signal.bracket,
+            side=signal.side,
+            price_cents=signal.price_cents,
+            quantity=signal.quantity,
+            model_probability=signal.model_probability,
+            market_probability=signal.market_probability,
+            ev_at_entry=signal.ev,
+            confidence=signal.confidence,
+            status="RESTING",
+            settlement_temp_f=None,
+            settlement_source=None,
+            pnl_cents=None,
+            created_at=now,
+            settled_at=None,
+        )
+
+    # Log partial fills (some filled, some still resting).
+    # Only the filled portion is recorded as OPEN. The unfilled remainder
+    # will auto-expire on Kalshi.
     if order_status == "resting" and filled_count > 0:
         logger.info(
-            "Order partially filled, remainder resting",
+            "Order partially filled, remainder resting (will auto-expire)",
             extra={
                 "data": {
                     "order_id": order_id,
@@ -196,7 +239,7 @@ async def execute_trade(
             },
         )
 
-    # Record the trade in the database
+    # Record the trade in the database (filled portion)
     trade_id = str(uuid4())
     now = datetime.now(UTC).replace(tzinfo=None)
 

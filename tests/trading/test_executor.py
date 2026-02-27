@@ -366,3 +366,101 @@ class TestExecuteTrade:
 
         # YES side: store the fill price directly (20¢), NOT 100-20=80
         assert result.price_cents == 20
+
+    @pytest.mark.asyncio
+    async def test_resting_unfilled_returns_resting_status(
+        self, sample_signal: TradeSignal, mock_db: AsyncMock
+    ) -> None:
+        """When order is resting with 0 fills, trade is recorded as RESTING."""
+        mock_client = AsyncMock()
+        mock_client.place_order.return_value = _make_mock_response(
+            status="resting", count=0, taker_fill_cost=0
+        )
+
+        result = await execute_trade(
+            signal=sample_signal,
+            kalshi_client=mock_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        assert result.status == "RESTING"
+        assert result.quantity == sample_signal.quantity
+        assert result.price_cents == sample_signal.price_cents
+
+    @pytest.mark.asyncio
+    async def test_resting_unfilled_records_in_db(
+        self, sample_signal: TradeSignal, mock_db: AsyncMock
+    ) -> None:
+        """RESTING trade is persisted in the database with correct status."""
+        mock_client = AsyncMock()
+        mock_client.place_order.return_value = _make_mock_response(
+            status="resting", count=0, taker_fill_cost=0
+        )
+
+        await execute_trade(
+            signal=sample_signal,
+            kalshi_client=mock_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        mock_db.add.assert_called_once()
+        trade_obj = mock_db.add.call_args[0][0]
+        assert trade_obj.status.value == "RESTING"
+        assert trade_obj.quantity == sample_signal.quantity
+        assert trade_obj.price_cents == sample_signal.price_cents
+
+    @pytest.mark.asyncio
+    async def test_resting_unfilled_does_not_cancel(
+        self, sample_signal: TradeSignal, mock_db: AsyncMock
+    ) -> None:
+        """Unfilled resting orders are NOT canceled — they auto-expire via expiration_ts."""
+        mock_client = AsyncMock()
+        mock_client.place_order.return_value = _make_mock_response(
+            status="resting", count=0, taker_fill_cost=0
+        )
+
+        await execute_trade(
+            signal=sample_signal,
+            kalshi_client=mock_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        # cancel_order should NOT have been called
+        mock_client.cancel_order.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_order_includes_expiration_ts(
+        self, sample_signal: TradeSignal, mock_db: AsyncMock, mock_kalshi_client: AsyncMock
+    ) -> None:
+        """OrderRequest sent to Kalshi includes expiration_ts for auto-expiry."""
+        await execute_trade(
+            signal=sample_signal,
+            kalshi_client=mock_kalshi_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        # Extract the OrderRequest passed to place_order
+        order_arg = mock_kalshi_client.place_order.call_args[0][0]
+        assert order_arg.expiration_ts is not None
+        assert order_arg.expiration_ts > 0
+
+    @pytest.mark.asyncio
+    async def test_expiration_ts_in_api_dict(
+        self, sample_signal: TradeSignal, mock_db: AsyncMock, mock_kalshi_client: AsyncMock
+    ) -> None:
+        """The expiration_ts field appears in the to_api_dict() output."""
+        await execute_trade(
+            signal=sample_signal,
+            kalshi_client=mock_kalshi_client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        order_arg = mock_kalshi_client.place_order.call_args[0][0]
+        api_dict = order_arg.to_api_dict()
+        assert "expiration_ts" in api_dict
+        assert api_dict["expiration_ts"] > 0

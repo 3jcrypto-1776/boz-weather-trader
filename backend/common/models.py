@@ -71,6 +71,7 @@ class TradeStatus(enum.StrEnum):
     """Trade lifecycle status."""
 
     OPEN = "OPEN"
+    RESTING = "RESTING"  # Order on book, awaiting fill
     WON = "WON"
     LOST = "LOST"
     CANCELED = "CANCELED"
