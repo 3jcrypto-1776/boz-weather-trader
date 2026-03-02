@@ -1,8 +1,8 @@
 """Tests for _sync_resting_orders in the trading scheduler.
 
 Verifies the resting order sync logic that runs at the start of each
-trading cycle, transitioning RESTING trades to OPEN (filled), CANCELED
-(expired), or leaving them unchanged (still resting).
+trading cycle, transitioning RESTING trades to OPEN (filled), deleting
+expired/canceled orders, or leaving them unchanged (still resting).
 """
 
 from __future__ import annotations
@@ -123,8 +123,8 @@ class TestSyncRestingOrders:
         assert trade.price_cents == 41
 
     @pytest.mark.asyncio
-    async def test_canceled_order_transitions_to_canceled(self) -> None:
-        """When Kalshi order is canceled, trade transitions RESTING → CANCELED."""
+    async def test_canceled_order_is_deleted(self) -> None:
+        """When Kalshi order is canceled, trade is deleted from DB."""
         from backend.trading.scheduler import _sync_resting_orders
 
         trade = _make_mock_trade(order_id="order-1")
@@ -141,11 +141,11 @@ class TestSyncRestingOrders:
         result = await _sync_resting_orders(mock_session, mock_client, "user-1")
 
         assert result == 1
-        assert trade.status == TradeStatus.CANCELED
+        mock_session.delete.assert_awaited_once_with(trade)
 
     @pytest.mark.asyncio
-    async def test_order_not_found_transitions_to_canceled(self) -> None:
-        """When order is not found on Kalshi, trade transitions to CANCELED."""
+    async def test_order_not_found_is_deleted(self) -> None:
+        """When order is not found on Kalshi, trade is deleted from DB."""
         from backend.trading.scheduler import _sync_resting_orders
 
         trade = _make_mock_trade(order_id="order-1")
@@ -161,7 +161,7 @@ class TestSyncRestingOrders:
         result = await _sync_resting_orders(mock_session, mock_client, "user-1")
 
         assert result == 1
-        assert trade.status == TradeStatus.CANCELED
+        mock_session.delete.assert_awaited_once_with(trade)
 
     @pytest.mark.asyncio
     async def test_still_resting_no_change(self) -> None:
@@ -207,10 +207,10 @@ class TestSyncRestingOrders:
 
         result = await _sync_resting_orders(mock_session, mock_client, "user-1")
 
-        assert result == 2  # t1 (filled) + t3 (expired)
+        assert result == 2  # t1 (filled) + t3 (deleted)
         assert trade1.status == TradeStatus.OPEN
         assert trade2.status == TradeStatus.RESTING
-        assert trade3.status == TradeStatus.CANCELED
+        mock_session.delete.assert_awaited_once_with(trade3)
 
     @pytest.mark.asyncio
     async def test_kalshi_api_failure_returns_zero(self) -> None:

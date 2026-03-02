@@ -705,12 +705,12 @@ async def _sync_resting_orders(
             order = orders_by_id.get(trade.kalshi_order_id)
 
             if order is None:
-                # Order not found — likely expired on Kalshi
-                trade.status = TradeStatus.CANCELED
+                # Order not found — likely expired on Kalshi; delete from DB
+                await session.delete(trade)
                 transitioned += 1
                 RESTING_ORDER_SYNCED_TOTAL.labels(outcome="expired").inc()
                 logger.info(
-                    "Resting order expired (not found on Kalshi)",
+                    "Resting order expired — deleted (not found on Kalshi)",
                     extra={
                         "data": {
                             "trade_id": trade.id,
@@ -751,11 +751,11 @@ async def _sync_resting_orders(
                 )
 
             elif order.status == "canceled":
-                trade.status = TradeStatus.CANCELED
+                await session.delete(trade)
                 transitioned += 1
                 RESTING_ORDER_SYNCED_TOTAL.labels(outcome="expired").inc()
                 logger.info(
-                    "Resting order canceled on Kalshi",
+                    "Resting order canceled — deleted",
                     extra={
                         "data": {
                             "trade_id": trade.id,

@@ -116,11 +116,10 @@ async def test_winning_no_trade(db: AsyncSession, test_user) -> None:
     await settle_trade(trade, settlement, db)
 
     assert trade.status == TradeStatus.WON
-    # NO cost = 100 - 22 = 78c.  Payout = 100c.  Profit = 22c.
-    fees = estimate_fees(22, "no")  # max(1, int(22 * 0.15)) = 3
-    expected_pnl = 100 - (100 - 22) - fees  # 100 - 78 - 3 = 19
-    assert trade.pnl_cents == expected_pnl
-    assert trade.fees_cents == fees
+    # price_cents=22 is actual NO cost. profit = 100 - 22 = 78c.
+    # fee = max(1, int(78 * 0.15)) = 11c.  pnl = 78 - 11 = 67c.
+    assert trade.pnl_cents == 67
+    assert trade.fees_cents == 11
 
 
 @pytest.mark.asyncio
@@ -136,8 +135,8 @@ async def test_losing_no_trade(db: AsyncSession, test_user) -> None:
     await settle_trade(trade, settlement, db)
 
     assert trade.status == TradeStatus.LOST
-    # NO cost = 100 - 22 = 78c.  Lost the cost.
-    assert trade.pnl_cents == -(100 - 22)
+    # price_cents=22 is actual NO cost. Lost the cost.
+    assert trade.pnl_cents == -22
     assert trade.fees_cents == 0
 
 

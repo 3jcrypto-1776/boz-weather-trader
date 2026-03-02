@@ -118,16 +118,18 @@ export function useTrades(
   city?: CityCode,
   status?: string,
   date?: string,
-  config?: SWRConfiguration
+  perPage?: number,
+  config?: SWRConfiguration,
 ) {
   const params = new URLSearchParams({ page: String(page) });
   if (city) params.set("city", city);
   if (status) params.set("status", status);
   if (date) params.set("trade_date", date);
+  if (perPage) params.set("per_page", String(perPage));
 
   return useSWR<TradesPage>(
     `/api/trades?${params.toString()}`,
-    () => fetchTrades(page, city, status, date),
+    () => fetchTrades(page, city, status, date, perPage),
     {
       refreshInterval: 0,
       ...config,

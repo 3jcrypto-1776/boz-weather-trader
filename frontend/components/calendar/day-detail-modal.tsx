@@ -39,7 +39,7 @@ export default function DayDetailModal({
   const [sortBy, setSortBy] = useState<DaySortOption>("time");
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  const { data, isLoading } = useTrades(1, undefined, undefined, date);
+  const { data, isLoading } = useTrades(1, undefined, undefined, date, 200);
 
   const displayDate = formatDateLong(date);
 

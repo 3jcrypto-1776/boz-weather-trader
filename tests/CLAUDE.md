@@ -71,7 +71,7 @@ tests/
 │   ├── test_ev_calculator.py      → EV math, fees, bracket scanning, Kelly integration, guardrails (divergence cap, blending, YES floor) (68 tests)
 │   ├── test_scheduler.py          → Celery tasks: trading cycle, expiry, Kalshi-based settlement, Kelly params, bracket cap, guardrail settings (46 tests)
 │   ├── test_kelly.py              → Kelly Criterion: sizing, fractional, fees, caps, edge cases (35 tests)
-│   ├── test_postmortem.py         → Settlement matching, P&L, rich narratives, Kalshi-based settlement (settle_from_kalshi) (49 tests)
+│   ├── test_postmortem.py         → Settlement matching, P&L, rich narratives, Kalshi-based settlement (settle_from_kalshi) (50 tests)
 │   ├── test_sync.py               → Portfolio sync: ticker parsing, reconciliation, sentinel values, market_date, fill price, NO side conversion (27 tests)
 │   ├── test_retraining_trigger.py → Post-settlement retraining trigger: 3 conditions, cooldown, metrics (8 tests)
 │   ├── test_bracket_cap.py        → Per-bracket position cap: _get_open_bracket_qty, cap blocking, Prometheus metric (~15 tests)
@@ -1146,7 +1146,7 @@ jobs:
 | Job | What It Does | Failure Blocks Merge? |
 |------|--------------|-----------------------|
 | `backend-lint` | `ruff check` + `ruff format --check` on `backend/` and `tests/` | Yes |
-| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1476 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
+| `backend-test` | `pytest tests/ -x -q --tb=short --cov=backend` (1486 tests, in-memory SQLite, no Docker needed) + coverage artifact upload | Yes |
 | `frontend` | `npm run lint` (ESLint via next lint) + `npm test` (Vitest, 254 tests) | Yes |
 | `docker-build` | Docker build smoke test for backend + frontend Dockerfiles | Yes |
 

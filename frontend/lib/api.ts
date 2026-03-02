@@ -151,12 +151,14 @@ export async function fetchTrades(
   page: number = 1,
   city?: CityCode,
   status?: string,
-  date?: string
+  date?: string,
+  perPage?: number,
 ): Promise<TradesPage> {
   const params = new URLSearchParams({ page: String(page) });
   if (city) params.set("city", city);
   if (status) params.set("status", status);
   if (date) params.set("trade_date", date);
+  if (perPage) params.set("per_page", String(perPage));
   return apiFetch<TradesPage>(`/api/trades?${params.toString()}`);
 }
 

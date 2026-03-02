@@ -132,13 +132,18 @@ export function formatTime(dateStr: string): string {
 /**
  * Calculate trade cost, payout, and potential profit from price and quantity.
  * All values in cents. Payout assumes $1 per contract on the winning side.
+ *
+ * For executed trades (trade cards): omit `side` — price_cents is already
+ * the actual cost per contract for both YES and NO sides.
+ *
+ * For pending trades (signals): pass `side` — price_cents is the YES market
+ * price, so NO cost must be computed as (100 - price) per contract.
  */
-export function tradeFinancials(priceCents: number, quantity: number, side: string) {
-  // Cost is what you pay: price × quantity for YES, (100 - price) × quantity for NO
-  const costCents = side === "yes" ? priceCents * quantity : (100 - priceCents) * quantity;
-  // Payout if right: $1.00 × quantity = 100 cents per contract
+export function tradeFinancials(priceCents: number, quantity: number, side?: string) {
+  // When side is "no", priceCents is the YES market price — convert to NO cost.
+  // Otherwise (YES or omitted), priceCents is already the actual cost.
+  const costCents = side === "no" ? (100 - priceCents) * quantity : priceCents * quantity;
   const payoutCents = 100 * quantity;
-  // Potential profit: payout - cost
   const profitCents = payoutCents - costCents;
   return { costCents, payoutCents, profitCents };
 }

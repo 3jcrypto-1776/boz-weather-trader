@@ -33,7 +33,6 @@ from backend.common.models import (
     TradeStatus,
     WeatherForecast,
 )
-from backend.trading.ev_calculator import estimate_fees
 from backend.weather.stations import STATION_CONFIGS
 
 logger = get_logger("POSTMORTEM")
@@ -175,15 +174,15 @@ async def settle_trade(
     # Determine if the bracket was hit
     won = _did_bracket_win(trade.bracket_label, actual_temp, trade.side)
 
-    # Calculate P&L in cents
+    # Calculate P&L in cents.
+    # price_cents = actual cost per contract for both YES and NO sides.
     cost_cents = trade.price_cents * trade.quantity
-    if trade.side == "no":
-        cost_cents = (100 - trade.price_cents) * trade.quantity
 
     if won:
         payout_cents = 100 * trade.quantity
         profit_cents = payout_cents - cost_cents
-        fee_cents = estimate_fees(trade.price_cents, trade.side) * trade.quantity
+        # Fee = 15% of profit per contract, min 1c
+        fee_cents = max(1, int((100 - trade.price_cents) * 0.15)) * trade.quantity
         pnl_cents = profit_cents - fee_cents
         trade.status = TradeStatus.WON
         trade.fees_cents = fee_cents
@@ -256,15 +255,14 @@ async def settle_from_kalshi(
     """
     won = market_result == trade.side
 
-    # P&L calculation (same math as settle_trade)
+    # P&L calculation — price_cents = actual cost per contract for both sides.
     cost_cents = trade.price_cents * trade.quantity
-    if trade.side == "no":
-        cost_cents = (100 - trade.price_cents) * trade.quantity
 
     if won:
         payout_cents = 100 * trade.quantity
         profit_cents = payout_cents - cost_cents
-        fee_cents = estimate_fees(trade.price_cents, trade.side) * trade.quantity
+        # Fee = 15% of profit per contract, min 1c
+        fee_cents = max(1, int((100 - trade.price_cents) * 0.15)) * trade.quantity
         pnl_cents = profit_cents - fee_cents
         trade.status = TradeStatus.WON
         trade.fees_cents = fee_cents

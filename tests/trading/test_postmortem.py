@@ -483,17 +483,30 @@ class TestSettleFromKalshi:
 
     @pytest.mark.asyncio
     async def test_pnl_no_win(self) -> None:
-        """NO at 22c wins: cost=(100-22)=78, pnl=(100-78)-fee=22-3=19c."""
+        """NO at actual cost 22c wins: cost=22, profit=78, fee=11, pnl=67c."""
         trade = self._make_trade(side="no", price_cents=22)
         mock_db = self._make_mock_db()
 
         await settle_from_kalshi(trade, "no", mock_db)
 
         assert trade.status == TradeStatus.WON
-        # NO at 22c: cost = 100 - 22 = 78c, profit = 100 - 78 = 22c
-        # fee = estimate_fees(22, 'no') = max(1, int(22 * 0.15)) = 3c
-        assert trade.pnl_cents == 19
-        assert trade.fees_cents == 3
+        # price_cents=22 is the actual NO cost per contract.
+        # cost = 22 * 1 = 22c, profit = 100 - 22 = 78c
+        # fee = max(1, int((100-22) * 0.15)) = max(1, int(78*0.15)) = 11c
+        assert trade.pnl_cents == 67
+        assert trade.fees_cents == 11
+
+    @pytest.mark.asyncio
+    async def test_pnl_no_loss(self) -> None:
+        """NO at actual cost 22c loses: pnl = -22c."""
+        trade = self._make_trade(side="no", price_cents=22)
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "yes", mock_db)
+
+        assert trade.status == TradeStatus.LOST
+        assert trade.pnl_cents == -22
+        assert trade.fees_cents == 0
 
     @pytest.mark.asyncio
     async def test_source_is_kalshi(self) -> None:

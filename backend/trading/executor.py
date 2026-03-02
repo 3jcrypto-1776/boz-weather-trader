@@ -131,12 +131,11 @@ async def execute_trade(
         else signal.price_cents
     )
 
-    # For NO side, convert to YES-equivalent price.
-    # Kalshi's taker_fill_cost for NO = what you paid for the NO contract.
-    # Settlement code expects price_cents to always be the YES price:
-    #   YES cost = price_cents * qty
-    #   NO cost  = (100 - price_cents) * qty
-    # So for NO side: price_cents = 100 - (NO fill cost per contract)
+    # For NO side, convert Kalshi's taker_fill_cost to actual NO cost.
+    # Kalshi reports taker_fill_cost as the YES-equivalent total for NO buys.
+    # Dividing gives the YES price per contract; 100 - that = actual NO cost.
+    # price_cents stores actual cost per contract for both sides:
+    #   cost = price_cents * qty   (both YES and NO)
     if signal.side == "no" and taker_fill_cost > 0 and filled_count > 0:
         fill_price_cents = 100 - fill_price_cents
 

@@ -34,6 +34,7 @@ async def get_trades(
     status: str | None = None,
     trade_date: date | None = None,
     page: int = 1,
+    per_page: int = TRADES_PER_PAGE,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TradesPage:
@@ -41,10 +42,11 @@ async def get_trades(
 
     Args:
         city: Optional city code filter (NYC, CHI, MIA, AUS).
-        status: Optional status filter (OPEN, RESTING, WON, LOST, CANCELED,
-                ACTIVE=OPEN+RESTING, SETTLED=WON+LOST+CANCELED).
+        status: Optional status filter (OPEN, RESTING, WON, LOST,
+                ACTIVE=OPEN+RESTING, SETTLED=WON+LOST).
         trade_date: Optional date filter (YYYY-MM-DD) for calendar drill-down.
         page: Page number (1-indexed, defaults to 1).
+        per_page: Results per page (1-200, defaults to 20).
         user: The authenticated user.
         db: Async database session.
 
@@ -67,8 +69,8 @@ async def get_trades(
             base_query = base_query.where(Trade.status.in_(active))
             count_query = count_query.where(Trade.status.in_(active))
         elif status.upper() == "SETTLED":
-            # Pseudo-filter: all settled trades (WON + LOST + CANCELED)
-            settled = [TradeStatus.WON, TradeStatus.LOST, TradeStatus.CANCELED]
+            # Pseudo-filter: settled trades (WON + LOST)
+            settled = [TradeStatus.WON, TradeStatus.LOST]
             base_query = base_query.where(Trade.status.in_(settled))
             count_query = count_query.where(Trade.status.in_(settled))
         else:
@@ -83,11 +85,12 @@ async def get_trades(
     total_result = await db.execute(count_query)
     total = int(total_result.scalar())
 
+    # Clamp per_page to safe range
+    per_page = max(1, min(per_page, 200))
+
     # Apply ordering and pagination
-    offset = (page - 1) * TRADES_PER_PAGE
-    paginated_query = (
-        base_query.order_by(Trade.created_at.desc()).offset(offset).limit(TRADES_PER_PAGE)
-    )
+    offset = (page - 1) * per_page
+    paginated_query = base_query.order_by(Trade.created_at.desc()).offset(offset).limit(per_page)
 
     result = await db.execute(paginated_query)
     trades = [trade_to_record(t) for t in result.scalars().all()]

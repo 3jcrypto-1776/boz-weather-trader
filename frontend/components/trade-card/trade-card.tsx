@@ -36,7 +36,6 @@ export default function TradeCard({ group, currentTempF }: TradeCardProps) {
   const { costCents, profitCents } = tradeFinancials(
     group.vwapCents,
     group.totalQuantity,
-    group.side,
   );
   const borderColor =
     group.status === "WON"
