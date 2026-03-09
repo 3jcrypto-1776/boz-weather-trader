@@ -196,6 +196,30 @@ class TestRidgeModelManagerTrain:
         metrics = _train_manager(manager, tmp_path, noise_std=50.0)
         assert metrics["accepted"] is False
 
+    def test_train_handles_all_nan_columns(self, tmp_path) -> None:
+        """Training succeeds when some columns are entirely NaN."""
+        manager = RidgeModelManager(model_dir=str(tmp_path))
+        X, y = _make_synthetic_data(noise_std=1.0)
+        # Set columns 3, 5, 7 to all-NaN.
+        X[:, 3] = np.nan
+        X[:, 5] = np.nan
+        X[:, 7] = np.nan
+        split = int(len(X) * 0.8)
+        metrics = manager.train(X[:split], y[:split], X[split:], y[split:])
+        assert "rmse" in metrics
+        assert metrics["dropped_columns"] == 3
+        assert "valid_col_mask" in metrics
+
+    def test_train_all_nan_raises(self, tmp_path) -> None:
+        """Training raises ValueError when ALL columns are NaN."""
+        manager = RidgeModelManager(model_dir=str(tmp_path))
+        n = 50
+        X = np.full((n, NUM_FEATURES), np.nan, dtype=np.float32)
+        y = np.random.default_rng(42).uniform(30, 90, n).astype(np.float32)
+        split = int(n * 0.8)
+        with pytest.raises(ValueError, match="All feature columns are NaN"):
+            manager.train(X[:split], y[:split], X[split:], y[split:])
+
 
 class TestRidgeModelManagerPredict:
     """Tests for Ridge model prediction."""
@@ -223,6 +247,21 @@ class TestRidgeModelManagerPredict:
         with pytest.raises(ValueError, match="Expected"):
             manager.predict(features)
 
+    def test_predict_with_nan_columns_dropped(self, tmp_path) -> None:
+        """Predict works after training with some all-NaN columns."""
+        manager = RidgeModelManager(model_dir=str(tmp_path))
+        X, y = _make_synthetic_data(noise_std=1.0)
+        X[:, 3] = np.nan
+        X[:, 5] = np.nan
+        split = int(len(X) * 0.8)
+        manager.train(X[:split], y[:split], X[split:], y[split:])
+        # Predict with full-width features (including NaN columns).
+        features = np.random.default_rng(99).standard_normal(NUM_FEATURES).astype(np.float32)
+        features[0] = 65.0
+        result = manager.predict(features)
+        assert isinstance(result, float)
+        assert not np.isnan(result)
+
 
 class TestRidgeModelManagerSaveLoad:
     """Tests for Ridge model persistence."""
@@ -245,3 +284,22 @@ class TestRidgeModelManagerSaveLoad:
         manager.save()
         assert (tmp_path / RIDGE_MODEL_FILENAME).exists()
         assert (tmp_path / RIDGE_METADATA_FILENAME).exists()
+
+    def test_save_load_with_nan_columns(self, tmp_path) -> None:
+        """Column mask survives save/load roundtrip."""
+        manager = RidgeModelManager(model_dir=str(tmp_path))
+        X, y = _make_synthetic_data(noise_std=1.0)
+        X[:, 3] = np.nan
+        X[:, 5] = np.nan
+        split = int(len(X) * 0.8)
+        manager.train(X[:split], y[:split], X[split:], y[split:])
+        features = np.random.default_rng(99).standard_normal(NUM_FEATURES).astype(np.float32)
+        features[0] = 65.0
+        original = manager.predict(features)
+        manager.save()
+
+        loaded = RidgeModelManager(model_dir=str(tmp_path))
+        assert loaded.load() is True
+        assert loaded._valid_col_mask is not None
+        assert loaded._valid_col_mask.sum() == NUM_FEATURES - 2
+        assert abs(loaded.predict(features) - original) < 0.01

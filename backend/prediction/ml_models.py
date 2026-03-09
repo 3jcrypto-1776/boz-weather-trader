@@ -253,6 +253,7 @@ class RidgeModelManager:
         self._model_dir = Path(model_dir)
         self._metadata: dict | None = None
         self._nan_fill_values: np.ndarray | None = None
+        self._valid_col_mask: np.ndarray | None = None
 
     @property
     def model_path(self) -> Path:
@@ -294,6 +295,9 @@ class RidgeModelManager:
                 fill_list = self._metadata.get("nan_fill_values")
                 if fill_list is not None:
                     self._nan_fill_values = np.array(fill_list, dtype=np.float32)
+                mask_list = self._metadata.get("valid_col_mask")
+                if mask_list is not None:
+                    self._valid_col_mask = np.array(mask_list, dtype=bool)
 
             logger.info(
                 "Ridge model loaded",
@@ -334,6 +338,10 @@ class RidgeModelManager:
         if self._nan_fill_values is not None:
             features = _impute_nan(features, self._nan_fill_values)
 
+        # Drop columns that were all-NaN during training.
+        if self._valid_col_mask is not None:
+            features = features[:, self._valid_col_mask]
+
         prediction = self._model.predict(features)
         return float(prediction[0])
 
@@ -357,8 +365,15 @@ class RidgeModelManager:
         """
         self._nan_fill_values = np.nanmedian(x_train, axis=0).astype(np.float32)
 
-        x_train_clean = _impute_nan(x_train, self._nan_fill_values)
-        x_test_clean = _impute_nan(x_test, self._nan_fill_values)
+        # Identify columns where nanmedian produced NaN (all-NaN columns).
+        self._valid_col_mask = ~np.isnan(self._nan_fill_values)
+        dropped = int(np.sum(~self._valid_col_mask))
+
+        if not self._valid_col_mask.any():
+            raise ValueError("All feature columns are NaN — cannot train Ridge model")
+
+        x_train_clean = _impute_nan(x_train, self._nan_fill_values)[:, self._valid_col_mask]
+        x_test_clean = _impute_nan(x_test, self._nan_fill_values)[:, self._valid_col_mask]
 
         model = Ridge(**DEFAULT_RIDGE_PARAMS)
         model.fit(x_train_clean, y_train)
@@ -382,7 +397,15 @@ class RidgeModelManager:
             "trained_at": datetime.now(UTC).isoformat(),
             "accepted": accepted,
             "nan_fill_values": self._nan_fill_values.tolist(),
+            "valid_col_mask": self._valid_col_mask.tolist(),
+            "dropped_columns": dropped,
         }
+
+        if dropped > 0:
+            logger.info(
+                "Ridge dropped all-NaN columns",
+                extra={"data": {"dropped": dropped, "remaining": int(self._valid_col_mask.sum())}},
+            )
 
         if accepted:
             self._model = model
