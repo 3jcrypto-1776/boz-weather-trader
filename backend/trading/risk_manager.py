@@ -301,23 +301,27 @@ class RiskManager:
         """
         trading_day = get_trading_day()
         trading_day_dt = datetime.combine(trading_day, datetime.min.time())
-        state = await self._get_or_create_daily_state(trading_day_dt)
+        state, is_new = await self._get_or_create_daily_state(trading_day_dt)
 
-        # If the state was just created, log the reset
-        if state.trades_count == 0 and state.total_loss_cents == 0:
+        # Log only when a genuinely new day's state was created
+        if is_new:
             logger.info(
                 "Daily limits reset",
                 extra={"data": {"new_day": str(trading_day)}},
             )
 
-    async def _get_or_create_daily_state(self, trading_day: datetime) -> DailyRiskState:
+    async def _get_or_create_daily_state(
+        self,
+        trading_day: datetime,
+    ) -> tuple[DailyRiskState, bool]:
         """Get or create the DailyRiskState row for the given trading day.
 
         Args:
             trading_day: The trading day as a datetime.
 
         Returns:
-            The DailyRiskState for the given day.
+            Tuple of (DailyRiskState, is_new) where is_new is True if the
+            row was just created (first cycle of a new trading day).
         """
         result = await self.db.execute(
             select(DailyRiskState).where(
@@ -338,5 +342,6 @@ class RiskManager:
             )
             self.db.add(state)
             await self.db.flush()
+            return state, True
 
-        return state
+        return state, False

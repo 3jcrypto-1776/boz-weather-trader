@@ -414,24 +414,40 @@ class TestValidateMarketPrices:
     """Validate market prices from Kalshi before using them."""
 
     def test_valid_prices_pass(self) -> None:
-        """All valid integer prices [1, 99] pass."""
+        """All valid integer prices [1, 99] are returned."""
         prices = {"53-54F": 22, "55-56F": 35, "57-58F": 50}
-        assert validate_market_prices(prices) is True
+        result = validate_market_prices(prices)
+        assert result == prices
 
-    def test_zero_price_fails(self) -> None:
-        """Price of 0 is invalid."""
+    def test_zero_price_filtered(self) -> None:
+        """Price of 0 is filtered out, other valid prices remain."""
+        prices = {"53-54F": 0, "55-56F": 35}
+        result = validate_market_prices(prices)
+        assert result == {"55-56F": 35}
+
+    def test_all_zero_prices_returns_empty(self) -> None:
+        """All zero prices returns empty dict."""
         prices = {"53-54F": 0}
-        assert validate_market_prices(prices) is False
+        result = validate_market_prices(prices)
+        assert result == {}
 
-    def test_hundred_price_fails(self) -> None:
-        """Price of 100 is invalid."""
-        prices = {"53-54F": 100}
-        assert validate_market_prices(prices) is False
+    def test_hundred_price_filtered(self) -> None:
+        """Price of 100 is filtered out."""
+        prices = {"53-54F": 100, "55-56F": 50}
+        result = validate_market_prices(prices)
+        assert result == {"55-56F": 50}
 
-    def test_non_int_fails(self) -> None:
-        """Float price is invalid."""
-        prices = {"53-54F": 22.5}
-        assert validate_market_prices(prices) is False
+    def test_non_int_filtered(self) -> None:
+        """Float price is filtered out."""
+        prices = {"53-54F": 22.5, "55-56F": 50}
+        result = validate_market_prices(prices)
+        assert result == {"55-56F": 50}
+
+    def test_mixed_valid_and_invalid(self) -> None:
+        """Zero-price tail brackets are filtered, valid brackets kept."""
+        prices = {"<=52F": 0, "53-54F": 22, "55-56F": 35, ">=61F": 0}
+        result = validate_market_prices(prices)
+        assert result == {"53-54F": 22, "55-56F": 35}
 
 
 # ---------------------------------------------------------------------------

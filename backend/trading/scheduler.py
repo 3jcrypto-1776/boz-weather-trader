@@ -343,9 +343,11 @@ async def _run_trading_cycle() -> None:
                 )
                 continue
 
-            if not validate_market_prices(market_prices):
+            # Filter out brackets with invalid prices (e.g., zero-liquidity tails)
+            market_prices = validate_market_prices(market_prices)
+            if not market_prices:
                 logger.error(
-                    "Skipping city: invalid market prices",
+                    "Skipping city: no valid market prices after filtering",
                     extra={"data": {"city": prediction.city}},
                 )
                 continue
@@ -598,16 +600,50 @@ async def _settle_and_postmortem() -> None:
             )
             return
 
+        logger.info(
+            "Kalshi settlements fetched",
+            extra={
+                "data": {
+                    "total_settlements": len(ticker_results),
+                    "sample_tickers": list(ticker_results.keys())[:5],
+                }
+            },
+        )
+
         # Find trades that need settlement
         open_trades_result = await session.execute(
             select(Trade).where(Trade.status == TradeStatus.OPEN)
         )
+        open_trades = list(open_trades_result.scalars().all())
+
+        if open_trades:
+            open_tickers = [t.market_ticker for t in open_trades]
+            logger.info(
+                "Open trades for settlement matching",
+                extra={
+                    "data": {
+                        "open_count": len(open_trades),
+                        "open_tickers": open_tickers,
+                    }
+                },
+            )
 
         settled_count = 0
-        for trade in open_trades_result.scalars().all():
+        for trade in open_trades:
             # Check if Kalshi has settled this market
             market_result = ticker_results.get(trade.market_ticker)
             if market_result is None:
+                # Log unmatched trades at debug level for diagnostics
+                logger.debug(
+                    "No settlement match for open trade",
+                    extra={
+                        "data": {
+                            "trade_id": trade.id[:8] if trade.id else "?",
+                            "market_ticker": trade.market_ticker,
+                            "in_kalshi": trade.market_ticker in ticker_results,
+                        }
+                    },
+                )
                 continue  # Market not settled on Kalshi yet
 
             # Optionally fetch NWS temp for display
@@ -1245,7 +1281,15 @@ async def _fetch_market_prices(kalshi_client, city: str, target_date) -> dict[st
             )
             label = bracket_info["label"]
             # Use yes_ask as the market price (what you'd pay to buy YES)
-            prices[label] = market.yes_ask if market.yes_ask > 0 else market.last_price
+            # Skip brackets where both yes_ask and last_price are 0 (no liquidity)
+            price = market.yes_ask if market.yes_ask > 0 else market.last_price
+            if price > 0:
+                prices[label] = price
+            else:
+                logger.debug(
+                    "Skipping zero-price bracket from REST",
+                    extra={"data": {"city": city, "bracket": label, "ticker": market.ticker}},
+                )
 
         return prices
     except Exception as exc:

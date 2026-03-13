@@ -502,7 +502,7 @@ class TestRunTradingCycle:
             patch("backend.trading.scheduler._fetch_latest_predictions", return_value=[prediction]),
             patch("backend.trading.ev_calculator.validate_predictions", return_value=True),
             patch("backend.trading.scheduler._fetch_market_prices", return_value={"55-56°F": 22}),
-            patch("backend.trading.ev_calculator.validate_market_prices", return_value=True),
+            patch("backend.trading.ev_calculator.validate_market_prices", side_effect=lambda p: p),
             patch(
                 "backend.trading.scheduler._fetch_market_tickers",
                 return_value={"55-56°F": "KXHIGHNY-B3"},
@@ -555,7 +555,7 @@ class TestRunTradingCycle:
                 "backend.trading.scheduler._fetch_market_prices",
                 return_value={"55-56°F": 22},
             ),
-            patch("backend.trading.ev_calculator.validate_market_prices", return_value=True),
+            patch("backend.trading.ev_calculator.validate_market_prices", side_effect=lambda p: p),
             patch(
                 "backend.trading.scheduler._fetch_market_tickers",
                 return_value={"55-56°F": "KXHIGHNY-B3"},
@@ -605,7 +605,7 @@ class TestRunTradingCycle:
             patch("backend.trading.scheduler._fetch_latest_predictions", return_value=[prediction]),
             patch("backend.trading.ev_calculator.validate_predictions", return_value=True),
             patch("backend.trading.scheduler._fetch_market_prices", return_value={"55-56°F": 22}),
-            patch("backend.trading.ev_calculator.validate_market_prices", return_value=True),
+            patch("backend.trading.ev_calculator.validate_market_prices", side_effect=lambda p: p),
             patch(
                 "backend.trading.scheduler._fetch_market_tickers",
                 return_value={"55-56°F": "KXHIGHNY-B3"},
@@ -651,7 +651,7 @@ class TestRunTradingCycle:
             patch("backend.trading.scheduler._fetch_latest_predictions", return_value=[prediction]),
             patch("backend.trading.ev_calculator.validate_predictions", return_value=True),
             patch("backend.trading.scheduler._fetch_market_prices", return_value={"55-56°F": 22}),
-            patch("backend.trading.ev_calculator.validate_market_prices", return_value=True),
+            patch("backend.trading.ev_calculator.validate_market_prices", side_effect=lambda p: p),
             patch(
                 "backend.trading.scheduler._fetch_market_tickers",
                 return_value={"55-56°F": "KXHIGHNY-B3"},
@@ -1087,7 +1087,7 @@ class TestTradingCycleKellyIntegration:
             patch("backend.trading.scheduler._fetch_latest_predictions", return_value=[prediction]),
             patch("backend.trading.ev_calculator.validate_predictions", return_value=True),
             patch("backend.trading.scheduler._fetch_market_prices", return_value={"55-56°F": 22}),
-            patch("backend.trading.ev_calculator.validate_market_prices", return_value=True),
+            patch("backend.trading.ev_calculator.validate_market_prices", side_effect=lambda p: p),
             patch(
                 "backend.trading.scheduler._fetch_market_tickers",
                 return_value={"55-56°F": "KXHIGHNY-B3"},
@@ -1138,7 +1138,7 @@ class TestTradingCycleKellyIntegration:
             patch("backend.trading.scheduler._fetch_latest_predictions", return_value=[prediction]),
             patch("backend.trading.ev_calculator.validate_predictions", return_value=True),
             patch("backend.trading.scheduler._fetch_market_prices", return_value={"55-56°F": 22}),
-            patch("backend.trading.ev_calculator.validate_market_prices", return_value=True),
+            patch("backend.trading.ev_calculator.validate_market_prices", side_effect=lambda p: p),
             patch(
                 "backend.trading.scheduler._fetch_market_tickers",
                 return_value={"55-56°F": "KXHIGHNY-B3"},
@@ -1186,7 +1186,7 @@ class TestTradingCycleKellyIntegration:
             patch("backend.trading.scheduler._fetch_latest_predictions", return_value=[prediction]),
             patch("backend.trading.ev_calculator.validate_predictions", return_value=True),
             patch("backend.trading.scheduler._fetch_market_prices", return_value={"55-56°F": 22}),
-            patch("backend.trading.ev_calculator.validate_market_prices", return_value=True),
+            patch("backend.trading.ev_calculator.validate_market_prices", side_effect=lambda p: p),
             patch(
                 "backend.trading.scheduler._fetch_market_tickers",
                 return_value={"55-56°F": "KXHIGHNY-B3"},

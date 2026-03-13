@@ -509,31 +509,48 @@ def validate_predictions(predictions: list[BracketPrediction]) -> bool:
     return True
 
 
-def validate_market_prices(prices: dict[str, int]) -> bool:
-    """Validate market prices from Kalshi before using them.
+def validate_market_prices(prices: dict[str, int]) -> dict[str, int]:
+    """Validate market prices and return only valid ones.
 
-    Ensures all prices are integers in the valid range [1, 99].
+    Filters out brackets with invalid prices (non-integer, zero, or out of
+    range) instead of rejecting the entire city.  Tail brackets often have
+    zero liquidity (price 0) on Kalshi — this is normal and should not
+    block trading on other brackets that DO have valid prices.
 
     Args:
         prices: Mapping of bracket label to YES price in cents.
 
     Returns:
-        True if all prices are valid, False otherwise.
+        Dict of bracket labels with valid prices (integers in [1, 99]).
+        Empty dict if no brackets have valid prices.
     """
+    valid: dict[str, int] = {}
     for label, price in prices.items():
         if not isinstance(price, int):
-            logger.error(
-                "Market price is not an integer",
+            logger.warning(
+                "Market price is not an integer — skipping bracket",
                 extra={"data": {"bracket": label, "price": price}},
             )
-            return False
+            continue
         if not (1 <= price <= 99):
-            logger.error(
-                "Market price out of range",
+            logger.debug(
+                "Market price out of range — skipping bracket",
                 extra={"data": {"bracket": label, "price_cents": price}},
             )
-            return False
-    return True
+            continue
+        valid[label] = price
+    if len(valid) < len(prices):
+        logger.info(
+            "Filtered invalid market prices",
+            extra={
+                "data": {
+                    "total_brackets": len(prices),
+                    "valid_brackets": len(valid),
+                    "skipped": len(prices) - len(valid),
+                }
+            },
+        )
+    return valid
 
 
 def _generate_signal_reasoning(

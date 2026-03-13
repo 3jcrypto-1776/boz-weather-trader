@@ -177,7 +177,7 @@ def test_validate_then_scan_full_flow(
 ) -> None:
     """Full defensive chain: validate predictions → validate prices → scan."""
     assert validate_predictions([prediction]) is True
-    assert validate_market_prices(prices) is True
+    assert validate_market_prices(prices) == prices
 
     signals = scan_all_brackets(prediction, prices, tickers, min_ev_threshold=0.01)
     assert isinstance(signals, list)

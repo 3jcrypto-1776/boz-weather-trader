@@ -84,22 +84,25 @@ def test_probabilities_dont_sum() -> None:
     assert validate_predictions([pred]) is False
 
 
-def test_invalid_market_price_zero() -> None:
-    """Price of 0 → validate_market_prices returns False."""
+def test_invalid_market_price_zero_filtered() -> None:
+    """Price of 0 is filtered out; valid bracket remains."""
     prices = {"53-55": 0, "55-57": 25}
-    assert validate_market_prices(prices) is False
+    result = validate_market_prices(prices)
+    assert result == {"55-57": 25}
 
 
-def test_invalid_market_price_hundred() -> None:
-    """Price of 100 → validate_market_prices returns False."""
+def test_invalid_market_price_hundred_filtered() -> None:
+    """Price of 100 is filtered out; valid bracket remains."""
     prices = {"53-55": 100, "55-57": 25}
-    assert validate_market_prices(prices) is False
+    result = validate_market_prices(prices)
+    assert result == {"55-57": 25}
 
 
-def test_float_market_price() -> None:
-    """Float price (22.5) → validate_market_prices returns False."""
+def test_float_market_price_filtered() -> None:
+    """Float price (22.5) is filtered out; valid bracket remains."""
     prices = {"53-55": 22.5, "55-57": 25}
-    assert validate_market_prices(prices) is False
+    result = validate_market_prices(prices)
+    assert result == {"55-57": 25}
 
 
 def test_empty_forecasts_raises() -> None:
