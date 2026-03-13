@@ -17,7 +17,7 @@ backend/trading/
 ├── executor.py        -> Trade execution orchestrator (auto + manual modes). Orders placed with 14-min expiration_ts. Unfilled → RESTING status, filled → OPEN status. No more immediate cancel.
 ├── postmortem.py      -> Generate full trade post-mortem after settlement
 ├── sync.py            -> Kalshi portfolio sync (reconciles app Trade records with actual Kalshi filled orders)
-├── scheduler.py       -> Celery tasks for trading cycle (passes Kelly params, GuardrailSettings, auto-sync, post-settlement retraining trigger, bracket cap via _get_open_bracket_qty). `_sync_resting_orders()` syncs resting trades at start of each cycle.
+├── scheduler.py       -> Celery tasks for trading cycle (passes Kelly params, GuardrailSettings, auto-sync, post-settlement retraining trigger, bracket cap via _get_open_bracket_qty). `_sync_resting_orders()` syncs resting trades at start of each cycle. `_fetch_market_prices()` tries Redis cache → REST yes_ask → orderbook fallback. `best_yes_price_from_orderbook()` extracts best YES ask from orderbook (or derives from NO bids).
 ├── notifications.py   -> Web push notifications via VAPID
 └── exceptions.py      -> Trading-specific exceptions (or import from common)
 ```

@@ -1222,11 +1222,33 @@ async def _fetch_latest_predictions(db, cities: list[str]) -> list:
     return predictions
 
 
+def best_yes_price_from_orderbook(orderbook) -> int | None:
+    """Extract best (lowest) YES ask price from an orderbook.
+
+    Falls back to deriving from best NO bid if YES side is empty.
+    Each entry in orderbook.yes / orderbook.no is [price_cents, quantity].
+
+    Args:
+        orderbook: KalshiOrderbook with yes/no lists of [price, qty] pairs.
+
+    Returns:
+        Best YES price in cents, or None if no liquidity on either side.
+    """
+    if orderbook.yes:
+        return min(level[0] for level in orderbook.yes)
+    if orderbook.no:
+        best_no_bid = max(level[0] for level in orderbook.no)
+        return 100 - best_no_bid
+    return None
+
+
 async def _fetch_market_prices(kalshi_client, city: str, target_date) -> dict[str, int]:
     """Fetch current market prices from Kalshi for a city's brackets.
 
     Tries the Redis cache first (populated by the Kalshi WebSocket feed).
     Falls back to the REST API if the cache is empty or stale.
+    When the REST market listing returns zero prices (yes_ask=0, last_price=0),
+    falls back to the orderbook endpoint to derive prices from live liquidity.
 
     Args:
         kalshi_client: Authenticated KalshiClient.
@@ -1236,7 +1258,7 @@ async def _fetch_market_prices(kalshi_client, city: str, target_date) -> dict[st
     Returns:
         Dict mapping bracket label to YES price in cents.
     """
-    from backend.common.metrics import KALSHI_WS_CACHE_HITS_TOTAL
+    from backend.common.metrics import KALSHI_WS_CACHE_HITS_TOTAL, ORDERBOOK_FALLBACK_TOTAL
     from backend.kalshi.markets import WEATHER_SERIES_TICKERS, parse_bracket_from_market
 
     try:
@@ -1292,14 +1314,53 @@ async def _fetch_market_prices(kalshi_client, city: str, target_date) -> dict[st
             )
             label = bracket_info["label"]
             # Use yes_ask as the market price (what you'd pay to buy YES)
-            # Skip brackets where both yes_ask and last_price are 0 (no liquidity)
+            # Fast path: market listing has a nonzero price
             price = market.yes_ask if market.yes_ask > 0 else market.last_price
             if price > 0:
                 prices[label] = price
-            else:
-                logger.debug(
-                    "Skipping zero-price bracket from REST",
-                    extra={"data": {"city": city, "bracket": label, "ticker": market.ticker}},
+                continue
+
+            # Orderbook fallback: market listing returned zero prices
+            # (Kalshi API sometimes omits yes_ask/last_price from listings)
+            try:
+                orderbook = await kalshi_client.get_orderbook(market.ticker)
+                ob_price = best_yes_price_from_orderbook(orderbook)
+                if ob_price is not None and 1 <= ob_price <= 99:
+                    prices[label] = ob_price
+                    ORDERBOOK_FALLBACK_TOTAL.labels(city=city).inc()
+                    logger.info(
+                        "Used orderbook fallback for bracket pricing",
+                        extra={
+                            "data": {
+                                "city": city,
+                                "bracket": label,
+                                "ticker": market.ticker,
+                                "ob_price": ob_price,
+                            }
+                        },
+                    )
+                else:
+                    logger.debug(
+                        "Skipping bracket: no liquidity in orderbook",
+                        extra={
+                            "data": {
+                                "city": city,
+                                "bracket": label,
+                                "ticker": market.ticker,
+                            }
+                        },
+                    )
+            except Exception as ob_exc:
+                logger.warning(
+                    "Orderbook fallback failed for bracket",
+                    extra={
+                        "data": {
+                            "city": city,
+                            "bracket": label,
+                            "ticker": market.ticker,
+                            "error": str(ob_exc),
+                        }
+                    },
                 )
 
         return prices

@@ -25,18 +25,18 @@ scripts/updater/     → Self-update sidecar (Dockerfile, server.py, update.sh) 
 monitoring/
   ├── prometheus/  → Prometheus scrape config + alerting rules
   │   ├── prometheus.yml   → Scrape config, rule_files, alertmanager target
-  │   └── rules/           → 6 alert rule YAML files (17 rules across http, celery, trading, weather, targets, kalshi_ws)
+  │   └── rules/           → 6 alert rule YAML files (18 rules across http, celery, trading, weather, targets, kalshi_ws)
   ├── alertmanager/        → Alertmanager config (webhook routing, severity-based repeat, inhibit rules)
   └── grafana/     → Grafana provisioning + dashboard JSON files
       ├── provisioning/  → Auto-provisioned datasources + dashboard provider
       └── dashboards/    → API Overview (8 panels) + Trading & Weather (10 panels) + Kalshi WS Feed (6 panels)
-tests/                   → 1502 backend + 260 frontend = 1762 tests
+tests/                   → 1514 backend + 260 frontend = 1774 tests
   ├── common/      → Shared module tests: config, schemas, models, logging, encryption, middleware, metrics (123)
   ├── training/    → Training API endpoint tests (11)
   ├── weather/     → Weather pipeline: NWS, Open-Meteo, normalizer, stations, CLI parser, scheduler (140)
   ├── kalshi/      → Kalshi client: auth, REST, WS, markets, orders, models, cache, market feed (143)
   ├── prediction/  → Prediction engine: ensemble, multi-model ML, brackets, error dist, accuracy, calibration, pipeline, source weights, retraining (266)
-  ├── trading/     → Trading engine: EV calc + guardrails, Kelly sizing, risk, cooldowns, queue, executor, scheduler, safety, sync, retraining trigger, bracket cap, resting order sync (351)
+  ├── trading/     → Trading engine: EV calc + guardrails, Kelly sizing, risk, cooldowns, queue, executor, scheduler, safety, sync, retraining trigger, bracket cap, resting order sync, orderbook pricing (363)
   ├── backtesting/ → Backtesting engine: schemas, risk sim, data loader, engine, metrics, integration (95)
   ├── api/         → API endpoints: auth, dashboard, dashboard stats, health, markets, queue, settings, trades, trades/sync, accuracy, optimization, calendar, version, update, training (174)
   ├── websocket/   → WebSocket: events, manager, subscriber, router (40)

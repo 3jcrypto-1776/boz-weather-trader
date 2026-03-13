@@ -53,7 +53,7 @@ VALID_SEVERITIES = {"critical", "warning", "info"}
 # Prometheus duration regex: e.g. 1m, 5m, 30m, 1h, 2h, 1d
 PROMETHEUS_DURATION_RE = re.compile(r"^\d+[smhdwy]$")
 
-EXPECTED_RULE_COUNT = 17
+EXPECTED_RULE_COUNT = 18
 
 
 # ─── Helpers ───

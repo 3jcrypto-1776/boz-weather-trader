@@ -17,17 +17,32 @@ groups:
             More than 5 trades were blocked by the risk manager in the
             last 15 minutes. Check risk limits and market conditions.
 
-      # No trades executed in 2 hours (possible data/market issue)
+      # No trades executed in 1 hour (possible data/market issue)
       - alert: NoTradesExecuted
-        expr: increase(trades_executed_total[2h]) == 0
-        for: 2h
+        expr: increase(trades_executed_total[1h]) == 0
+        for: 1h
         labels:
-          severity: info
+          severity: warning
         annotations:
-          summary: "No trades executed in 2 hours"
+          summary: "No trades executed in 1 hour"
           description: >
-            No trades have been executed in the last 2 hours. This may
+            No trades have been executed in the last hour. This may
             indicate no +EV opportunities, or a data pipeline issue.
+
+      # All cities using orderbook fallback but still no trades
+      - alert: AllCitiesZeroPrices
+        expr: >
+          increase(orderbook_fallback_total[30m]) > 0
+          and increase(trades_executed_total[1h]) == 0
+          and (hour() >= 10 and hour() <= 23)
+        for: 45m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No trades despite orderbook fallback for 45+ minutes"
+          description: >
+            The trading cycle is using orderbook pricing but still not
+            executing trades during market hours. Check market conditions.
 
       # Multiple trading cycle errors
       - alert: TradingCycleErrors

@@ -84,6 +84,12 @@ GUARDRAIL_BLOCKED_TOTAL = Counter(
     labelnames=["reason"],
 )
 
+ORDERBOOK_FALLBACK_TOTAL = Counter(
+    "orderbook_fallback_total",
+    "Times scheduler fell back to orderbook for bracket pricing",
+    labelnames=["city"],
+)
+
 # ─── WebSocket Metrics ───
 
 WS_CONNECTIONS_ACTIVE = Gauge(

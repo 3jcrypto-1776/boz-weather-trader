@@ -52,7 +52,7 @@ backend/
 monitoring/
 ├── prometheus/
 │   ├── prometheus.yml            → Scrape config, rule_files, alertmanager target
-│   └── rules/                    → Alert rule YAML files (17 rules, 6 groups)
+│   └── rules/                    → Alert rule YAML files (18 rules, 6 groups)
 │       ├── http.yml              → HighErrorRate, SlowResponses, HighConcurrency
 │       ├── celery.yml            → TaskFailureRateHigh, TaskDurationHigh, TradingCycleMissing
 │       ├── trading.yml           → RiskBlocksHigh, NoTradesExecuted, TradingCycleErrors

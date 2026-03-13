@@ -8,7 +8,7 @@ This directory contains all tests for Boz Weather Trader. Tests are organized to
 tests/
 ├── conftest.py          → Shared fixtures (database, mock clients, test data)
 ├── factories.py         → Test data factories for generating realistic test data
-├── test_alert_rules.py         → Alert rule YAML validation (47 tests across 6 files, 17 rules)
+├── test_alert_rules.py         → Alert rule YAML validation (47 tests across 6 files, 18 rules)
 ├── test_alertmanager_config.py → Alertmanager config validation (14 tests)
 ├── test_grafana_dashboards.py  → Dashboard JSON validation (31 tests across 3 dashboards)
 ├── fixtures/            → Mock API response JSON files
@@ -66,7 +66,7 @@ tests/
 │   ├── test_error_dist.py    → Season detection + error std calculation (12 tests)
 │   ├── test_postmortem.py    → Post-mortem narrative generation (22 tests)
 │   └── test_pipeline.py      → Full prediction pipeline orchestration + multi-model integration (11 tests)
-├── trading/             → Unit tests + safety tests for backend/trading/ (351 tests)
+├── trading/             → Unit tests + safety tests for backend/trading/ (363 tests)
 │   ├── conftest.py      → Trading fixtures (mock Kalshi client, sample predictions)
 │   ├── test_ev_calculator.py      → EV math, fees, bracket scanning, Kelly integration, guardrails (divergence cap, blending, YES floor) (68 tests)
 │   ├── test_scheduler.py          → Celery tasks: trading cycle, expiry, Kalshi-based settlement, Kelly params, bracket cap, guardrail settings (46 tests)
@@ -82,6 +82,7 @@ tests/
 │   ├── test_executor.py           → Order placement + DB recording + market_date + fill price + NO side conversion + resting order creation (22 tests)
 │   ├── test_sync_resting.py       → Sync resting orders: fill detection, expiry, cancel, no-change (9 tests)
 │   ├── test_cooldown.py           → Per-loss + consecutive cooldowns + toggle guards (per-loss + consecutive) (21 tests)
+│   ├── test_orderbook_pricing.py  → Orderbook fallback: best_yes_price_from_orderbook, _fetch_market_prices orderbook path, counter (12 tests)
 │   └── test_notifications.py      → Web push via VAPID (5 tests)
 ├── api/                 → API endpoint tests (174 tests)
 │   ├── conftest.py      → API fixtures (api_engine, client, mock_kalshi, factories)

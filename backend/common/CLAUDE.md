@@ -864,6 +864,7 @@ All Prometheus metric objects are module-level singletons. Import them wherever 
 | `ML_SOURCE_WEIGHTS_UPDATED_TOTAL` | Counter | — | Source weight recalculations after retraining |
 | `BRACKET_CAP_BLOCKED_TOTAL` | Counter | city | Trades blocked by per-bracket position cap |
 | `GUARDRAIL_BLOCKED_TOTAL` | Counter | reason | Trades blocked by guardrails (divergence_cap, yes_floor) |
+| `ORDERBOOK_FALLBACK_TOTAL` | Counter | city | Times scheduler fell back to orderbook for bracket pricing |
 
 ### Usage
 
