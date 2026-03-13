@@ -203,6 +203,17 @@ async def _run_trading_cycle() -> None:
     # different loop" errors.
     reset_engine()
 
+    # Step 0: Attempt settlement before trading. This ensures settled markets
+    # are processed every 15 minutes (each cycle), not just at 9 AM ET.
+    # Failures here must not block the trading cycle.
+    try:
+        await _settle_and_postmortem()
+    except Exception as exc:
+        logger.warning(
+            "Settlement attempt during trading cycle failed (non-fatal)",
+            extra={"data": {"error": str(exc)}},
+        )
+
     # Step 2: Market hours check (before DB work)
     if not _are_markets_open():
         logger.debug(

@@ -313,6 +313,20 @@ class TestRunTradingCycle:
     exit path or behavior of the trading cycle.
     """
 
+    @pytest.fixture(autouse=True)
+    def _mock_settlement(self):
+        """Prevent _settle_and_postmortem from running during cycle tests.
+
+        The trading cycle now calls _settle_and_postmortem() at the start
+        of every cycle. We mock it out so unit tests for the cycle itself
+        don't need to set up settlement infrastructure.
+        """
+        with patch(
+            "backend.trading.scheduler._settle_and_postmortem",
+            new_callable=AsyncMock,
+        ):
+            yield
+
     @pytest.mark.asyncio
     async def test_skips_when_markets_closed(self) -> None:
         """Returns early without DB access when markets are closed."""
@@ -1056,6 +1070,15 @@ class TestGetBankrollCents:
 # ---------------------------------------------------------------------------
 class TestTradingCycleKellyIntegration:
     """Tests for Kelly Criterion integration in the trading cycle."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_settlement(self):
+        """Prevent _settle_and_postmortem from running during cycle tests."""
+        with patch(
+            "backend.trading.scheduler._settle_and_postmortem",
+            new_callable=AsyncMock,
+        ):
+            yield
 
     @pytest.mark.asyncio
     async def test_kelly_disabled_no_bankroll_query(self) -> None:
