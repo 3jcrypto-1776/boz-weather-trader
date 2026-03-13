@@ -24,7 +24,7 @@ logger = get_logger("SYSTEM")
 _GITHUB_REPO = "aclarkson2013/boz-weather-trader"
 _GITHUB_API_URL = f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest"
 _CACHE_KEY = "boz:latest_version"
-_CACHE_TTL_SECONDS = 3600  # 1 hour
+_CACHE_TTL_SECONDS = 900  # 15 minutes
 
 
 def _parse_semver(version: str) -> tuple[int, ...]:

@@ -245,7 +245,7 @@ export function useVersion(config?: SWRConfiguration) {
     "/api/version",
     () => fetchVersion(),
     {
-      refreshInterval: 3_600_000, // 1 hour
+      refreshInterval: 900_000, // 15 minutes
       ...config,
     }
   );
