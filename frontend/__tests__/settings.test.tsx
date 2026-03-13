@@ -50,6 +50,7 @@ const MOCK_SETTINGS: UserSettings = {
   notifications_enabled: true,
   max_contracts_per_bracket: 3,
   enable_consecutive_loss_limit: true,
+  enable_per_loss_cooldown: true,
   model_weight: 0.4,
   max_model_market_divergence: 0.25,
   min_market_prob_for_yes: 0.15,
@@ -555,5 +556,58 @@ describe("SettingsPage", () => {
     fireEvent.change(slider, { target: { value: "0.2" } });
     // Should show "Skip YES trades on brackets the market prices below 20%"
     expect(screen.getByText(/below 20%/)).toBeInTheDocument();
+  });
+
+  describe("per-loss cooldown toggle", () => {
+    it("renders toggle in ON state by default", () => {
+      mockUseSettings.mockReturnValue({
+        data: MOCK_SETTINGS,
+        error: undefined,
+        isLoading: false,
+      });
+
+      render(<SettingsPage />);
+      const toggle = screen.getByTestId("per-loss-cooldown-toggle");
+      expect(toggle).toBeInTheDocument();
+      expect(toggle.className).toContain("bg-boz-primary");
+      expect(screen.getByText("60 min")).toBeInTheDocument();
+      expect(screen.getByText(/Pauses trading for 60 minutes after each loss/)).toBeInTheDocument();
+    });
+
+    it("toggles to OFF and shows disabled state", () => {
+      mockUseSettings.mockReturnValue({
+        data: MOCK_SETTINGS,
+        error: undefined,
+        isLoading: false,
+      });
+
+      render(<SettingsPage />);
+      const toggle = screen.getByTestId("per-loss-cooldown-toggle");
+      fireEvent.click(toggle);
+
+      expect(toggle.className).toContain("bg-gray-300");
+      expect(screen.getByText("Off")).toBeInTheDocument();
+      expect(screen.getByText("Per-loss cooldown disabled")).toBeInTheDocument();
+    });
+
+    it("disables cooldown slider when toggle is OFF", () => {
+      mockUseSettings.mockReturnValue({
+        data: { ...MOCK_SETTINGS, enable_per_loss_cooldown: false },
+        error: undefined,
+        isLoading: false,
+      });
+
+      render(<SettingsPage />);
+      const toggle = screen.getByTestId("per-loss-cooldown-toggle");
+      expect(toggle.className).toContain("bg-gray-300");
+      // Find the slider that's a sibling of the label containing the toggle
+      const sliders = document.querySelectorAll('input[type="range"][disabled]');
+      // At least one disabled slider (the cooldown one) should exist
+      const cooldownSlider = Array.from(sliders).find(
+        (s) => s.getAttribute("max") === "1440"
+      );
+      expect(cooldownSlider).toBeTruthy();
+      expect(cooldownSlider).toBeDisabled();
+    });
   });
 });

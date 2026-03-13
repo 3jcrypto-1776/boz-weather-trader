@@ -176,3 +176,80 @@ async def test_stats_unauthenticated(unauthed_client: AsyncClient) -> None:
     """GET /api/dashboard/stats returns 401 when not authenticated."""
     response = await unauthed_client.get("/api/dashboard/stats")
     assert response.status_code == 401
+
+
+# ─── Cooldown Status Endpoint Tests ───
+
+
+async def test_cooldown_status_no_cooldown(client: AsyncClient) -> None:
+    """GET /api/dashboard/stats/cooldown returns inactive when no cooldown."""
+    response = await client.get("/api/dashboard/stats/cooldown")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_active"] is False
+    assert data["cooldown_type"] is None
+    assert data["cooldown_until"] is None
+    assert data["remaining_minutes"] is None
+    assert data["consecutive_losses"] == 0
+
+
+async def test_cooldown_status_per_loss_active(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    """GET /api/dashboard/stats/cooldown returns per_loss when per-loss cooldown is active."""
+    from backend.common.models import DailyRiskState
+
+    today_et = datetime.now(ET).date()
+    # Store as naive ET (TZNaiveDateTime strips tzinfo; endpoint re-adds ET)
+    future_et = datetime.now(ET).replace(tzinfo=None) + timedelta(minutes=30)
+    state = DailyRiskState(
+        user_id="test-user-001",
+        trading_day=today_et,
+        cooldown_until=future_et,
+        consecutive_losses=1,
+    )
+    db.add(state)
+    await db.flush()
+
+    response = await client.get("/api/dashboard/stats/cooldown")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_active"] is True
+    assert data["cooldown_type"] == "per_loss"
+    assert data["remaining_minutes"] is not None
+    assert data["remaining_minutes"] > 0
+    assert data["consecutive_losses"] == 1
+
+
+async def test_cooldown_status_consecutive_loss_active(
+    client: AsyncClient,
+    db: AsyncSession,
+) -> None:
+    """GET /api/dashboard/stats/cooldown returns consecutive_loss for rest-of-day cooldown."""
+    from backend.common.models import DailyRiskState
+
+    today_et = datetime.now(ET).date()
+    # Store as naive ET 23:59:59 (matches _get_end_of_trading_day() after tzinfo strip)
+    end_of_day_naive = datetime(today_et.year, today_et.month, today_et.day, 23, 59, 59)
+    state = DailyRiskState(
+        user_id="test-user-001",
+        trading_day=today_et,
+        cooldown_until=end_of_day_naive,
+        consecutive_losses=3,
+    )
+    db.add(state)
+    await db.flush()
+
+    response = await client.get("/api/dashboard/stats/cooldown")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_active"] is True
+    assert data["cooldown_type"] == "consecutive_loss"
+    assert data["consecutive_losses"] == 3
+
+
+async def test_cooldown_status_unauthenticated(unauthed_client: AsyncClient) -> None:
+    """GET /api/dashboard/stats/cooldown returns 401 when not authenticated."""
+    response = await unauthed_client.get("/api/dashboard/stats/cooldown")
+    assert response.status_code == 401

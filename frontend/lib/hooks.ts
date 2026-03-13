@@ -18,6 +18,7 @@ import {
   fetchCalibration,
   fetchCurrentWeather,
   fetchDashboard,
+  fetchCooldownStatus,
   fetchDashboardStats,
   fetchLogs,
   fetchMarkets,
@@ -80,6 +81,19 @@ export function useDashboardStats(config?: SWRConfiguration) {
     () => fetchDashboardStats(),
     {
       refreshInterval: 30_000,
+      ...config,
+    }
+  );
+}
+
+// ─── Cooldown Status ───
+
+export function useCooldownStatus(config?: SWRConfiguration) {
+  return useSWR<import("./types").CooldownStatus>(
+    "/api/dashboard/stats/cooldown",
+    () => fetchCooldownStatus(),
+    {
+      refreshInterval: 15_000,
       ...config,
     }
   );

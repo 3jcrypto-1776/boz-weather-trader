@@ -12,7 +12,7 @@ backend/trading/
 ├── ev_calculator.py   -> Expected value calculation + Kelly-sized signals for each bracket + guardrails (divergence cap, probability blending, YES market floor)
 ├── kelly.py           -> Kelly Criterion position sizing (fractional Kelly, fee-adjusted, safety caps)
 ├── risk_manager.py    -> Position limits, daily loss, exposure tracking
-├── cooldown.py        -> Cooldown timer logic (per-loss and consecutive)
+├── cooldown.py        -> Cooldown timer logic (per-loss with enable toggle, and consecutive loss with enable toggle)
 ├── trade_queue.py     -> Trade approval queue for manual mode
 ├── executor.py        -> Trade execution orchestrator (auto + manual modes). Orders placed with 14-min expiration_ts. Unfilled → RESTING status, filled → OPEN status. No more immediate cancel.
 ├── postmortem.py      -> Generate full trade post-mortem after settlement

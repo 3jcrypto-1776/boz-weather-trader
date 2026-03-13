@@ -136,6 +136,10 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
   return apiFetch<DashboardStats>("/api/dashboard/stats");
 }
 
+export async function fetchCooldownStatus(): Promise<import("./types").CooldownStatus> {
+  return apiFetch<import("./types").CooldownStatus>("/api/dashboard/stats/cooldown");
+}
+
 // ─── Markets (1 endpoint) ───
 
 export async function fetchMarkets(

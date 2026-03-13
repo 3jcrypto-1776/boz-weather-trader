@@ -107,3 +107,26 @@ async def test_patch_consecutive_loss_toggle(client: AsyncClient) -> None:
     # Verify it persists on GET
     get_resp = await client.get("/api/settings")
     assert get_resp.json()["enable_consecutive_loss_limit"] is False
+
+
+async def test_get_settings_includes_per_loss_cooldown_toggle(client: AsyncClient) -> None:
+    """GET /api/settings includes enable_per_loss_cooldown (defaults to True)."""
+    response = await client.get("/api/settings")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["enable_per_loss_cooldown"] is True
+
+
+async def test_patch_per_loss_cooldown_toggle(client: AsyncClient) -> None:
+    """PATCH /api/settings can toggle enable_per_loss_cooldown."""
+    response = await client.patch(
+        "/api/settings",
+        json={"enable_per_loss_cooldown": False},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["enable_per_loss_cooldown"] is False
+
+    # Verify it persists on GET
+    get_resp = await client.get("/api/settings")
+    assert get_resp.json()["enable_per_loss_cooldown"] is False

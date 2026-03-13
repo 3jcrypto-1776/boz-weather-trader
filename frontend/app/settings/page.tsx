@@ -33,6 +33,7 @@ export default function SettingsPage() {
   const [cooldown, setCooldown] = useState(60);
   const [consecutiveLossLimit, setConsecutiveLossLimit] = useState(3);
   const [enableConsecutiveLossLimit, setEnableConsecutiveLossLimit] = useState(true);
+  const [enablePerLossCooldown, setEnablePerLossCooldown] = useState(true);
   const [maxContractsPerBracket, setMaxContractsPerBracket] = useState(3);
   const [activeCities, setActiveCities] = useState<CityCode[]>(ALL_CITIES);
   const [notifications, setNotifications] = useState(true);
@@ -61,6 +62,7 @@ export default function SettingsPage() {
       setCooldown(settings.cooldown_per_loss_minutes);
       setConsecutiveLossLimit(settings.consecutive_loss_limit);
       setEnableConsecutiveLossLimit(settings.enable_consecutive_loss_limit);
+      setEnablePerLossCooldown(settings.enable_per_loss_cooldown);
       setMaxContractsPerBracket(settings.max_contracts_per_bracket);
       setActiveCities(settings.active_cities);
       setNotifications(settings.notifications_enabled);
@@ -91,6 +93,7 @@ export default function SettingsPage() {
         cooldown_per_loss_minutes: cooldown,
         consecutive_loss_limit: consecutiveLossLimit,
         enable_consecutive_loss_limit: enableConsecutiveLossLimit,
+        enable_per_loss_cooldown: enablePerLossCooldown,
         max_contracts_per_bracket: maxContractsPerBracket,
         active_cities: activeCities,
         notifications_enabled: notifications,
@@ -339,8 +342,25 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label className="flex justify-between text-xs mb-1">
-                      <span>Cooldown After Loss</span>
-                      <span className="font-medium">{cooldown} min</span>
+                      <span className="flex items-center gap-2">
+                        <button
+                          onClick={() => setEnablePerLossCooldown(!enablePerLossCooldown)}
+                          className={`relative w-8 h-5 rounded-full transition-colors flex-shrink-0 ${
+                            enablePerLossCooldown ? "bg-boz-primary" : "bg-gray-300"
+                          }`}
+                          data-testid="per-loss-cooldown-toggle"
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow ${
+                              enablePerLossCooldown ? "translate-x-3" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                        Cooldown After Loss
+                      </span>
+                      <span className="font-medium">
+                        {enablePerLossCooldown ? `${cooldown} min` : "Off"}
+                      </span>
                     </label>
                     <input
                       type="range"
@@ -349,8 +369,16 @@ export default function SettingsPage() {
                       step={15}
                       value={cooldown}
                       onChange={(e) => setCooldown(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                      disabled={!enablePerLossCooldown}
+                      className={`w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary ${
+                        !enablePerLossCooldown ? "opacity-40 cursor-not-allowed" : ""
+                      }`}
                     />
+                    <p className="text-xs text-boz-neutral mt-1">
+                      {enablePerLossCooldown
+                        ? `Pauses trading for ${cooldown} minutes after each loss`
+                        : "Per-loss cooldown disabled"}
+                    </p>
                   </div>
                   <div>
                     <label className="flex justify-between text-xs mb-1">

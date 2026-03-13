@@ -6,9 +6,11 @@ import type { DashboardData, DashboardStats } from "@/lib/types";
 // Mock hooks
 const mockUseDashboard = vi.fn();
 const mockUseDashboardStats = vi.fn();
+const mockUseCooldownStatus = vi.fn();
 vi.mock("@/lib/hooks", () => ({
   useDashboard: () => mockUseDashboard(),
   useDashboardStats: () => mockUseDashboardStats(),
+  useCooldownStatus: () => mockUseCooldownStatus(),
   useCurrentWeather: () => ({ data: undefined, error: undefined }),
 }));
 
@@ -111,6 +113,7 @@ describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseDashboardStats.mockReturnValue({ data: undefined, error: undefined });
+    mockUseCooldownStatus.mockReturnValue({ data: undefined, error: undefined });
   });
 
   it("shows loading skeletons", () => {
@@ -339,5 +342,67 @@ describe("DashboardPage", () => {
     const timestamp = screen.getByTestId("prediction-timestamp");
     expect(timestamp).toBeInTheDocument();
     expect(timestamp.textContent).toContain("Updated");
+  });
+
+  // --- Phase 46: Cooldown banner ---
+
+  it("hides cooldown banner when no cooldown is active", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+    mockUseCooldownStatus.mockReturnValue({
+      data: { is_active: false, cooldown_type: null, cooldown_until: null, remaining_minutes: null, consecutive_losses: 0 },
+    });
+
+    render(<DashboardPage />);
+    expect(screen.queryByTestId("cooldown-banner")).not.toBeInTheDocument();
+  });
+
+  it("shows cooldown banner for per-loss cooldown", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+    mockUseCooldownStatus.mockReturnValue({
+      data: {
+        is_active: true,
+        cooldown_type: "per_loss",
+        cooldown_until: new Date(Date.now() + 23 * 60_000).toISOString(),
+        remaining_minutes: 23,
+        consecutive_losses: 1,
+      },
+    });
+
+    render(<DashboardPage />);
+    const banner = screen.getByTestId("cooldown-banner");
+    expect(banner).toBeInTheDocument();
+    expect(screen.getByText("Per-loss cooldown")).toBeInTheDocument();
+    expect(screen.getByText(/23 min remaining/)).toBeInTheDocument();
+  });
+
+  it("shows cooldown banner for consecutive loss cooldown", () => {
+    mockUseDashboard.mockReturnValue({
+      data: MOCK_DASHBOARD,
+      error: undefined,
+      isLoading: false,
+    });
+    mockUseCooldownStatus.mockReturnValue({
+      data: {
+        is_active: true,
+        cooldown_type: "consecutive_loss",
+        cooldown_until: "2026-03-13T23:59:59-04:00",
+        remaining_minutes: 480,
+        consecutive_losses: 3,
+      },
+    });
+
+    render(<DashboardPage />);
+    const banner = screen.getByTestId("cooldown-banner");
+    expect(banner).toBeInTheDocument();
+    expect(screen.getByText("Consecutive loss cooldown")).toBeInTheDocument();
+    expect(screen.getByText(/480 min remaining/)).toBeInTheDocument();
   });
 });

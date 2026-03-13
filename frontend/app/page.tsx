@@ -14,7 +14,7 @@ import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import TradeCard from "@/components/trade-card/trade-card";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
-import { useCurrentWeather, useDashboard, useDashboardStats } from "@/lib/hooks";
+import { useCooldownStatus, useCurrentWeather, useDashboard, useDashboardStats } from "@/lib/hooks";
 import { groupByMarket } from "@/lib/trade-grouping";
 import type { CityCode, DashboardData, DashboardStats, StatsPeriod } from "@/lib/types";
 import { centsToDollars, confidenceBadgeColor, formatPnL, shortBracketLabel, CITY_NAMES } from "@/lib/utils";
@@ -399,6 +399,38 @@ function DashboardSkeleton() {
   );
 }
 
+function CooldownBanner() {
+  const { data: cooldown } = useCooldownStatus();
+
+  if (!cooldown?.is_active) return null;
+
+  const typeLabel = cooldown.cooldown_type === "consecutive_loss"
+    ? "Consecutive loss cooldown"
+    : "Per-loss cooldown";
+
+  return (
+    <div
+      className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-center gap-3"
+      data-testid="cooldown-banner"
+    >
+      <div className="w-2 h-2 rounded-full bg-boz-warning animate-pulse flex-shrink-0" />
+      <div className="text-sm">
+        <span className="font-medium text-amber-800">{typeLabel}</span>
+        {cooldown.remaining_minutes != null && (
+          <span className="text-amber-700 ml-1">
+            — {cooldown.remaining_minutes} min remaining
+          </span>
+        )}
+        {cooldown.cooldown_until && (
+          <span className="text-amber-600 text-xs ml-2">
+            (until {new Date(cooldown.cooldown_until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })})
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { data, error, isLoading } = useDashboard();
   const { data: stats } = useDashboardStats();
@@ -407,6 +439,7 @@ export default function DashboardPage() {
     <ErrorBoundary>
       <h1 className="text-xl font-bold mb-4">Dashboard</h1>
       <WeatherTicker />
+      <CooldownBanner />
 
       {isLoading && <DashboardSkeleton />}
 

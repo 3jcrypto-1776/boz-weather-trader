@@ -125,6 +125,12 @@ class CooldownManager:
                         },
                     )
                 else:
+                    # If the per-loss cooldown toggle is off, clear it
+                    if not self.settings.enable_per_loss_cooldown:
+                        state.cooldown_until = None
+                        await self.db.flush()
+                        return False, ""
+
                     reason = f"Per-loss cooldown: {remaining:.0f} min remaining"
                     logger.info(
                         "Cooldown active",
@@ -153,8 +159,8 @@ class CooldownManager:
         state = await self._get_or_create_daily_state()
         now = datetime.now(ET)
 
-        # Per-loss cooldown
-        if self.settings.cooldown_per_loss_minutes > 0:
+        # Per-loss cooldown (gated by toggle)
+        if self.settings.enable_per_loss_cooldown and self.settings.cooldown_per_loss_minutes > 0:
             state.cooldown_until = now + timedelta(minutes=self.settings.cooldown_per_loss_minutes)
             logger.info(
                 "Per-loss cooldown activated",

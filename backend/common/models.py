@@ -134,6 +134,9 @@ class User(Base):
     # Consecutive loss limit toggle
     enable_consecutive_loss_limit = Column(Boolean, default=True)
 
+    # Per-loss cooldown toggle
+    enable_per_loss_cooldown = Column(Boolean, default=True)
+
     # Trading engine guardrails
     model_weight = Column(Float, default=0.4)
     max_model_market_divergence = Column(Float, default=0.25)

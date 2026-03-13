@@ -138,6 +138,7 @@ export interface UserSettings {
   notifications_enabled: boolean;
   max_contracts_per_bracket: number;
   enable_consecutive_loss_limit: boolean;
+  enable_per_loss_cooldown: boolean;
   // Trading engine guardrails
   model_weight: number;
   max_model_market_divergence: number;
@@ -157,6 +158,7 @@ export interface SettingsUpdate {
   demo_mode?: boolean;
   max_contracts_per_bracket?: number;
   enable_consecutive_loss_limit?: boolean;
+  enable_per_loss_cooldown?: boolean;
   // Trading engine guardrails
   model_weight?: number;
   max_model_market_divergence?: number;
@@ -310,6 +312,16 @@ export interface DashboardStats {
 }
 
 export type StatsPeriod = "yesterday" | "week" | "month" | "year" | "all_time";
+
+// ─── Cooldown Status ───
+
+export interface CooldownStatus {
+  is_active: boolean;
+  cooldown_type: "per_loss" | "consecutive_loss" | null;
+  cooldown_until: string | null; // ISO datetime
+  remaining_minutes: number | null;
+  consecutive_losses: number;
+}
 
 // ─── Grouped Trades (frontend-only aggregation) ───
 

@@ -127,6 +127,9 @@ def user_to_settings(user: User) -> UserSettings:
         enable_consecutive_loss_limit=user.enable_consecutive_loss_limit
         if user.enable_consecutive_loss_limit is not None
         else True,
+        enable_per_loss_cooldown=user.enable_per_loss_cooldown
+        if user.enable_per_loss_cooldown is not None
+        else True,
         model_weight=user.model_weight if user.model_weight is not None else 0.4,
         max_model_market_divergence=user.max_model_market_divergence
         if user.max_model_market_divergence is not None

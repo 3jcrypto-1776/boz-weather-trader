@@ -220,11 +220,25 @@ class SettingsUpdate(BaseModel):
     demo_mode: bool | None = None
     max_contracts_per_bracket: int | None = None
     enable_consecutive_loss_limit: bool | None = None
+    enable_per_loss_cooldown: bool | None = None
 
     # Trading engine guardrails
     model_weight: float | None = None
     max_model_market_divergence: float | None = None
     min_market_prob_for_yes: float | None = None
+
+
+# ─── Cooldown Status ───
+
+
+class CooldownStatus(BaseModel):
+    """Current cooldown state for the dashboard indicator."""
+
+    is_active: bool
+    cooldown_type: str | None = None  # "per_loss" | "consecutive_loss"
+    cooldown_until: UTCDatetime | None = None
+    remaining_minutes: int | None = None
+    consecutive_losses: int = 0
 
 
 # ─── Current Weather (Ticker) ───

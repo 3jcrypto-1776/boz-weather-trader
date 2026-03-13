@@ -229,6 +229,9 @@ class UserSettings(BaseModel):
     # ─── Consecutive Loss Toggle ───
     enable_consecutive_loss_limit: bool = True
 
+    # ─── Per-Loss Cooldown Toggle ───
+    enable_per_loss_cooldown: bool = True
+
     # ─── Trading Engine Guardrails ───
     model_weight: float = Field(default=0.4, ge=0.0, le=1.0)  # Blend weight for model
     max_model_market_divergence: float = Field(default=0.25, ge=0.0, le=0.50)
