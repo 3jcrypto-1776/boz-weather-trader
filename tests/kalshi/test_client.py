@@ -12,7 +12,12 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
-from backend.kalshi.client import DEMO_BASE_URL, PROD_BASE_URL, KalshiClient
+from backend.kalshi.client import (
+    DEMO_BASE_URL,
+    PROD_BASE_URL,
+    KalshiClient,
+    _parse_orderbook_response,
+)
 from backend.kalshi.exceptions import (
     KalshiApiError,
     KalshiAuthError,
@@ -322,3 +327,84 @@ class TestGetOrdersPagination:
         for call in client.client.request.call_args_list:
             params = call.kwargs.get("params", {})
             assert params.get("status") == "executed"
+
+
+# ─── Orderbook Response Parsing ───
+
+
+class TestParseOrderbookResponse:
+    """Tests for _parse_orderbook_response handling legacy and v2 fp formats."""
+
+    def test_legacy_format_with_orderbook_key(self):
+        """Legacy format: data['orderbook'] with cents integer arrays."""
+        data = {
+            "orderbook": {
+                "yes": [[22, 10], [21, 5]],
+                "no": [[78, 8], [79, 3]],
+            }
+        }
+        ob = _parse_orderbook_response(data)
+        assert ob.yes == [[22, 10], [21, 5]]
+        assert ob.no == [[78, 8], [79, 3]]
+
+    def test_fp_format_with_orderbook_fp_key(self):
+        """Current v2 format: data['orderbook_fp'] with dollar strings."""
+        data = {
+            "orderbook_fp": {
+                "yes_dollars": [["0.2200", "10.00"], ["0.2100", "5.00"]],
+                "no_dollars": [["0.7800", "8.00"], ["0.7900", "3.00"]],
+            }
+        }
+        ob = _parse_orderbook_response(data)
+        assert ob.yes == [[22, 10], [21, 5]]
+        assert ob.no == [[78, 8], [79, 3]]
+
+    def test_fp_format_empty_sides(self):
+        """FP format with empty yes_dollars and no_dollars."""
+        data = {
+            "orderbook_fp": {
+                "yes_dollars": [],
+                "no_dollars": [],
+            }
+        }
+        ob = _parse_orderbook_response(data)
+        assert ob.yes == []
+        assert ob.no == []
+
+    def test_fp_format_missing_sides_defaults_empty(self):
+        """FP format missing yes_dollars/no_dollars keys defaults to empty."""
+        data = {"orderbook_fp": {}}
+        ob = _parse_orderbook_response(data)
+        assert ob.yes == []
+        assert ob.no == []
+
+    def test_fp_format_price_rounding(self):
+        """Dollar strings that need rounding convert correctly to cents."""
+        data = {
+            "orderbook_fp": {
+                "yes_dollars": [["0.1500", "100.00"], ["0.0100", "1.00"]],
+                "no_dollars": [["0.9900", "50.00"]],
+            }
+        }
+        ob = _parse_orderbook_response(data)
+        assert ob.yes == [[15, 100], [1, 1]]
+        assert ob.no == [[99, 50]]
+
+    def test_unknown_format_raises_error(self):
+        """Neither 'orderbook' nor 'orderbook_fp' key raises KalshiApiError."""
+        data = {"something_else": {}}
+        with pytest.raises(KalshiApiError, match="Unexpected orderbook response"):
+            _parse_orderbook_response(data)
+
+    def test_legacy_format_preferred_when_both_present(self):
+        """If both keys present, legacy 'orderbook' is used."""
+        data = {
+            "orderbook": {"yes": [[30, 5]], "no": []},
+            "orderbook_fp": {
+                "yes_dollars": [["0.9900", "99.00"]],
+                "no_dollars": [],
+            },
+        }
+        ob = _parse_orderbook_response(data)
+        # Should use legacy format
+        assert ob.yes == [[30, 5]]

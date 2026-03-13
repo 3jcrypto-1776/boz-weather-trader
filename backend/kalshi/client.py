@@ -54,6 +54,58 @@ PROD_BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
 DEMO_BASE_URL = "https://demo-api.kalshi.co/trade-api/v2"
 
 
+# ─── Orderbook Parsing ───
+
+
+def _parse_orderbook_response(data: dict) -> KalshiOrderbook:
+    """Parse a Kalshi orderbook API response into a KalshiOrderbook model.
+
+    Handles two formats:
+    - **Legacy**: ``{"orderbook": {"yes": [[cents, qty], ...], "no": [...]}}``
+    - **Current (v2 fp)**: ``{"orderbook_fp": {"yes_dollars": [["0.22", "10.00"], ...],
+      "no_dollars": [...]}}`` where each level is ``[price_dollars_str, qty_fp_str]``.
+
+    The current format uses fixed-point strings for prices (dollars) and
+    quantities.  We convert to ``[[price_cents, qty_int], ...]`` to match
+    the ``KalshiOrderbook`` model used throughout the codebase.
+
+    Args:
+        data: Raw JSON dict from ``GET /markets/{ticker}/orderbook``.
+
+    Returns:
+        KalshiOrderbook with yes/no levels in ``[cents, qty]`` format.
+    """
+    # Legacy format (cents integer arrays)
+    if "orderbook" in data:
+        return KalshiOrderbook(**data["orderbook"])
+
+    # Current v2 fixed-point dollar format
+    if "orderbook_fp" in data:
+        ob_fp = data["orderbook_fp"]
+        yes_levels: list[list[int]] = []
+        no_levels: list[list[int]] = []
+
+        for price_str, qty_str in ob_fp.get("yes_dollars", []):
+            price_cents = int(round(float(price_str) * 100))
+            qty = int(round(float(qty_str)))
+            yes_levels.append([price_cents, qty])
+
+        for price_str, qty_str in ob_fp.get("no_dollars", []):
+            price_cents = int(round(float(price_str) * 100))
+            qty = int(round(float(qty_str)))
+            no_levels.append([price_cents, qty])
+
+        return KalshiOrderbook(yes=yes_levels, no=no_levels)
+
+    # Neither key present — raise a clear error
+    available_keys = list(data.keys())
+    msg = (
+        f"Unexpected orderbook response structure. "
+        f"Expected 'orderbook' or 'orderbook_fp' key, got: {available_keys}"
+    )
+    raise KalshiApiError(msg, context={"keys": available_keys})
+
+
 class KalshiClient:
     """Async Kalshi API client with auth, rate limiting, and error handling.
 
@@ -270,14 +322,18 @@ class KalshiClient:
     async def get_orderbook(self, ticker: str) -> KalshiOrderbook:
         """Get the current orderbook for a market.
 
+        Handles both legacy format (``data["orderbook"]`` with cents) and
+        the current Kalshi v2 format (``data["orderbook_fp"]`` with
+        ``yes_dollars`` / ``no_dollars`` as string pairs).
+
         Args:
             ticker: Market ticker (e.g., "KXHIGHNY-26FEB18-T52").
 
         Returns:
-            KalshiOrderbook with yes and no price/quantity levels.
+            KalshiOrderbook with yes and no price/quantity levels in cents.
         """
         data = await self._request("GET", f"/markets/{ticker}/orderbook")
-        return KalshiOrderbook(**data["orderbook"])
+        return _parse_orderbook_response(data)
 
     # ─── Orders ───
 
