@@ -20,9 +20,10 @@ Usage:
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ─── Helper Functions ───
 
@@ -74,10 +75,17 @@ class KalshiMarket(BaseModel):
     """A single Kalshi market (bracket) with current pricing.
 
     Prices are in cents (integers). Edge brackets have one null strike:
-    - Bottom edge: floor_strike=None, cap_strike=47.99
-    - Top edge: floor_strike=58.0, cap_strike=None
-    - Middle: floor_strike=52.0, cap_strike=53.99
+    - Bottom edge: floor_strike=None, cap_strike=49
+    - Top edge: floor_strike=58, cap_strike=None
+    - Middle: floor_strike=49, cap_strike=50
+
+    After the March 2026 fixed-point migration, Kalshi returns dollar-string
+    fields (``yes_ask_dollars``, ``volume_fp``, etc.) instead of integer cent
+    fields. The ``convert_dollars_to_cents`` model validator transparently
+    converts these to integer cents so downstream code is unaffected.
     """
+
+    model_config = ConfigDict(extra="allow")
 
     ticker: str
     event_ticker: str
@@ -96,6 +104,51 @@ class KalshiMarket(BaseModel):
     result: str | None = None
     close_time: datetime | None = None
     expiration_time: datetime | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def convert_dollars_to_cents(cls, data: dict) -> dict:
+        """Convert Kalshi fixed-point ``_dollars`` fields to integer cents.
+
+        Handles the March 2026 API migration where ``yes_ask``, ``yes_bid``,
+        ``no_ask``, ``no_bid``, ``last_price`` (integer cents) were replaced
+        by ``yes_ask_dollars``, ``yes_bid_dollars``, etc. (string dollars).
+        Also converts ``volume_fp`` and ``open_interest_fp`` string fields.
+
+        If the legacy cent fields are already populated with nonzero values
+        (e.g. in tests or cached data), they are left untouched.
+        """
+        if not isinstance(data, dict):
+            return data
+
+        # Price fields: _dollars (string "0.3000") -> cents (int 30)
+        dollar_to_cent_pairs = [
+            ("yes_ask_dollars", "yes_ask"),
+            ("yes_bid_dollars", "yes_bid"),
+            ("no_ask_dollars", "no_ask"),
+            ("no_bid_dollars", "no_bid"),
+            ("last_price_dollars", "last_price"),
+        ]
+        for dollar_field, cent_field in dollar_to_cent_pairs:
+            if dollar_field in data and not data.get(cent_field):
+                with contextlib.suppress(ValueError, TypeError):
+                    data[cent_field] = int(round(float(data[dollar_field]) * 100))
+
+        # Volume: volume_fp (string "2887.00") -> volume (int 2887)
+        if "volume_fp" in data and not data.get("volume"):
+            with contextlib.suppress(ValueError, TypeError):
+                data["volume"] = int(float(data["volume_fp"]))
+
+        # Open interest: open_interest_fp -> open_interest
+        if "open_interest_fp" in data and not data.get("open_interest"):
+            with contextlib.suppress(ValueError, TypeError):
+                data["open_interest"] = int(float(data["open_interest_fp"]))
+
+        # result: Kalshi now returns "" instead of null for unsettled markets
+        if data.get("result") == "":
+            data["result"] = None
+
+        return data
 
 
 class KalshiOrderbook(BaseModel):
@@ -224,6 +277,10 @@ class OrderResponse(BaseModel):
     The Kalshi v2 API returns many fields; we capture the ones we need
     and allow extras so the model doesn't break on new API fields.
 
+    After the March 2026 fixed-point migration, some fields gained
+    ``_dollars`` / ``_fp`` variants. The ``convert_dollars_to_cents``
+    model validator converts these transparently.
+
     Attributes:
         order_id: Unique identifier assigned by Kalshi.
         ticker: Market ticker the order was placed on.
@@ -253,6 +310,34 @@ class OrderResponse(BaseModel):
     created_time: datetime
     taker_fees: int = 0
     taker_fill_cost: int = 0
+
+    @model_validator(mode="before")
+    @classmethod
+    def convert_dollars_to_cents(cls, data: dict) -> dict:
+        """Convert ``_dollars`` fields from the fixed-point API migration."""
+        if not isinstance(data, dict):
+            return data
+
+        dollar_to_cent_pairs = [
+            ("yes_price_dollars", "yes_price"),
+            ("taker_fees_dollars", "taker_fees"),
+            ("taker_fill_cost_dollars", "taker_fill_cost"),
+        ]
+        for dollar_field, cent_field in dollar_to_cent_pairs:
+            if dollar_field in data and not data.get(cent_field):
+                with contextlib.suppress(ValueError, TypeError):
+                    data[cent_field] = int(round(float(data[dollar_field]) * 100))
+
+        # fill_count_fp / initial_count_fp (string int)
+        for fp_field, int_field in [
+            ("fill_count_fp", "fill_count"),
+            ("initial_count_fp", "initial_count"),
+        ]:
+            if fp_field in data and not data.get(int_field):
+                with contextlib.suppress(ValueError, TypeError):
+                    data[int_field] = int(float(data[fp_field]))
+
+        return data
 
     @property
     def count(self) -> int:
@@ -293,7 +378,22 @@ class KalshiSettlement(BaseModel):
         settled_time: When the market was settled.
     """
 
+    model_config = ConfigDict(extra="allow")
+
     ticker: str
     market_result: str
-    revenue: int
+    revenue: int = 0
     settled_time: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def convert_dollars_to_cents(cls, data: dict) -> dict:
+        """Convert ``revenue_dollars`` from the fixed-point API migration."""
+        if not isinstance(data, dict):
+            return data
+
+        if "revenue_dollars" in data and not data.get("revenue"):
+            with contextlib.suppress(ValueError, TypeError):
+                data["revenue"] = int(round(float(data["revenue_dollars"]) * 100))
+
+        return data

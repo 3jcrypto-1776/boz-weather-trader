@@ -190,6 +190,26 @@ class TestParseBracketFromMarket:
             assert result_dn["label"] == expected_label, f"cap={dotninety_cap}"
             assert result_int["label"] == expected_label, f"cap={integer_cap}"
 
+    # ─── Post-migration integer strike tests ───
+
+    def test_post_migration_middle_bracket_integer_strikes(self) -> None:
+        """Post-migration: floor=49, cap=50 produces '49° to 50°F'."""
+        market = {"floor_strike": 49, "cap_strike": 50, "ticker": "B49.5"}
+        result = parse_bracket_from_market(market)
+        assert result["label"] == "49° to 50°F"
+
+    def test_post_migration_bottom_edge_integer_cap(self) -> None:
+        """Post-migration: floor=None, cap=49 produces '48°F or below'."""
+        market = {"floor_strike": None, "cap_strike": 49, "ticker": "B48"}
+        result = parse_bracket_from_market(market)
+        assert result["label"] == "48°F or below"
+
+    def test_post_migration_top_edge_integer_floor(self) -> None:
+        """Post-migration: floor=55, cap=None produces '55°F or above'."""
+        market = {"floor_strike": 55, "cap_strike": None, "ticker": "B55"}
+        result = parse_bracket_from_market(market)
+        assert result["label"] == "55°F or above"
+
 
 # ─── Event Markets Parsing ───
 

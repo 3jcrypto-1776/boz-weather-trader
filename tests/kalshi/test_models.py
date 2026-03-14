@@ -155,6 +155,133 @@ class TestKalshiMarket:
         assert top.cap_strike is None
 
 
+class TestKalshiMarketDollarsConversion:
+    """Tests for KalshiMarket model_validator converting _dollars fields to cents."""
+
+    def test_converts_dollars_strings_to_cents(self) -> None:
+        """Dollar-string fields are converted to integer cent fields."""
+        market = KalshiMarket(
+            ticker="KXHIGHNY-26MAR14-B49.5",
+            event_ticker="KXHIGHNY-26MAR14",
+            title="49-50 bracket",
+            status="active",
+            yes_ask_dollars="0.3000",
+            yes_bid_dollars="0.2900",
+            no_ask_dollars="0.7100",
+            no_bid_dollars="0.7000",
+            last_price_dollars="0.3000",
+            volume_fp="2887.00",
+            open_interest_fp="2679.00",
+            floor_strike=49,
+            cap_strike=50,
+        )
+        assert market.yes_ask == 30
+        assert market.yes_bid == 29
+        assert market.no_ask == 71
+        assert market.no_bid == 70
+        assert market.last_price == 30
+        assert market.volume == 2887
+        assert market.open_interest == 2679
+
+    def test_legacy_cent_fields_preserved_when_nonzero(self) -> None:
+        """If legacy cent fields are already nonzero, they are NOT overwritten."""
+        market = KalshiMarket(
+            ticker="KXHIGHNY-26FEB18-T52",
+            event_ticker="KXHIGHNY-26FEB18",
+            title="test",
+            status="active",
+            yes_ask=25,
+            yes_bid=22,
+            yes_ask_dollars="0.9900",
+            yes_bid_dollars="0.9900",
+        )
+        assert market.yes_ask == 25
+        assert market.yes_bid == 22
+
+    def test_empty_result_string_becomes_none(self) -> None:
+        """Kalshi returns result='' for unsettled markets; converted to None."""
+        market = KalshiMarket(
+            ticker="KXHIGHNY-26MAR14-B49.5",
+            event_ticker="KXHIGHNY-26MAR14",
+            title="test",
+            status="active",
+            result="",
+        )
+        assert market.result is None
+
+    def test_integer_floor_and_cap_strike(self) -> None:
+        """Post-migration integer strikes are handled correctly."""
+        market = KalshiMarket(
+            ticker="KXHIGHNY-26MAR14-B49.5",
+            event_ticker="KXHIGHNY-26MAR14",
+            title="49 to 50",
+            status="active",
+            floor_strike=49,
+            cap_strike=50,
+        )
+        assert market.floor_strike == 49.0
+        assert market.cap_strike == 50.0
+
+    def test_full_api_response_shape(self) -> None:
+        """A complete post-migration API response is parsed correctly."""
+        api_data = {
+            "ticker": "KXHIGHNY-26MAR14-B49.5",
+            "event_ticker": "KXHIGHNY-26MAR14",
+            "title": "Will the **high temp in NYC** be 49-50 on Mar 14?",
+            "subtitle": "49 to 50",
+            "status": "active",
+            "yes_ask_dollars": "0.3000",
+            "yes_bid_dollars": "0.2900",
+            "no_ask_dollars": "0.7100",
+            "no_bid_dollars": "0.7000",
+            "last_price_dollars": "0.3000",
+            "volume_fp": "2887.00",
+            "open_interest_fp": "2679.00",
+            "floor_strike": 49,
+            "cap_strike": 50,
+            "result": "",
+            "close_time": "2026-03-15T03:59:00Z",
+            "expiration_time": "2026-03-21T14:00:00Z",
+        }
+        market = KalshiMarket(**api_data)
+        assert market.yes_ask == 30
+        assert market.yes_bid == 29
+        assert market.no_ask == 71
+        assert market.no_bid == 70
+        assert market.last_price == 30
+        assert market.volume == 2887
+        assert market.open_interest == 2679
+        assert market.result is None
+        assert market.floor_strike == 49.0
+        assert market.cap_strike == 50.0
+
+    def test_invalid_dollars_string_ignored(self) -> None:
+        """Invalid dollar strings (non-numeric) are silently ignored."""
+        market = KalshiMarket(
+            ticker="KXHIGHNY-26MAR14-B49.5",
+            event_ticker="KXHIGHNY-26MAR14",
+            title="test",
+            status="active",
+            yes_ask_dollars="not_a_number",
+        )
+        assert market.yes_ask == 0  # default
+
+    def test_extra_fields_allowed(self) -> None:
+        """Extra fields from the API (e.g. yes_ask_size_fp) don't break parsing."""
+        market = KalshiMarket(
+            ticker="KXHIGHNY-26MAR14-B49.5",
+            event_ticker="KXHIGHNY-26MAR14",
+            title="test",
+            status="active",
+            yes_ask_dollars="0.3000",
+            yes_ask_size_fp="158.00",
+            yes_bid_size_fp="278.00",
+            fractional_trading_enabled=False,
+            price_level_structure="linear_cent",
+        )
+        assert market.yes_ask == 30
+
+
 class TestKalshiOrderbook:
     """Tests for KalshiOrderbook model."""
 
@@ -321,6 +448,52 @@ class TestOrderResponse:
         assert response.count == 1  # backward-compat property
 
 
+class TestOrderResponseDollarsConversion:
+    """Tests for OrderResponse model_validator converting _dollars fields."""
+
+    def test_converts_dollars_fields_to_cents(self) -> None:
+        """Dollar-string fields are converted to integer cent fields."""
+        response = OrderResponse(
+            order_id="abc-123",
+            ticker="KXHIGHNY-26MAR14-B49.5",
+            action="buy",
+            side="yes",
+            type="limit",
+            status="executed",
+            created_time=datetime(2026, 3, 14, 10, 0, 0),
+            yes_price_dollars="0.3000",
+            taker_fees_dollars="0.1200",
+            taker_fill_cost_dollars="0.3000",
+            fill_count_fp="1.00",
+            initial_count_fp="1.00",
+        )
+        assert response.yes_price == 30
+        assert response.taker_fees == 12
+        assert response.taker_fill_cost == 30
+        assert response.fill_count == 1
+        assert response.initial_count == 1
+
+    def test_legacy_cent_fields_preserved(self) -> None:
+        """Legacy integer cent fields are NOT overwritten when present."""
+        response = OrderResponse(
+            order_id="abc-123",
+            ticker="KXHIGHNY-26FEB18-T52",
+            action="buy",
+            side="yes",
+            type="limit",
+            fill_count=1,
+            initial_count=1,
+            yes_price=22,
+            status="resting",
+            created_time=datetime(2026, 2, 17, 10, 5, 0),
+            taker_fees=11,
+            taker_fill_cost=22,
+        )
+        assert response.yes_price == 22
+        assert response.taker_fees == 11
+        assert response.taker_fill_cost == 22
+
+
 # ─── Position & Settlement Models ───
 
 
@@ -352,3 +525,24 @@ class TestKalshiSettlement:
         assert settlement.market_result == "yes"
         assert settlement.revenue == 100
         assert settlement.settled_time == datetime(2026, 2, 19, 14, 0, 0)
+
+    def test_converts_revenue_dollars_to_cents(self) -> None:
+        """revenue_dollars string is converted to integer revenue cents."""
+        settlement = KalshiSettlement(
+            ticker="KXHIGHNY-26MAR14-B49.5",
+            market_result="yes",
+            revenue_dollars="1.0000",
+            settled_time=datetime(2026, 3, 21, 14, 0, 0),
+        )
+        assert settlement.revenue == 100
+
+    def test_legacy_revenue_preserved(self) -> None:
+        """Legacy integer revenue is NOT overwritten when present."""
+        settlement = KalshiSettlement(
+            ticker="KXHIGHNY-26FEB18-T52",
+            market_result="yes",
+            revenue=100,
+            revenue_dollars="0.5000",
+            settled_time=datetime(2026, 2, 19, 14, 0, 0),
+        )
+        assert settlement.revenue == 100
