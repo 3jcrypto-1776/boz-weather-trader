@@ -214,15 +214,8 @@ async def _run_trading_cycle() -> None:
             extra={"data": {"error": str(exc)}},
         )
 
-    # Step 2: Market hours check (before DB work)
-    if not _are_markets_open():
-        logger.debug(
-            "Trading cycle skipped: markets closed",
-            extra={"data": {}},
-        )
-        TRADING_CYCLES_TOTAL.labels(outcome="skipped").inc()
-        return
-
+    # Always open a session for housekeeping tasks (resting sync, portfolio sync)
+    # that must run even when markets are closed.
     session = await get_task_session()
     try:
         # Load user settings (placeholder -- single user for v1)
@@ -239,6 +232,75 @@ async def _run_trading_cycle() -> None:
         if user_id is None:
             logger.info(
                 "Trading cycle skipped: no user found",
+                extra={"data": {}},
+            )
+            TRADING_CYCLES_TOTAL.labels(outcome="skipped").inc()
+            return
+
+        # Build Kalshi client for housekeeping (sync, resting orders)
+        kalshi_client = await _get_kalshi_client(session, user_id)
+
+        # Sync resting orders BEFORE market hours check: orders placed in the
+        # last cycle before market close must be synced even when markets are
+        # closed.  This avoids stale RESTING trades sitting in the DB until
+        # the next market-open cycle.
+        if kalshi_client is not None:
+            # Portfolio sync: reconcile with Kalshi positions
+            try:
+                from backend.trading.sync import sync_portfolio
+
+                sync_result = await sync_portfolio(kalshi_client, session, user_id)
+                if sync_result.synced_count > 0:
+                    logger.info(
+                        "Portfolio sync found new trades",
+                        extra={
+                            "data": {
+                                "synced": sync_result.synced_count,
+                                "skipped": sync_result.skipped_count,
+                            }
+                        },
+                    )
+                    await publish_event_safe(
+                        "trade.synced",
+                        {
+                            "synced_count": sync_result.synced_count,
+                        },
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Portfolio sync failed (non-fatal)",
+                    extra={"data": {"error": str(exc)}},
+                )
+
+            # Sync resting orders: check if any RESTING trades have been filled
+            # or expired on Kalshi since last cycle.
+            try:
+                synced = await _sync_resting_orders(session, kalshi_client, user_id)
+                if synced > 0:
+                    logger.info(
+                        "Synced resting orders",
+                        extra={"data": {"transitioned": synced}},
+                    )
+                    await session.commit()
+            except Exception as exc:
+                logger.warning(
+                    "Resting order sync failed (non-fatal)",
+                    extra={"data": {"error": str(exc)}},
+                )
+
+        # Step 2: Market hours check — skip trading (but housekeeping above
+        # already ran).
+        if not _are_markets_open():
+            logger.debug(
+                "Trading cycle skipped: markets closed",
+                extra={"data": {}},
+            )
+            TRADING_CYCLES_TOTAL.labels(outcome="skipped").inc()
+            return
+
+        if kalshi_client is None:
+            logger.info(
+                "Trading cycle skipped: no Kalshi client available",
                 extra={"data": {}},
             )
             TRADING_CYCLES_TOTAL.labels(outcome="skipped").inc()
@@ -266,61 +328,6 @@ async def _run_trading_cycle() -> None:
         bankroll_cents = 0
         if user_settings.use_kelly_sizing:
             bankroll_cents = await _get_bankroll_cents(session, user_id, user_settings)
-
-        # Steps 5-11: Fetch predictions, scan, execute/queue
-        # These are placeholders that need the prediction engine and
-        # Kalshi client to be fully wired up.
-        kalshi_client = await _get_kalshi_client(session, user_id)
-        if kalshi_client is None:
-            logger.info(
-                "Trading cycle skipped: no Kalshi client available",
-                extra={"data": {}},
-            )
-            TRADING_CYCLES_TOTAL.labels(outcome="skipped").inc()
-            return
-
-        # Portfolio sync: reconcile with Kalshi positions
-        try:
-            from backend.trading.sync import sync_portfolio
-
-            sync_result = await sync_portfolio(kalshi_client, session, user_id)
-            if sync_result.synced_count > 0:
-                logger.info(
-                    "Portfolio sync found new trades",
-                    extra={
-                        "data": {
-                            "synced": sync_result.synced_count,
-                            "skipped": sync_result.skipped_count,
-                        }
-                    },
-                )
-                await publish_event_safe(
-                    "trade.synced",
-                    {
-                        "synced_count": sync_result.synced_count,
-                    },
-                )
-        except Exception as exc:
-            logger.warning(
-                "Portfolio sync failed (non-fatal)",
-                extra={"data": {"error": str(exc)}},
-            )
-
-        # Sync resting orders: check if any RESTING trades have been filled
-        # or expired on Kalshi since last cycle.
-        try:
-            synced = await _sync_resting_orders(session, kalshi_client, user_id)
-            if synced > 0:
-                logger.info(
-                    "Synced resting orders",
-                    extra={"data": {"transitioned": synced}},
-                )
-                await session.commit()
-        except Exception as exc:
-            logger.warning(
-                "Resting order sync failed (non-fatal)",
-                extra={"data": {"error": str(exc)}},
-            )
 
         # Fetch predictions for active cities
         predictions = await _fetch_latest_predictions(session, user_settings.active_cities)

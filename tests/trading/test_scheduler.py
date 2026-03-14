@@ -329,16 +329,22 @@ class TestRunTradingCycle:
 
     @pytest.mark.asyncio
     async def test_skips_when_markets_closed(self) -> None:
-        """Returns early without DB access when markets are closed."""
+        """Runs housekeeping (resting sync) but skips trading when markets closed."""
         from backend.trading.scheduler import _run_trading_cycle
 
-        with patch("backend.trading.scheduler._are_markets_open", return_value=False):
-            mock_session = AsyncMock()
-            with patch("backend.trading.scheduler.get_task_session", return_value=mock_session):
-                await _run_trading_cycle()
+        mock_session = _make_mock_db_session()
 
-            # Session should not be created since we return before DB work
-            # (actually, session IS NOT obtained since the check is before it)
+        with (
+            patch("backend.trading.scheduler._are_markets_open", return_value=False),
+            patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
+            patch("backend.trading.scheduler._load_user_settings", return_value=_make_user_settings()),
+            patch("backend.trading.scheduler._get_user_id", return_value="user-1"),
+            patch("backend.trading.scheduler._get_kalshi_client", return_value=None),
+        ):
+            await _run_trading_cycle()
+
+        # Session opened for housekeeping, then closed
+        mock_session.close.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_skips_when_no_user_settings(self) -> None:
