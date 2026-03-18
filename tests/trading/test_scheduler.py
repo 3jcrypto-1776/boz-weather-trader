@@ -337,7 +337,10 @@ class TestRunTradingCycle:
         with (
             patch("backend.trading.scheduler._are_markets_open", return_value=False),
             patch("backend.trading.scheduler.get_task_session", return_value=mock_session),
-            patch("backend.trading.scheduler._load_user_settings", return_value=_make_user_settings()),
+            patch(
+                "backend.trading.scheduler._load_user_settings",
+                return_value=_make_user_settings(),
+            ),
             patch("backend.trading.scheduler._get_user_id", return_value="user-1"),
             patch("backend.trading.scheduler._get_kalshi_client", return_value=None),
         ):
