@@ -108,8 +108,6 @@ def create_app() -> FastAPI:
         "http://localhost:3000",  # Next.js dev server
         "http://127.0.0.1:3000",
         "http://frontend:3000",  # Docker Compose networking
-        "http://10.0.0.51:3000",  # Homelab LAN
-        "http://100.66.104.66:3000",  # Tailscale
     ]
     if settings.cors_origins:
         cors_origins.extend(
