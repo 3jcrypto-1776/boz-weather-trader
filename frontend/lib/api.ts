@@ -31,16 +31,29 @@ import type {
   VersionInfo,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const FALLBACK_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+/**
+ * Derive the API base URL at runtime from the browser's current hostname.
+ * This allows the same build to work over LAN (10.0.0.51) and Tailscale (100.x.y.z).
+ * Falls back to NEXT_PUBLIC_API_URL during SSR or when window is unavailable.
+ */
+function getApiUrl(): string {
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  return FALLBACK_API_URL;
+}
 
 // ─── WebSocket URL ───
 
 /**
- * Derive the WebSocket URL from the REST API URL.
+ * Derive the WebSocket URL from the current hostname.
  * Converts http: → ws: and https: → wss:, then appends /ws.
  */
 export function getWsUrl(): string {
-  return API_URL.replace(/^http/, "ws") + "/ws";
+  const base = getApiUrl();
+  return base.replace(/^http/, "ws") + "/ws";
 }
 
 // ─── Fetch Wrapper ───
@@ -58,7 +71,7 @@ async function apiFetch<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_URL}${path}`;
+  const url = `${getApiUrl()}${path}`;
 
   const res = await fetch(url, {
     headers: {
