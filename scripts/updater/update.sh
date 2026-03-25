@@ -55,16 +55,48 @@ if ! git pull origin master; then
     exit 1
 fi
 
-# Step 2: Docker build (only services with build configs)
-printf "=== Step 2/3: Building Docker images ===\n"
-write_status "building" "docker compose build"
-if ! $COMPOSE build --no-cache; then
-    write_status "error" "docker compose build" "\"docker compose build failed — check Dockerfiles and build context\""
+# Step 2: Docker build
+# Backend + celery use standard docker compose build.
+# Frontend needs buildx --allow security.insecure to bypass Proxmox AppArmor
+# blocking Node.js child_process.spawn during `npm run build`.
+printf "=== Step 2/4: Building backend image ===\n"
+write_status "building" "docker compose build (backend)"
+if ! $COMPOSE build --no-cache backend celery-worker celery-beat; then
+    write_status "error" "docker compose build" "\"backend build failed — check Dockerfile.backend\""
     exit 1
 fi
 
-# Step 3: Restart app containers with new images
-printf "=== Step 3/3: Restarting app containers ===\n"
+# Ensure buildx builder with security.insecure entitlement exists
+BUILDER_NAME="insecure-builder"
+if ! docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
+    printf "Creating buildx builder '%s' with insecure entitlement...\n" "$BUILDER_NAME"
+    docker buildx create --name "$BUILDER_NAME" --buildkitd-flags '--allow-insecure-entitlement security.insecure' --use
+else
+    docker buildx use "$BUILDER_NAME"
+fi
+
+# Read NEXT_PUBLIC_API_URL from override file if present
+NEXT_PUBLIC_API_URL=""
+if [ -f "${PROJECT_DIR}/docker-compose.override.yml" ]; then
+    NEXT_PUBLIC_API_URL=$(grep -A1 'NEXT_PUBLIC_API_URL' "${PROJECT_DIR}/docker-compose.override.yml" | tail -1 | sed 's/.*: *//' | tr -d ' "'"'" || true)
+fi
+
+printf "=== Step 3/4: Building frontend image (buildx) ===\n"
+write_status "building" "docker buildx build (frontend)"
+if ! docker buildx build \
+    --builder "$BUILDER_NAME" \
+    --allow security.insecure \
+    ${NEXT_PUBLIC_API_URL:+--build-arg "NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}"} \
+    --load \
+    -t boz-weather-trader-frontend \
+    -f "${PROJECT_DIR}/frontend/Dockerfile" \
+    "${PROJECT_DIR}/frontend"; then
+    write_status "error" "docker buildx build" "\"frontend build failed — check frontend/Dockerfile\""
+    exit 1
+fi
+
+# Step 4: Restart app containers with new images
+printf "=== Step 4/4: Restarting app containers ===\n"
 write_status "restarting" "docker compose restart"
 printf "Recreating services: %s\n" "$APP_SERVICES"
 if ! $COMPOSE up -d --force-recreate $APP_SERVICES; then
