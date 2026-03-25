@@ -248,6 +248,10 @@ async def execute_trade(
     # Extract the market event date from the ticker (e.g., KXHIGHAUS-26FEB23 → Feb 23)
     market_date = parse_market_date_from_ticker(signal.market_ticker)
 
+    # Store Kalshi's actual taker_fees (charged at trade time, not settlement).
+    # This is 0 for resting/maker orders and >0 for immediately matched orders.
+    taker_fees = getattr(response, "taker_fees", 0) or 0
+
     trade = Trade(
         id=trade_id,
         user_id=user_id,
@@ -266,6 +270,7 @@ async def execute_trade(
         ev_at_entry=signal.ev,
         confidence=signal.confidence,
         status=TradeStatus.OPEN,
+        fees_cents=taker_fees if taker_fees > 0 else None,
         created_at=now,
     )
 

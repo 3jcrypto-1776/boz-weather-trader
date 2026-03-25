@@ -96,6 +96,9 @@ async def _create_synced_trade(
     if order.side == "no":
         fill_price = 100 - fill_price
 
+    # Store Kalshi's actual fees (0 for maker/resting orders)
+    taker_fees = getattr(order, "taker_fees", 0) or 0
+
     trade = Trade(
         id=str(uuid4()),
         user_id=user_id,
@@ -113,6 +116,7 @@ async def _create_synced_trade(
         ev_at_entry=0.0,
         confidence="low",
         status=TradeStatus.OPEN,
+        fees_cents=taker_fees if taker_fees > 0 else None,
         created_at=order.created_time,
     )
     db.add(trade)

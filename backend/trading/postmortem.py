@@ -182,18 +182,24 @@ async def settle_trade(
     if won:
         payout_cents = 100 * trade.quantity
         profit_cents = payout_cents - cost_cents
-        # Kalshi fee: ceil(0.07 * C * P * (1-P)), P = YES price in dollars
-        yes_price = trade.price_cents if trade.side == "yes" else (100 - trade.price_cents)
-        p = yes_price / 100
-        fee_per_contract = max(1, math.ceil(7 * p * (1 - p)))
-        fee_cents = fee_per_contract * trade.quantity
+        # Use Kalshi's actual fees if stored at trade time (from taker_fees).
+        # Fall back to formula estimate if not available.
+        if trade.fees_cents is not None and trade.fees_cents >= 0:
+            fee_cents = trade.fees_cents
+        else:
+            # Kalshi fee estimate: ceil(0.07 * C * P * (1-P))
+            yes_price = trade.price_cents if trade.side == "yes" else (100 - trade.price_cents)
+            p = yes_price / 100
+            fee_per_contract = max(1, math.ceil(7 * p * (1 - p)))
+            fee_cents = fee_per_contract * trade.quantity
+            trade.fees_cents = fee_cents
         pnl_cents = profit_cents - fee_cents
         trade.status = TradeStatus.WON
-        trade.fees_cents = fee_cents
     else:
         pnl_cents = -cost_cents
         trade.status = TradeStatus.LOST
-        trade.fees_cents = 0
+        if trade.fees_cents is None:
+            trade.fees_cents = 0
 
     trade.pnl_cents = pnl_cents
     trade.settlement_temp_f = actual_temp
@@ -265,18 +271,24 @@ async def settle_from_kalshi(
     if won:
         payout_cents = 100 * trade.quantity
         profit_cents = payout_cents - cost_cents
-        # Kalshi fee: ceil(0.07 * C * P * (1-P)), P = YES price in dollars
-        yes_price = trade.price_cents if trade.side == "yes" else (100 - trade.price_cents)
-        p = yes_price / 100
-        fee_per_contract = max(1, math.ceil(7 * p * (1 - p)))
-        fee_cents = fee_per_contract * trade.quantity
+        # Use Kalshi's actual fees if stored at trade time (from taker_fees).
+        # Fall back to formula estimate if not available.
+        if trade.fees_cents is not None and trade.fees_cents >= 0:
+            fee_cents = trade.fees_cents
+        else:
+            # Kalshi fee estimate: ceil(0.07 * C * P * (1-P))
+            yes_price = trade.price_cents if trade.side == "yes" else (100 - trade.price_cents)
+            p = yes_price / 100
+            fee_per_contract = max(1, math.ceil(7 * p * (1 - p)))
+            fee_cents = fee_per_contract * trade.quantity
+            trade.fees_cents = fee_cents
         pnl_cents = profit_cents - fee_cents
         trade.status = TradeStatus.WON
-        trade.fees_cents = fee_cents
     else:
         pnl_cents = -cost_cents
         trade.status = TradeStatus.LOST
-        trade.fees_cents = 0
+        if trade.fees_cents is None:
+            trade.fees_cents = 0
 
     trade.pnl_cents = pnl_cents
     trade.settlement_source = "KALSHI"
