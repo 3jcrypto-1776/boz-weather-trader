@@ -22,6 +22,7 @@ import {
   fetchDashboardStats,
   fetchLogs,
   fetchMarkets,
+  fetchModelEdge,
   fetchPendingTrades,
   fetchPerformance,
   fetchSettings,
@@ -40,6 +41,7 @@ import type {
   DashboardData,
   DashboardStats,
   LogEntry,
+  ModelEdgeReport,
   PendingTrade,
   PerformanceData,
   SourceAccuracy,
@@ -221,6 +223,19 @@ export function useSourceAccuracy(
   return useSWR<SourceAccuracy[]>(
     `/api/accuracy/sources?city=${cityParam}`,
     () => fetchSourceAccuracy(cityParam),
+    { refreshInterval: 0, ...config }
+  );
+}
+
+// ─── Model Edge ───
+
+export function useModelEdge(
+  lookbackDays: number = 90,
+  config?: SWRConfiguration
+) {
+  return useSWR<ModelEdgeReport>(
+    `/api/accuracy/edge?lookback_days=${lookbackDays}`,
+    () => fetchModelEdge(lookbackDays),
     { refreshInterval: 0, ...config }
   );
 }

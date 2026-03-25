@@ -43,12 +43,20 @@ const MOCK_SETTINGS: UserSettings = {
   daily_loss_limit_cents: 1000,
   max_daily_exposure_cents: 2500,
   min_ev_threshold: 0.05,
+  min_ev_threshold_yes: 0.15,
+  min_ev_threshold_no: 0.05,
   cooldown_per_loss_minutes: 60,
   consecutive_loss_limit: 3,
   active_cities: ["NYC", "CHI", "MIA", "AUS"],
   notifications_enabled: true,
   max_contracts_per_bracket: 3,
   enable_consecutive_loss_limit: true,
+  enable_per_loss_cooldown: true,
+  model_weight: 0.4,
+  max_model_market_divergence: 0.25,
+  min_market_prob_for_yes: 0.15,
+  fee_estimate_mode: "conservative",
+  timezone: "",
 };
 
 describe("Update Button on Settings Page", () => {

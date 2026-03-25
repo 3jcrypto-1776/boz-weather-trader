@@ -141,6 +141,7 @@ def user_to_settings(user: User) -> UserSettings:
         min_market_prob_for_yes=user.min_market_prob_for_yes
         if user.min_market_prob_for_yes is not None
         else 0.15,
+        fee_estimate_mode=user.fee_estimate_mode or "realistic",
         timezone=user.timezone if user.timezone is not None else "",
     )
 

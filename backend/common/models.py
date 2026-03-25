@@ -144,6 +144,9 @@ class User(Base):
     max_model_market_divergence = Column(Float, default=0.25)
     min_market_prob_for_yes = Column(Float, default=0.15)
 
+    # Fee estimation
+    fee_estimate_mode = Column(String, default="realistic")
+
     # Display preferences
     timezone = Column(String, default="")
 

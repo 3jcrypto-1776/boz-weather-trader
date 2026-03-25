@@ -34,6 +34,21 @@ export default function TradeCard({ group, currentTempF }: TradeCardProps) {
 
   const isSettled = group.status === "WON" || group.status === "LOST";
   const isMulti = group.trades.length > 1;
+
+  // Per-trade model vs market edge badge (settled trades only)
+  const edgeBadge = (() => {
+    if (!isSettled) return null;
+    const actual =
+      (group.status === "WON" && group.side === "yes") ||
+      (group.status === "LOST" && group.side === "no")
+        ? 1
+        : 0;
+    const modelError = (group.avgModelProbability - actual) ** 2;
+    const marketError = (group.avgMarketProbability - actual) ** 2;
+    if (modelError < marketError) return { label: "Model \u2713", color: "text-boz-success bg-green-50" };
+    if (marketError < modelError) return { label: "Market \u2713", color: "text-boz-neutral bg-gray-100" };
+    return null;
+  })();
   const countdown = settlementCountdown(group.market_ticker, isSettled);
   const { costCents, profitCents } = tradeFinancials(
     group.vwapCents,
@@ -75,6 +90,14 @@ export default function TradeCard({ group, currentTempF }: TradeCardProps) {
             >
               {group.confidence}
             </span>
+            {edgeBadge && (
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${edgeBadge.color}`}
+                data-testid="edge-badge"
+              >
+                {edgeBadge.label}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-xs text-boz-neutral">

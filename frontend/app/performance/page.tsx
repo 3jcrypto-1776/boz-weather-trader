@@ -15,11 +15,12 @@ import Skeleton from "@/components/ui/skeleton";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import {
   useCalibration,
+  useModelEdge,
   usePerformance,
   useSourceAccuracy,
   useTrainingReports,
 } from "@/lib/hooks";
-import type { CityCode } from "@/lib/types";
+import type { CityCode, ModelEdgeBucket } from "@/lib/types";
 import { centsToDollars, formatPnL, formatProbability } from "@/lib/utils";
 
 const CITY_OPTIONS: CityCode[] = ["NYC", "CHI", "MIA", "AUS"];
@@ -31,6 +32,7 @@ export default function PerformancePage() {
   const { data: sources } = useSourceAccuracy(accuracyCity);
   const { data: trainingReports, mutate: mutateTraining } =
     useTrainingReports();
+  const { data: modelEdge } = useModelEdge();
 
   if (isLoading) {
     return (
@@ -227,6 +229,53 @@ export default function PerformancePage() {
           {sources && <SourceAccuracyChart sources={sources} />}
         </div>
 
+        {/* Model Edge */}
+        {modelEdge && (
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+            <h3 className="text-sm font-semibold mb-3">Model Edge</h3>
+
+            {/* Summary */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="text-sm">
+                Model Brier:{" "}
+                <span className="font-medium">{modelEdge.model_brier.toFixed(3)}</span>
+                {" vs Market Brier: "}
+                <span className="font-medium">{modelEdge.market_brier.toFixed(3)}</span>
+              </div>
+              <span
+                className={`text-sm font-bold ${
+                  modelEdge.sample_count < 20
+                    ? "text-boz-neutral"
+                    : modelEdge.edge > 0
+                      ? "text-boz-success"
+                      : "text-boz-danger"
+                }`}
+              >
+                {modelEdge.edge_pct}
+              </span>
+              <span className="text-xs text-boz-neutral">
+                ({modelEdge.sample_count} samples)
+              </span>
+            </div>
+
+            {/* Per-side table */}
+            {Object.keys(modelEdge.by_side).length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-xs font-semibold text-boz-neutral mb-2">By Side</h4>
+                <ModelEdgeTable buckets={modelEdge.by_side} />
+              </div>
+            )}
+
+            {/* Per-city table */}
+            {Object.keys(modelEdge.by_city).length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-boz-neutral mb-2">By City</h4>
+                <ModelEdgeTable buckets={modelEdge.by_city} />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Current Model Status */}
         {trainingReports && trainingReports.reports.length > 0 && (
           <ModelStatus report={trainingReports.reports[0]} />
@@ -266,5 +315,44 @@ export default function PerformancePage() {
         )}
       </div>
     </ErrorBoundary>
+  );
+}
+
+function ModelEdgeTable({ buckets }: { buckets: Record<string, ModelEdgeBucket> }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-left text-boz-neutral border-b border-gray-100">
+            <th className="py-1 pr-3 font-medium">Label</th>
+            <th className="py-1 pr-3 font-medium">Model Brier</th>
+            <th className="py-1 pr-3 font-medium">Market Brier</th>
+            <th className="py-1 pr-3 font-medium">Edge</th>
+            <th className="py-1 font-medium">Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(buckets).map(([label, bucket]) => (
+            <tr key={label} className="border-b border-gray-50">
+              <td className="py-1.5 pr-3 font-medium">{label}</td>
+              <td className="py-1.5 pr-3">{bucket.model_brier.toFixed(3)}</td>
+              <td className="py-1.5 pr-3">{bucket.market_brier.toFixed(3)}</td>
+              <td
+                className={`py-1.5 pr-3 font-medium ${
+                  bucket.sample_count < 10
+                    ? "text-boz-neutral"
+                    : bucket.edge > 0
+                      ? "text-boz-success"
+                      : "text-boz-danger"
+                }`}
+              >
+                {bucket.edge > 0 ? "+" : ""}{(bucket.edge * 100).toFixed(1)}%
+              </td>
+              <td className="py-1.5 text-boz-neutral">{bucket.verdict}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

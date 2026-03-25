@@ -17,6 +17,7 @@ vi.mock("@/lib/hooks", () => ({
   useDashboardStats: () => mockUseDashboardStats(),
   useCooldownStatus: () => mockUseCooldownStatus(),
   useCurrentWeather: () => ({ data: undefined, error: undefined }),
+  useModelEdge: () => ({ data: undefined, error: undefined, isLoading: false }),
 }));
 
 // Mock next/navigation for BottomNav + useRouter
@@ -270,8 +271,9 @@ describe("DashboardPage", () => {
     render(<DashboardPage />);
     // Falls back to today_pnl_cents from dashboard data
     expect(screen.getByText("+$3.50")).toBeInTheDocument();
-    // W/L shows dash when no stats
-    expect(screen.getByText("—")).toBeInTheDocument();
+    // W/L and Model Edge show dash when no stats/edge data
+    const dashes = screen.getAllByText("—");
+    expect(dashes.length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders recent trades", () => {

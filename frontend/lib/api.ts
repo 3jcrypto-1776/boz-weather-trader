@@ -272,6 +272,14 @@ export async function fetchSourceAccuracy(
   );
 }
 
+export async function fetchModelEdge(
+  lookbackDays: number = 90
+): Promise<import("./types").ModelEdgeReport> {
+  return apiFetch<import("./types").ModelEdgeReport>(
+    `/api/accuracy/edge?lookback_days=${lookbackDays}`
+  );
+}
+
 // ─── Weather (1 endpoint) ───
 
 export async function fetchCurrentWeather(): Promise<CurrentWeatherResponse> {

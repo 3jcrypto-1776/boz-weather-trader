@@ -54,6 +54,7 @@ const MOCK_SETTINGS: UserSettings = {
   model_weight: 0.4,
   max_model_market_divergence: 0.25,
   min_market_prob_for_yes: 0.15,
+  fee_estimate_mode: "conservative",
   timezone: "",
 };
 

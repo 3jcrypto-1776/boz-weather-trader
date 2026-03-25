@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  BarChart3,
   DollarSign,
   TrendingDown,
   TrendingUp,
@@ -14,7 +15,7 @@ import ErrorBoundary from "@/components/ui/error-boundary";
 import Skeleton from "@/components/ui/skeleton";
 import TradeCard from "@/components/trade-card/trade-card";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
-import { useCooldownStatus, useCurrentWeather, useDashboard, useDashboardStats } from "@/lib/hooks";
+import { useCooldownStatus, useCurrentWeather, useDashboard, useDashboardStats, useModelEdge } from "@/lib/hooks";
 import { useTimezone } from "@/lib/timezone-context";
 import { groupByMarket } from "@/lib/trade-grouping";
 import type { CityCode, DashboardData, DashboardStats, StatsPeriod } from "@/lib/types";
@@ -270,6 +271,15 @@ function DashboardContent({
   const wlLosses = stats ? stats[wlPeriod].losses : 0;
   const wlValue = stats ? `${wlWins}W / ${wlLosses}L` : "—";
 
+  // Model edge stat
+  const { data: modelEdge } = useModelEdge();
+  const edgeColor = !modelEdge || modelEdge.sample_count < 20
+    ? "text-boz-neutral"
+    : modelEdge.edge > 0
+      ? "text-boz-success"
+      : "text-boz-danger";
+  const edgeValue = modelEdge ? modelEdge.edge_pct : "—";
+
   // Current weather for live temp on OPEN trade cards
   const { data: weather } = useCurrentWeather();
   const tempByCity = useMemo(() => {
@@ -314,6 +324,12 @@ function DashboardContent({
           value={wlValue}
           icon={Trophy}
           onClick={handleWlClick}
+        />
+        <StatCard
+          label="Model Edge"
+          value={edgeValue}
+          icon={BarChart3}
+          color={edgeColor}
         />
       </div>
 

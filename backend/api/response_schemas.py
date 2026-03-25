@@ -229,6 +229,9 @@ class SettingsUpdate(BaseModel):
     max_model_market_divergence: float | None = None
     min_market_prob_for_yes: float | None = None
 
+    # Fee estimation
+    fee_estimate_mode: str | None = None
+
     # Display preferences
     timezone: str | None = None
 
@@ -334,3 +337,29 @@ class TrainingReportListResponse(BaseModel):
 
     reports: list[TrainingReportResponse]
     total: int
+
+
+# ─── Model Edge Report ───
+
+
+class ModelEdgeBucket(BaseModel):
+    """Brier score comparison for a subset of trades (by side or city)."""
+
+    model_brier: float
+    market_brier: float
+    edge: float  # market_brier - model_brier (positive = model better)
+    sample_count: int
+    verdict: str  # "Model outperforming", "Market outperforming", "Insufficient data"
+
+
+class ModelEdgeReport(BaseModel):
+    """Overall model edge report comparing model vs market Brier scores."""
+
+    model_brier: float
+    market_brier: float
+    edge: float
+    edge_pct: str  # e.g., "18%" — (edge / market_brier * 100)
+    verdict: str
+    sample_count: int
+    by_side: dict[str, ModelEdgeBucket]  # "yes" and "no"
+    by_city: dict[str, ModelEdgeBucket]  # "NYC", "CHI", etc.

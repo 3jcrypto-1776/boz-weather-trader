@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.common.models import CityEnum, Prediction, Settlement, WeatherForecast
+from backend.common.models import (
+    CityEnum,
+    Prediction,
+    Settlement,
+    Trade,
+    TradeStatus,
+    WeatherForecast,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -234,3 +242,129 @@ class TestGetAccuracyTrends:
         """Returns 401 when not authenticated."""
         response = await unauthed_client.get("/api/accuracy/trends")
         assert response.status_code == 401
+
+
+# ─── /api/accuracy/edge Tests ───
+
+
+def _make_settled_trade(
+    user_id: str,
+    city: str = "NYC",
+    side: str = "yes",
+    status: TradeStatus = TradeStatus.WON,
+    model_probability: float = 0.30,
+    market_probability: float = 0.25,
+) -> Trade:
+    """Create a settled Trade ORM model for edge tests."""
+    return Trade(
+        id=str(uuid4()),
+        user_id=user_id,
+        kalshi_order_id=f"order-{uuid4().hex[:8]}",
+        city=CityEnum(city),
+        trade_date=datetime(2026, 2, 10, tzinfo=UTC),
+        market_ticker=f"KXHIGH{city}-26FEB10-B3",
+        bracket_label="55-56°F",
+        side=side,
+        price_cents=25,
+        quantity=1,
+        model_probability=model_probability,
+        market_probability=market_probability,
+        ev_at_entry=0.05,
+        confidence="medium",
+        status=status,
+        pnl_cents=75 if status == TradeStatus.WON else -25,
+        fees_cents=2,
+        settled_at=datetime(2026, 2, 11, tzinfo=UTC),
+    )
+
+
+class TestGetModelEdge:
+    """Tests for GET /api/accuracy/edge."""
+
+    async def test_insufficient_data(self, client: AsyncClient) -> None:
+        """Fewer than 10 settled trades returns Insufficient data verdict."""
+        response = await client.get("/api/accuracy/edge")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["verdict"] == "Insufficient data"
+        assert data["sample_count"] < 10
+        assert data["model_brier"] == 0.0
+        assert data["market_brier"] == 0.0
+
+    async def test_with_sufficient_data(self, client: AsyncClient, db: AsyncSession) -> None:
+        """Returns edge report when enough settled trades exist."""
+        # Get the test user ID
+        from sqlalchemy import select
+
+        from backend.common.models import User
+
+        result = await db.execute(select(User).limit(1))
+        user = result.scalar_one()
+
+        # Add 12 settled trades (mix of won/lost, yes/no)
+        for i in range(12):
+            side = "yes" if i % 2 == 0 else "no"
+            status = TradeStatus.WON if i % 3 != 0 else TradeStatus.LOST
+            trade = _make_settled_trade(
+                user_id=user.id,
+                city="NYC" if i < 6 else "CHI",
+                side=side,
+                status=status,
+                model_probability=0.30 + (i * 0.02),
+                market_probability=0.25 + (i * 0.01),
+            )
+            db.add(trade)
+        await db.commit()
+
+        response = await client.get("/api/accuracy/edge")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sample_count"] == 12
+        assert data["verdict"] in ("Model outperforming", "Market outperforming")
+        assert "%" in data["edge_pct"]
+        assert isinstance(data["model_brier"], float)
+        assert isinstance(data["market_brier"], float)
+        assert "by_side" in data
+        assert "by_city" in data
+
+    async def test_lookback_days_parameter(self, client: AsyncClient) -> None:
+        """Custom lookback_days is accepted."""
+        response = await client.get("/api/accuracy/edge?lookback_days=30")
+        assert response.status_code == 200
+
+    async def test_lookback_days_validation(self, client: AsyncClient) -> None:
+        """lookback_days must be between 1 and 365."""
+        response = await client.get("/api/accuracy/edge?lookback_days=0")
+        assert response.status_code == 422
+
+        response = await client.get("/api/accuracy/edge?lookback_days=400")
+        assert response.status_code == 422
+
+    async def test_unauthenticated(self, unauthed_client: AsyncClient) -> None:
+        """Returns 401 when not authenticated."""
+        response = await unauthed_client.get("/api/accuracy/edge")
+        assert response.status_code == 401
+
+    async def test_by_side_breakdown(self, client: AsyncClient, db: AsyncSession) -> None:
+        """Edge report includes per-side breakdown."""
+        from sqlalchemy import select
+
+        from backend.common.models import User
+
+        result = await db.execute(select(User).limit(1))
+        user = result.scalar_one()
+
+        # Add 15 YES-side trades
+        for i in range(15):
+            trade = _make_settled_trade(
+                user_id=user.id,
+                side="yes",
+                status=TradeStatus.WON if i % 2 == 0 else TradeStatus.LOST,
+            )
+            db.add(trade)
+        await db.commit()
+
+        response = await client.get("/api/accuracy/edge")
+        assert response.status_code == 200
+        data = response.json()
+        assert "yes" in data["by_side"]

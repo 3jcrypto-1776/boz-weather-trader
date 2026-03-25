@@ -108,7 +108,7 @@ def apply_guardrails(
     return round(blended, 6), None
 
 
-def estimate_fees(price_cents: int, side: str) -> int:
+def estimate_fees(price_cents: int, side: str, mode: str = "conservative") -> int:
     """Estimate Kalshi taker fees for a single contract in CENTS.
 
     Kalshi fee formula (effective Feb 5, 2026):
@@ -119,9 +119,13 @@ def estimate_fees(price_cents: int, side: str) -> int:
     so the fee is identical regardless of side. We keep the side parameter for
     API compatibility but it doesn't affect the result.
 
+    In "realistic" mode, the taker fee is scaled to 30% of the theoretical
+    maximum, reflecting the empirically observed average fee rebate.
+
     Args:
         price_cents: Market YES price in cents (1-99).
         side: "yes" or "no" (kept for API compatibility; fee is side-agnostic).
+        mode: "conservative" (full theoretical fee) or "realistic" (30% of taker fee).
 
     Returns:
         Estimated fee in CENTS per contract (int, minimum 1).
@@ -138,7 +142,10 @@ def estimate_fees(price_cents: int, side: str) -> int:
 
     # Kalshi: ceil(0.07 * 1 * P * (1-P)), convert to cents: ceil(7 * P * (1-P))
     p = price_cents / 100
-    fee_cents = math.ceil(7 * p * (1 - p))
+    taker_fee = math.ceil(7 * p * (1 - p))
+
+    fee_cents = math.ceil(taker_fee * 0.30) if mode == "realistic" else taker_fee
+
     return max(1, fee_cents)
 
 
@@ -146,6 +153,7 @@ def calculate_ev(
     model_prob: float,
     market_price_cents: int,
     side: str,
+    fee_mode: str = "conservative",
 ) -> float:
     """Calculate expected value for a potential trade.
 
@@ -157,6 +165,7 @@ def calculate_ev(
         model_prob: Our model's probability for the bracket (0.0 to 1.0).
         market_price_cents: Kalshi market YES price in CENTS (1-99).
         side: "yes" or "no".
+        fee_mode: "conservative" (full fee) or "realistic" (30% of taker fee).
 
     Returns:
         Expected value in DOLLARS (positive = profitable).
@@ -178,7 +187,7 @@ def calculate_ev(
         msg = f"side must be 'yes' or 'no', got {side!r}"
         raise ValueError(msg)
 
-    fee_cents = estimate_fees(market_price_cents, side)
+    fee_cents = estimate_fees(market_price_cents, side, mode=fee_mode)
     fee_dollars = fee_cents / 100
 
     ev = (prob_win * 1.00) - cost_dollars - fee_dollars
@@ -199,6 +208,7 @@ def scan_bracket(
     bankroll_cents: int = 0,
     max_trade_size_cents: int = 100,
     guardrail_settings: GuardrailSettings | None = None,
+    fee_estimate_mode: str = "conservative",
 ) -> TradeSignal | None:
     """Scan a single bracket for trading opportunities on both YES and NO sides.
 
@@ -245,9 +255,15 @@ def scan_bracket(
 
     # Calculate EV using blended probabilities (or skip if blocked)
     ev_yes = (
-        calculate_ev(blended_yes, market_price_cents, "yes") if blended_yes is not None else -999.0
+        calculate_ev(blended_yes, market_price_cents, "yes", fee_mode=fee_estimate_mode)
+        if blended_yes is not None
+        else -999.0
     )
-    ev_no = calculate_ev(blended_no, market_price_cents, "no") if blended_no is not None else -999.0
+    ev_no = (
+        calculate_ev(blended_no, market_price_cents, "no", fee_mode=fee_estimate_mode)
+        if blended_no is not None
+        else -999.0
+    )
 
     logger.debug(
         "Bracket scan",
@@ -364,6 +380,7 @@ def scan_all_brackets(
     *,
     min_ev_threshold_yes: float | None = None,
     min_ev_threshold_no: float | None = None,
+    fee_estimate_mode: str = "conservative",
 ) -> list[TradeSignal]:
     """Scan all brackets for a city and return all +EV trade signals.
 
@@ -431,6 +448,7 @@ def scan_all_brackets(
             bankroll_cents=bankroll_cents,
             max_trade_size_cents=max_trade_size_cents,
             guardrail_settings=guardrail_settings,
+            fee_estimate_mode=fee_estimate_mode,
         )
         if signal is not None:
             signals.append(signal)

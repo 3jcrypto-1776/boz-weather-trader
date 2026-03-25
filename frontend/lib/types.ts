@@ -145,6 +145,8 @@ export interface UserSettings {
   model_weight: number;
   max_model_market_divergence: number;
   min_market_prob_for_yes: number;
+  // Fee estimation
+  fee_estimate_mode: string;
   // Display preferences
   timezone: string; // IANA timezone or "" for browser default
 }
@@ -169,6 +171,8 @@ export interface SettingsUpdate {
   model_weight?: number;
   max_model_market_divergence?: number;
   min_market_prob_for_yes?: number;
+  // Fee estimation
+  fee_estimate_mode?: string;
   // Display preferences
   timezone?: string;
 }
@@ -425,4 +429,25 @@ export interface PushSubscriptionPayload {
   endpoint: string;
   expirationTime: number | null;
   keys: Record<string, string>;
+}
+
+// ─── Model Edge ───
+
+export interface ModelEdgeBucket {
+  model_brier: number;
+  market_brier: number;
+  edge: number;
+  sample_count: number;
+  verdict: string;
+}
+
+export interface ModelEdgeReport {
+  model_brier: number;
+  market_brier: number;
+  edge: number;
+  edge_pct: string;
+  verdict: string;
+  sample_count: number;
+  by_side: Record<string, ModelEdgeBucket>;
+  by_city: Record<string, ModelEdgeBucket>;
 }

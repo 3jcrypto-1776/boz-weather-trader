@@ -188,6 +188,7 @@ def _simulate_day(
             max_trade_size_cents=risk.get_max_trade_size_cents(),
             min_ev_threshold_yes=getattr(config, "min_ev_threshold_yes", None),
             min_ev_threshold_no=getattr(config, "min_ev_threshold_no", None),
+            fee_estimate_mode=getattr(config, "fee_estimate_mode", "conservative"),
         )
 
         # Execute each signal through risk manager

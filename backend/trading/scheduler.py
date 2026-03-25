@@ -407,6 +407,7 @@ async def _run_trading_cycle() -> None:
                 guardrail_settings=guardrail_settings,
                 min_ev_threshold_yes=user_settings.min_ev_threshold_yes,
                 min_ev_threshold_no=user_settings.min_ev_threshold_no,
+                fee_estimate_mode=user_settings.fee_estimate_mode,
             )
             if not signals:
                 logger.debug(

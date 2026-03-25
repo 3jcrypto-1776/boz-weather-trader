@@ -40,6 +40,9 @@ export default function SettingsPage() {
   const [activeCities, setActiveCities] = useState<CityCode[]>(ALL_CITIES);
   const [notifications, setNotifications] = useState(true);
 
+  // Fee estimation
+  const [feeEstimateMode, setFeeEstimateMode] = useState("conservative");
+
   // Model guardrails
   const [modelWeight, setModelWeight] = useState(0.4);
   const [maxDivergence, setMaxDivergence] = useState(0.25);
@@ -76,6 +79,7 @@ export default function SettingsPage() {
       setModelWeight(settings.model_weight);
       setMaxDivergence(settings.max_model_market_divergence);
       setMinMarketProb(settings.min_market_prob_for_yes);
+      setFeeEstimateMode(settings.fee_estimate_mode || "conservative");
       setTimezone(settings.timezone);
     }
   }, [settings]);
@@ -110,6 +114,7 @@ export default function SettingsPage() {
         model_weight: modelWeight,
         max_model_market_divergence: maxDivergence,
         min_market_prob_for_yes: minMarketProb,
+        fee_estimate_mode: feeEstimateMode,
         timezone,
       };
       await updateSettings(update);
@@ -474,6 +479,30 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
+              </section>
+
+              {/* Fee Estimation */}
+              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <h2 className="text-sm font-semibold mb-3">Fee Estimation</h2>
+                <div className="flex gap-2">
+                  {(["conservative", "realistic"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setFeeEstimateMode(mode)}
+                      className={`min-h-[44px] flex-1 px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                        feeEstimateMode === mode
+                          ? "bg-boz-primary text-white"
+                          : "bg-gray-100 text-boz-neutral hover:bg-gray-200"
+                      }`}
+                      data-testid={`fee-mode-${mode}`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-boz-neutral mt-2">
+                  Realistic accounts for most limit orders having zero fees
+                </p>
               </section>
 
               {/* Model Guardrails */}

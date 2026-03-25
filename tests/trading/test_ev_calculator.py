@@ -73,6 +73,48 @@ class TestEstimateFees:
         result = estimate_fees(50, "yes")
         assert isinstance(result, int)
 
+    def test_realistic_mode_lower_fee(self) -> None:
+        """Realistic mode returns 30% of taker fee (rounded up, min 1)."""
+        conservative = estimate_fees(50, "yes", mode="conservative")
+        realistic = estimate_fees(50, "yes", mode="realistic")
+        assert realistic < conservative
+        # ceil(7 * 0.5 * 0.5) = 2, realistic = ceil(2 * 0.30) = ceil(0.6) = 1
+        assert realistic == 1
+
+    def test_realistic_mode_at_22_cents(self) -> None:
+        """Realistic at 22c: taker = ceil(7*0.22*0.78)=2, realistic = ceil(2*0.30)=1."""
+        assert estimate_fees(22, "yes", mode="realistic") == 1
+
+    def test_conservative_is_default(self) -> None:
+        """Default mode (no explicit mode) matches conservative."""
+        default = estimate_fees(40, "yes")
+        conservative = estimate_fees(40, "yes", mode="conservative")
+        assert default == conservative
+
+    def test_realistic_minimum_fee(self) -> None:
+        """Realistic mode still returns minimum 1 cent."""
+        # At 95c, taker = ceil(7*0.95*0.05) = 1, realistic = ceil(1*0.30) = ceil(0.3) = 1
+        assert estimate_fees(95, "yes", mode="realistic") == 1
+
+
+# ---------------------------------------------------------------------------
+# TestCalculateEVWithFeeMode
+# ---------------------------------------------------------------------------
+class TestCalculateEVWithFeeMode:
+    """EV calculation with different fee modes."""
+
+    def test_realistic_mode_higher_ev(self) -> None:
+        """Realistic mode produces higher EV due to lower fees."""
+        ev_conservative = calculate_ev(0.40, 22, "yes", fee_mode="conservative")
+        ev_realistic = calculate_ev(0.40, 22, "yes", fee_mode="realistic")
+        assert ev_realistic >= ev_conservative
+
+    def test_default_fee_mode_is_conservative(self) -> None:
+        """Default fee_mode matches conservative."""
+        ev_default = calculate_ev(0.40, 22, "yes")
+        ev_conservative = calculate_ev(0.40, 22, "yes", fee_mode="conservative")
+        assert ev_default == ev_conservative
+
 
 # ---------------------------------------------------------------------------
 # TestCalculateEV
