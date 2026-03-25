@@ -1,16 +1,8 @@
 "use client";
 
+import { useTimezone } from "@/lib/timezone-context";
 import type { BracketPrediction } from "@/lib/types";
-import { confidenceBadgeColor, formatProbability } from "@/lib/utils";
-
-function formatMarketDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
+import { confidenceBadgeColor, formatDate, formatProbability } from "@/lib/utils";
 
 interface BracketViewProps {
   prediction: BracketPrediction;
@@ -26,7 +18,8 @@ export default function BracketView({
   prediction,
   marketPrices,
 }: BracketViewProps) {
-  const dateLabel = prediction.date ? formatMarketDate(prediction.date) : "";
+  const tz = useTimezone();
+  const dateLabel = prediction.date ? formatDate(prediction.date, tz) : "";
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">

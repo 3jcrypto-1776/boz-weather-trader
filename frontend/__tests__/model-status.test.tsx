@@ -10,6 +10,10 @@ vi.mock("lucide-react", () => ({
   Clock: () => <span data-testid="clock-icon" />,
 }));
 
+vi.mock("@/lib/timezone-context", () => ({
+  useTimezone: () => undefined,
+}));
+
 const makeReport = (overrides?: Partial<TrainingReport>): TrainingReport => ({
   id: 1,
   triggered_by: "schedule",

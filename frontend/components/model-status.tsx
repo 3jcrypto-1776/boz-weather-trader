@@ -1,7 +1,9 @@
 "use client";
 
 import { Brain, BarChart3, Clock } from "lucide-react";
+import { useTimezone } from "@/lib/timezone-context";
 import type { TrainingReport } from "@/lib/types";
+import { formatDateTime } from "@/lib/utils";
 
 /** Friendly display names for weather sources. */
 function sourceLabel(key: string): string {
@@ -28,16 +30,8 @@ interface Props {
 }
 
 export default function ModelStatus({ report }: Props) {
-  const trainedAt = new Date(report.completed_at);
-  const formattedDate = trainedAt.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-  const formattedTime = trainedAt.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const tz = useTimezone();
+  const formattedDateTime = formatDateTime(report.completed_at, tz);
 
   // Sort source weights descending
   const sourceWeights = report.source_weights_after ?? report.source_weights_before;
@@ -59,7 +53,7 @@ export default function ModelStatus({ report }: Props) {
         <div className="flex items-center gap-1 text-[11px] text-boz-neutral">
           <Clock className="w-3 h-3" />
           <span>
-            Last trained {formattedDate} {formattedTime}
+            Last trained {formattedDateTime}
           </span>
           <span className="mx-1">·</span>
           <span>

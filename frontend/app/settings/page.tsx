@@ -43,6 +43,9 @@ export default function SettingsPage() {
   const [maxDivergence, setMaxDivergence] = useState(0.25);
   const [minMarketProb, setMinMarketProb] = useState(0.15);
 
+  // Display preferences
+  const [timezone, setTimezone] = useState("");
+
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -69,6 +72,7 @@ export default function SettingsPage() {
       setModelWeight(settings.model_weight);
       setMaxDivergence(settings.max_model_market_divergence);
       setMinMarketProb(settings.min_market_prob_for_yes);
+      setTimezone(settings.timezone);
     }
   }, [settings]);
 
@@ -100,6 +104,7 @@ export default function SettingsPage() {
         model_weight: modelWeight,
         max_model_market_divergence: maxDivergence,
         min_market_prob_for_yes: minMarketProb,
+        timezone,
       };
       await updateSettings(update);
       await mutate("/api/settings");
@@ -527,6 +532,32 @@ export default function SettingsPage() {
                       {city}
                     </button>
                   ))}
+                </div>
+              </section>
+
+              {/* Display Preferences */}
+              <section className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+                <h2 className="text-sm font-semibold mb-3">Display</h2>
+                <div>
+                  <label className="block text-xs mb-1">Timezone</label>
+                  <select
+                    value={timezone}
+                    onChange={(e) => setTimezone(e.target.value)}
+                    className="w-full min-h-[44px] px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-boz-primary focus:border-transparent"
+                    data-testid="timezone-select"
+                  >
+                    <option value="">Browser Default</option>
+                    <option value="America/New_York">Eastern (ET)</option>
+                    <option value="America/Chicago">Central (CT)</option>
+                    <option value="America/Denver">Mountain (MT)</option>
+                    <option value="America/Los_Angeles">Pacific (PT)</option>
+                    <option value="America/Anchorage">Alaska (AKT)</option>
+                    <option value="Pacific/Honolulu">Hawaii (HT)</option>
+                    <option value="UTC">UTC</option>
+                  </select>
+                  <p className="text-xs text-boz-neutral mt-1">
+                    Controls how timestamps are displayed across the app
+                  </p>
                 </div>
               </section>
 

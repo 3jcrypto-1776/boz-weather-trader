@@ -49,7 +49,7 @@ export function formatProbability(prob: number): string {
  * In US timezones this shifts backward to the previous day. We append T12:00:00
  * to force midday parsing so the displayed date matches the intended date.
  */
-export function formatDate(dateStr: string | Date): string {
+export function formatDate(dateStr: string | Date, tz?: string): string {
   let d: Date;
   if (typeof dateStr === "string") {
     // Date-only string (YYYY-MM-DD) → add noon to avoid timezone day shift
@@ -59,11 +59,13 @@ export function formatDate(dateStr: string | Date): string {
   } else {
     d = dateStr;
   }
-  return d.toLocaleDateString("en-US", {
+  const opts: Intl.DateTimeFormatOptions = {
     weekday: "short",
     month: "short",
     day: "numeric",
-  });
+  };
+  if (tz) opts.timeZone = tz;
+  return d.toLocaleDateString("en-US", opts);
 }
 
 /**
@@ -72,7 +74,7 @@ export function formatDate(dateStr: string | Date): string {
  *
  * Uses the same noon-parsing trick as formatDate() to avoid timezone day shift.
  */
-export function formatDateLong(dateStr: string | Date): string {
+export function formatDateLong(dateStr: string | Date, tz?: string): string {
   let d: Date;
   if (typeof dateStr === "string") {
     d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
@@ -81,12 +83,14 @@ export function formatDateLong(dateStr: string | Date): string {
   } else {
     d = dateStr;
   }
-  return d.toLocaleDateString("en-US", {
+  const opts: Intl.DateTimeFormatOptions = {
     weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric",
-  });
+  };
+  if (tz) opts.timeZone = tz;
+  return d.toLocaleDateString("en-US", opts);
 }
 
 /**
@@ -95,19 +99,21 @@ export function formatDateLong(dateStr: string | Date): string {
  * we append "Z" as a defensive fallback.
  * Returns "Feb 18, 2:30 PM CST" style format with timezone indicator.
  */
-export function formatDateTime(dateStr: string): string {
+export function formatDateTime(dateStr: string, tz?: string): string {
   // If no timezone info, treat as UTC (defensive fallback for legacy data).
   const hasTimezone =
     dateStr.endsWith("Z") || dateStr.includes("+") || /[+-]\d{2}:\d{2}$/.test(dateStr);
   const normalized = hasTimezone ? dateStr : dateStr + "Z";
   const d = new Date(normalized);
-  return d.toLocaleString("en-US", {
+  const opts: Intl.DateTimeFormatOptions = {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
     timeZoneName: "short",
-  });
+  };
+  if (tz) opts.timeZone = tz;
+  return d.toLocaleString("en-US", opts);
 }
 
 /**
@@ -116,17 +122,19 @@ export function formatDateTime(dateStr: string): string {
  * we append "Z" as a defensive fallback.
  * Returns "3:06 PM CST" style format with timezone indicator.
  */
-export function formatTime(dateStr: string): string {
+export function formatTime(dateStr: string, tz?: string): string {
   // If no timezone info, treat as UTC (defensive fallback for legacy data).
   const hasTimezone =
     dateStr.endsWith("Z") || dateStr.includes("+") || /[+-]\d{2}:\d{2}$/.test(dateStr);
   const normalized = hasTimezone ? dateStr : dateStr + "Z";
   const d = new Date(normalized);
-  return d.toLocaleTimeString("en-US", {
+  const opts: Intl.DateTimeFormatOptions = {
     hour: "numeric",
     minute: "2-digit",
     timeZoneName: "short",
-  });
+  };
+  if (tz) opts.timeZone = tz;
+  return d.toLocaleTimeString("en-US", opts);
 }
 
 /**

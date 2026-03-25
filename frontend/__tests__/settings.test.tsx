@@ -54,6 +54,7 @@ const MOCK_SETTINGS: UserSettings = {
   model_weight: 0.4,
   max_model_market_divergence: 0.25,
   min_market_prob_for_yes: 0.15,
+  timezone: "",
 };
 
 describe("SettingsPage", () => {
@@ -608,6 +609,65 @@ describe("SettingsPage", () => {
       );
       expect(cooldownSlider).toBeTruthy();
       expect(cooldownSlider).toBeDisabled();
+    });
+  });
+
+  describe("Timezone Setting", () => {
+    it("renders timezone dropdown with Browser Default selected", () => {
+      mockUseSettings.mockReturnValue({
+        data: MOCK_SETTINGS,
+        error: undefined,
+        isLoading: false,
+      });
+
+      render(<SettingsPage />);
+      const select = screen.getByTestId("timezone-select") as HTMLSelectElement;
+      expect(select).toBeInTheDocument();
+      expect(select.value).toBe("");
+    });
+
+    it("renders timezone dropdown with saved timezone selected", () => {
+      mockUseSettings.mockReturnValue({
+        data: { ...MOCK_SETTINGS, timezone: "America/Chicago" },
+        error: undefined,
+        isLoading: false,
+      });
+
+      render(<SettingsPage />);
+      const select = screen.getByTestId("timezone-select") as HTMLSelectElement;
+      expect(select.value).toBe("America/Chicago");
+    });
+
+    it("can change timezone selection", () => {
+      mockUseSettings.mockReturnValue({
+        data: MOCK_SETTINGS,
+        error: undefined,
+        isLoading: false,
+      });
+
+      render(<SettingsPage />);
+      const select = screen.getByTestId("timezone-select");
+      fireEvent.change(select, { target: { value: "America/New_York" } });
+      expect((select as HTMLSelectElement).value).toBe("America/New_York");
+    });
+
+    it("includes timezone in save payload", async () => {
+      mockUpdateSettings.mockResolvedValue({});
+      mockUseSettings.mockReturnValue({
+        data: { ...MOCK_SETTINGS, timezone: "America/Denver" },
+        error: undefined,
+        isLoading: false,
+      });
+
+      render(<SettingsPage />);
+      const saveBtn = screen.getByRole("button", { name: /save settings/i });
+      fireEvent.click(saveBtn);
+
+      await waitFor(() => {
+        expect(mockUpdateSettings).toHaveBeenCalledWith(
+          expect.objectContaining({ timezone: "America/Denver" })
+        );
+      });
     });
   });
 });

@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DashboardData, DashboardStats } from "@/lib/types";
 
+// Mock timezone context
+vi.mock("@/lib/timezone-context", () => ({
+  useTimezone: () => undefined,
+}));
+
 // Mock hooks
 const mockUseDashboard = vi.fn();
 const mockUseDashboardStats = vi.fn();

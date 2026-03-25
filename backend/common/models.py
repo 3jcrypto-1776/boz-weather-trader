@@ -142,6 +142,9 @@ class User(Base):
     max_model_market_divergence = Column(Float, default=0.25)
     min_market_prob_for_yes = Column(Float, default=0.15)
 
+    # Display preferences
+    timezone = Column(String, default="")
+
     created_at = Column(TZNaiveDateTime, default=_utcnow)
     updated_at = Column(TZNaiveDateTime, default=_utcnow, onupdate=_utcnow)
 

@@ -11,6 +11,7 @@ import {
   sortMarketGroups,
   type DaySortOption,
 } from "@/lib/trade-grouping";
+import { useTimezone } from "@/lib/timezone-context";
 import type { CalendarDay } from "@/lib/types";
 import { formatDateLong, formatPnL, formatProbability } from "@/lib/utils";
 
@@ -38,10 +39,11 @@ export default function DayDetailModal({
 }: DayDetailModalProps) {
   const [sortBy, setSortBy] = useState<DaySortOption>("time");
   const closeRef = useRef<HTMLButtonElement>(null);
+  const tz = useTimezone();
 
   const { data, isLoading } = useTrades(1, undefined, undefined, date, 200);
 
-  const displayDate = formatDateLong(date);
+  const displayDate = formatDateLong(date, tz);
 
   const marketGroups = useMemo(() => {
     if (!data) return [];

@@ -143,6 +143,8 @@ export interface UserSettings {
   model_weight: number;
   max_model_market_divergence: number;
   min_market_prob_for_yes: number;
+  // Display preferences
+  timezone: string; // IANA timezone or "" for browser default
 }
 
 export interface SettingsUpdate {
@@ -163,6 +165,8 @@ export interface SettingsUpdate {
   model_weight?: number;
   max_model_market_divergence?: number;
   min_market_prob_for_yes?: number;
+  // Display preferences
+  timezone?: string;
 }
 
 // ─── Logs ───

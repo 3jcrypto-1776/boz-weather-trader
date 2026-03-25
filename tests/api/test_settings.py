@@ -130,3 +130,37 @@ async def test_patch_per_loss_cooldown_toggle(client: AsyncClient) -> None:
     # Verify it persists on GET
     get_resp = await client.get("/api/settings")
     assert get_resp.json()["enable_per_loss_cooldown"] is False
+
+
+async def test_get_settings_includes_timezone_default(client: AsyncClient) -> None:
+    """GET /api/settings includes timezone (defaults to empty string = browser default)."""
+    response = await client.get("/api/settings")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["timezone"] == ""
+
+
+async def test_patch_timezone(client: AsyncClient) -> None:
+    """PATCH /api/settings can update timezone to an IANA timezone string."""
+    response = await client.patch(
+        "/api/settings",
+        json={"timezone": "America/Chicago"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["timezone"] == "America/Chicago"
+
+    # Verify it persists on GET
+    get_resp = await client.get("/api/settings")
+    assert get_resp.json()["timezone"] == "America/Chicago"
+
+
+async def test_patch_timezone_to_browser_default(client: AsyncClient) -> None:
+    """PATCH /api/settings can reset timezone to empty string (browser default)."""
+    # Set a timezone first
+    await client.patch("/api/settings", json={"timezone": "America/New_York"})
+
+    # Reset to browser default
+    response = await client.patch("/api/settings", json={"timezone": ""})
+    assert response.status_code == 200
+    assert response.json()["timezone"] == ""

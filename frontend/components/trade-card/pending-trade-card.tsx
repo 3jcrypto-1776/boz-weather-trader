@@ -2,6 +2,7 @@
 
 import { Check, X } from "lucide-react";
 
+import { useTimezone } from "@/lib/timezone-context";
 import type { PendingTrade } from "@/lib/types";
 import {
   centsToDollars,
@@ -31,6 +32,7 @@ export default function PendingTradeCard({
   onReject,
   isLoading = false,
 }: PendingTradeCardProps) {
+  const tz = useTimezone();
   const remaining = timeRemaining(trade.expires_at);
   const isExpired = remaining === "Expired";
   const evPercent = (trade.ev * 100).toFixed(1);
@@ -66,7 +68,7 @@ export default function PendingTradeCard({
 
       {/* Date + side subtitle */}
       <p className="text-xs text-boz-neutral mb-2">
-        {formatDate(trade.created_at)} at {formatTime(trade.created_at)} &middot;{" "}
+        {formatDate(trade.created_at, tz)} at {formatTime(trade.created_at, tz)} &middot;{" "}
         {trade.side.toUpperCase()} @ ${centsToDollars(trade.price_cents)}
         {countdown && (
           <>

@@ -9,12 +9,15 @@
  */
 
 import { ToastProvider } from "@/components/ui/toast";
+import { TimezoneProvider } from "@/lib/timezone-context";
 import { WebSocketProvider } from "@/lib/websocket";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WebSocketProvider>
-      <ToastProvider>{children}</ToastProvider>
+      <TimezoneProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </TimezoneProvider>
     </WebSocketProvider>
   );
 }

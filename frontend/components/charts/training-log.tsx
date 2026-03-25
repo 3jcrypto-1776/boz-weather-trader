@@ -11,7 +11,9 @@ import {
 } from "lucide-react";
 
 import { triggerRetraining } from "@/lib/api";
+import { useTimezone } from "@/lib/timezone-context";
 import type { TrainingReport, TrainingReportList } from "@/lib/types";
+import { formatDateTime } from "@/lib/utils";
 
 interface TrainingLogProps {
   data: TrainingReportList;
@@ -94,17 +96,9 @@ function formatWeights(
 /** Single expandable report card. */
 function ReportCard({ report }: { report: TrainingReport }) {
   const [expanded, setExpanded] = useState(false);
+  const tz = useTimezone();
 
-  const date = new Date(report.completed_at);
-  const dateStr = date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-  const timeStr = date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const dateTimeStr = formatDateTime(report.completed_at, tz);
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -120,7 +114,7 @@ function ReportCard({ report }: { report: TrainingReport }) {
           <ChevronRight className="w-4 h-4 text-boz-neutral flex-shrink-0" />
         )}
         <span className="text-xs text-boz-neutral whitespace-nowrap">
-          {dateStr} {timeStr}
+          {dateTimeStr}
         </span>
         <div className="flex items-center gap-1.5 flex-wrap">
           {triggerBadge(report.triggered_by)}
@@ -291,8 +285,8 @@ function ReportCard({ report }: { report: TrainingReport }) {
                 <>
                   {" "}
                   &middot; Data:{" "}
-                  {new Date(report.date_range_start).toLocaleDateString()} –{" "}
-                  {new Date(report.date_range_end).toLocaleDateString()}
+                  {new Date(report.date_range_start).toLocaleDateString("en-US", tz ? { timeZone: tz } : undefined)} –{" "}
+                  {new Date(report.date_range_end).toLocaleDateString("en-US", tz ? { timeZone: tz } : undefined)}
                 </>
               )}
             </div>

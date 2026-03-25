@@ -4,8 +4,10 @@ import {
   centsToDollars,
   confidenceBadgeColor,
   formatDate,
+  formatDateTime,
   formatPnL,
   formatProbability,
+  formatTime,
   parsePostmortemSections,
   shortBracketLabel,
   statusColor,
@@ -219,5 +221,40 @@ describe("shortBracketLabel", () => {
 
   it("falls back to bracket_label when both bounds null", () => {
     expect(shortBracketLabel("Unknown", null, null)).toBe("Unknown");
+  });
+});
+
+// ─── Timezone-aware formatting ───
+
+describe("formatDateTime with timezone", () => {
+  it("formats in specified timezone", () => {
+    // Midnight UTC = 7pm ET previous day
+    const result = formatDateTime("2026-03-25T00:00:00Z", "America/New_York");
+    expect(result).toContain("Mar 24");
+    expect(result).toContain("8:00 PM");
+  });
+
+  it("formats without timezone param (browser default)", () => {
+    const result = formatDateTime("2026-03-25T12:00:00Z");
+    // Should not throw and should contain some date info
+    expect(result).toContain("Mar");
+  });
+});
+
+describe("formatTime with timezone", () => {
+  it("formats time in specified timezone", () => {
+    // 18:00 UTC = 12:00 PM CT (CDT in March)
+    const result = formatTime("2026-03-25T18:00:00Z", "America/Chicago");
+    expect(result).toContain("1:00 PM");
+  });
+});
+
+describe("formatDate with timezone", () => {
+  it("works with date-only string regardless of timezone", () => {
+    // Date-only strings use noon-parsing trick so tz shouldn't change the date
+    const resultET = formatDate("2026-03-25", "America/New_York");
+    const resultPT = formatDate("2026-03-25", "America/Los_Angeles");
+    expect(resultET).toContain("Mar 25");
+    expect(resultPT).toContain("Mar 25");
   });
 });

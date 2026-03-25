@@ -1,5 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/timezone-context", () => ({
+  useTimezone: () => undefined,
+}));
 
 import TradeCard from "@/components/trade-card/trade-card";
 import type { GroupedTrade, TradeRecord } from "@/lib/types";

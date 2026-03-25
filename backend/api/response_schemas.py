@@ -227,6 +227,9 @@ class SettingsUpdate(BaseModel):
     max_model_market_divergence: float | None = None
     min_market_prob_for_yes: float | None = None
 
+    # Display preferences
+    timezone: str | None = None
+
 
 # ─── Cooldown Status ───
 

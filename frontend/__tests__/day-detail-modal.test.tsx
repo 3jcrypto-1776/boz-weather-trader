@@ -15,6 +15,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+vi.mock("@/lib/timezone-context", () => ({
+  useTimezone: () => undefined,
+}));
+
 import DayDetailModal from "@/components/calendar/day-detail-modal";
 
 function makeTrade(overrides: Partial<TradeRecord> = {}): TradeRecord {

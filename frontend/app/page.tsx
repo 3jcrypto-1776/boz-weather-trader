@@ -15,9 +15,10 @@ import Skeleton from "@/components/ui/skeleton";
 import TradeCard from "@/components/trade-card/trade-card";
 import WeatherTicker from "@/components/weather-ticker/weather-ticker";
 import { useCooldownStatus, useCurrentWeather, useDashboard, useDashboardStats } from "@/lib/hooks";
+import { useTimezone } from "@/lib/timezone-context";
 import { groupByMarket } from "@/lib/trade-grouping";
 import type { CityCode, DashboardData, DashboardStats, StatsPeriod } from "@/lib/types";
-import { centsToDollars, confidenceBadgeColor, formatPnL, shortBracketLabel, CITY_NAMES } from "@/lib/utils";
+import { centsToDollars, confidenceBadgeColor, formatDate, formatPnL, formatTime, shortBracketLabel, CITY_NAMES } from "@/lib/utils";
 
 // ─── Period Toggle Helpers ───
 
@@ -77,16 +78,6 @@ function StatCard({
 
 // ─── Predictions Section ───
 
-function formatMarketDate(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-  return date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 const PREDICTION_CITIES: CityCode[] = ["NYC", "CHI", "MIA", "AUS"];
 
 function PredictionsSection({
@@ -98,9 +89,10 @@ function PredictionsSection({
     predictions[0]?.city ?? "NYC",
   );
 
+  const tz = useTimezone();
   const pred = predictions.find((p) => p.city === selectedCity);
   const dateLabel = predictions[0]?.date
-    ? formatMarketDate(predictions[0].date)
+    ? formatDate(predictions[0].date, tz)
     : "";
 
   // Cities that have predictions available
@@ -119,10 +111,7 @@ function PredictionsSection({
         {predictions[0]?.generated_at && (
           <span className="text-[10px] text-boz-neutral" data-testid="prediction-timestamp">
             · Updated{" "}
-            {new Date(predictions[0].generated_at).toLocaleTimeString("en-US", {
-              hour: "numeric",
-              minute: "2-digit",
-            })}
+            {formatTime(predictions[0].generated_at, tz)}
           </span>
         )}
       </div>
@@ -257,6 +246,7 @@ function DashboardContent({
   stats: DashboardStats | undefined;
 }) {
   const router = useRouter();
+  const tz = useTimezone();
 
   // P/L period toggle (defaults to "week")
   const [pnlPeriod, setPnlPeriod] = useState<StatsPeriod>("week");
@@ -401,6 +391,7 @@ function DashboardSkeleton() {
 
 function CooldownBanner() {
   const { data: cooldown } = useCooldownStatus();
+  const tz = useTimezone();
 
   if (!cooldown?.is_active) return null;
 
@@ -423,7 +414,7 @@ function CooldownBanner() {
         )}
         {cooldown.cooldown_until && (
           <span className="text-amber-600 text-xs ml-2">
-            (until {new Date(cooldown.cooldown_until).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })})
+            (until {formatTime(cooldown.cooldown_until, tz)})
           </span>
         )}
       </div>

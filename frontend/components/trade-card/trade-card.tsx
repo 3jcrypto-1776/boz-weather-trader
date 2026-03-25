@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useState } from "react";
 
+import { useTimezone } from "@/lib/timezone-context";
 import type { GroupedTrade } from "@/lib/types";
 import {
   centsToDollars,
@@ -29,6 +30,7 @@ interface TradeCardProps {
  */
 export default function TradeCard({ group, currentTempF }: TradeCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const tz = useTimezone();
 
   const isSettled = group.status === "WON" || group.status === "LOST";
   const isMulti = group.trades.length > 1;
@@ -76,7 +78,7 @@ export default function TradeCard({ group, currentTempF }: TradeCardProps) {
           </div>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-xs text-boz-neutral">
-              {formatDate(group.date)}
+              {formatDate(group.date, tz)}
             </span>
             <span className="text-xs text-boz-neutral">
               {group.side.toUpperCase()} @ {centsToDollars(group.vwapCents)}
@@ -185,7 +187,7 @@ export default function TradeCard({ group, currentTempF }: TradeCardProps) {
                       {trade.quantity}x @ ${centsToDollars(trade.price_cents)}
                     </span>
                     <span className="text-boz-neutral">
-                      {formatDateTime(trade.created_at)}
+                      {formatDateTime(trade.created_at, tz)}
                     </span>
                   </div>
                 ))}

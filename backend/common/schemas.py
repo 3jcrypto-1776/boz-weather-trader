@@ -237,6 +237,9 @@ class UserSettings(BaseModel):
     max_model_market_divergence: float = Field(default=0.25, ge=0.0, le=0.50)
     min_market_prob_for_yes: float = Field(default=0.15, ge=0.0, le=0.50)
 
+    # ─── Display Preferences ───
+    timezone: str = ""  # IANA timezone (e.g. "America/Chicago"), empty = browser default
+
 
 # ─── Portfolio Sync ───
 
