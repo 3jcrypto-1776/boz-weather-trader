@@ -117,6 +117,11 @@ class UserSettings(BaseModel):
     model_weight: float            # 0.0-1.0, weight for model vs market in blended probability
     max_model_market_divergence: float  # max allowed abs diff between model and market prob
     min_market_prob_for_yes: float      # min market probability to allow YES trades
+    # Split EV thresholds (Phase 48)
+    min_ev_threshold_yes: float    # 0.0 to 1.0, minimum EV for YES trades
+    min_ev_threshold_no: float     # 0.0 to 1.0, minimum EV for NO trades
+    # Fee estimation mode (Phase 49)
+    fee_estimate_mode: str         # "conservative" or "realistic"
 ```
 
 ---
@@ -167,6 +172,11 @@ class User(Base):
     model_weight = Column(Float, default=0.7)  # 0.0-1.0 weight for model vs market prob
     max_model_market_divergence = Column(Float, default=0.30)  # max abs diff before blocking
     min_market_prob_for_yes = Column(Float, default=0.05)  # min market prob for YES trades
+    # Split EV thresholds (Phase 48)
+    min_ev_threshold_yes = Column(Float, default=0.05)  # separate YES EV threshold
+    min_ev_threshold_no = Column(Float, default=0.05)   # separate NO EV threshold
+    # Fee estimation (Phase 49)
+    fee_estimate_mode = Column(String, default="conservative")  # "conservative" or "realistic"
     created_at = Column(DateTime, default=datetime.utcnow)
     trades = relationship("Trade", back_populates="user")
 ```
@@ -302,6 +312,11 @@ class User(Base):
     model_weight = Column(Float, default=0.7)  # 0.0-1.0 weight for model vs market prob
     max_model_market_divergence = Column(Float, default=0.30)  # max abs diff before blocking
     min_market_prob_for_yes = Column(Float, default=0.05)  # min market prob for YES trades
+    # Split EV thresholds (Phase 48)
+    min_ev_threshold_yes = Column(Float, default=0.05)  # separate YES EV threshold
+    min_ev_threshold_no = Column(Float, default=0.05)   # separate NO EV threshold
+    # Fee estimation (Phase 49)
+    fee_estimate_mode = Column(String, default="conservative")  # "conservative" or "realistic"
     created_at = Column(DateTime, default=datetime.utcnow)
     trades = relationship("Trade", back_populates="user")
 

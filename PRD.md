@@ -1,9 +1,9 @@
 # Product Requirements Document (PRD)
 # Boz Weather Trader
 
-**Version:** 1.5.0
-**Date:** February 25, 2026
-**Status:** All P0+P1 complete (38 phases + 7 hotfixes + deployment hardening, 1630 tests)
+**Version:** 1.9.3
+**Date:** March 25, 2026
+**Status:** All P0+P1 complete (49 phases + 7 hotfixes + deployment hardening, 1827 tests)
 
 ---
 
@@ -308,7 +308,8 @@ This makes adding new market types straightforward without touching the core tra
 git clone https://github.com/aclarkson2013/boz-weather-trader.git
 cd boz-weather-trader
 cp .env.example .env  # Configure your settings
-docker-compose up -d
+docker compose build   # Build all container images
+docker compose up -d   # Start all services
 # Access at http://localhost:3000
 ```
 - Perfect for homelabs, Raspberry Pi, VPS
@@ -493,12 +494,12 @@ Your Machine (homelab / cloud VPS)
 - [x] **Trade logging** - Full audit trail of every trade placed with reasoning (Phase 4)
 - [x] **Trade post-mortems** - Auto-generated executive summary for each trade after settlement (Phase 3, 14)
 - [x] **Structured logging** - Module-tagged, leveled logs to stdout + database (Phase 1)
-- [x] **Unit + safety tests** - Every module ships with tests; 1421 backend + 209 frontend = 1630 tests (All phases)
+- [x] **Unit + safety tests** - Every module ships with tests; 1559 backend + 268 frontend = 1827 tests (All phases)
 - [x] **CI/CD pipeline** - GitHub Actions: 4 parallel jobs (backend-lint, backend-test w/ coverage, frontend, docker-build) (Phase 8, 22)
 - [x] **Docker Compose deployment** - 10-service Docker Compose (backend, frontend, postgres, redis, celery worker/beat, prometheus, grafana, alertmanager, updater) (Phase 6, 16, 19, 34)
 - [x] **Market type selector UI** - High Temp active, others show "Coming Soon" (Phase 5)
 - [x] **Demo mode** - Safe demo/production toggle, new users start in demo mode (Phase 15, 17)
-- [x] **Monitoring & alerting** - Prometheus metrics, 3 Grafana dashboards, 17 alert rules, Alertmanager webhook routing (Phases 12, 16, 19, 21)
+- [x] **Monitoring & alerting** - Prometheus metrics, 3 Grafana dashboards, 18 alert rules, Alertmanager webhook routing (Phases 12, 16, 19, 21)
 
 #### P1 - Should Have
 - [x] **Multi-city support** - Trade all 4 cities (NYC, Chicago, Miami, Austin) simultaneously (Phase 2 — active_cities in user settings)
@@ -526,6 +527,8 @@ Your Machine (homelab / cloud VPS)
 - [x] **Backtesting module** - Test strategy against historical data (Phase 25)
 - [x] **Historical forecast accuracy tracking** - Monitor model calibration over time (Phase 26)
 - [x] **Auto-retrain + Training Log** - Post-settlement retraining trigger, source weight adjustment, TrainingReport persistence, Training Log on Performance page (Phase 37)
+- [x] **Split EV thresholds** - Separate YES/NO minimum EV thresholds (`min_ev_threshold_yes`, `min_ev_threshold_no`) for asymmetric risk control (Phase 48)
+- [x] **Model edge tracking** - Per-bracket model edge accuracy endpoint, realistic fee estimation with Kalshi's actual formula, NO-side price fix (Phase 49)
 
 #### P2 - Nice to Have
 - [ ] **Additional market plugins** - Precipitation, snowfall, low temperature
@@ -584,7 +587,22 @@ Your Machine (homelab / cloud VPS)
 | HF | Cache zero-price fallback | `_fetch_market_prices()` cache validity check changed from `if prices:` to `if prices and any(v > 0 for v in prices.values())` to prevent all-zero WS cache from blocking REST fallback | 2 |
 | 37 | Auto-Retrain + Training Log | TrainingReport DB model + Alembic 0009, post-settlement retraining trigger (3 conditions), source weight persistence from accuracy data, pipeline cache invalidation, training reports API + manual trigger, Training Log on Performance page with expandable report cards | 49 backend + 15 frontend |
 | 38 | Per-Bracket Position Cap + Loss Toggle | `max_contracts_per_bracket` hard cap (1-20) in Settings, `enable_consecutive_loss_limit` on/off toggle, `_get_open_bracket_qty()` helper, `BRACKET_CAP_BLOCKED_TOTAL` Prometheus counter, Alembic 0010, `user_to_settings()` Kelly gap fix | 25 backend + 5 frontend |
-| **Total** | | **1421 backend + 209 frontend = 1630 tests** | |
+| HF | Frontend Dockerfile | `node:20-alpine` + `--ignore-scripts` for esbuild, AppArmor workaround for Proxmox | — |
+| HF | ship.sh rewrite | Full pipeline: test gate, version bump, tag, deploy to homelab, post-deploy Docker cleanup | — |
+| 39 | Model Status on Performance | Model status section, retrain interval 14→7 days | 9 frontend |
+| HF | Bracket parsing fix | `_did_bracket_win()` endswith('below') fix + 'to' separator support + resettle endpoint + actual temp on trade card | 14 backend + 2 frontend |
+| 40 | Kalshi-based settlement | `settle_from_kalshi()` using `market_result`, cursor pagination, scheduler rewrite | 12 backend |
+| 41 | Trading Engine Guardrails | Divergence cap, probability blending, YES market floor, `GuardrailSettings` dataclass, 3 new User columns | 23 backend + 5 frontend |
+| 42 | UI Polish | Calendar dynamic rows, live temp on trade cards, prediction timestamp | 3 frontend |
+| 43 | Calendar day detail modal | Centered modal overlay, sort bar, per-city toggle on open positions | 21 frontend |
+| 44 | Resting Orders | 14-min expiration, RESTING status, `_sync_resting_orders()`, ACTIVE pseudo-filter | 15 backend + 5 frontend |
+| 45 | Settlement Accuracy + Day Modal | Delete CANCELED trades, per_page param, NO-side cost fix, fee calc fix | 1 backend |
+| HF | Ridge NaN column fix | `_valid_col_mask` on RidgeModelManager, drop all-NaN columns before fitting | 4 backend |
+| 46 | Per-Loss Cooldown Toggle | `enable_per_loss_cooldown` toggle, `CooldownStatus` endpoint, frontend banner | 12 backend + 6 frontend |
+| 47 | Orderbook-Based Pricing | `best_yes_price_from_orderbook()`, REST fallback chain, `AllCitiesZeroPrices` alert | 12 backend |
+| 48 | Split EV YES/NO Threshold | `min_ev_threshold_yes` and `min_ev_threshold_no` separate thresholds, backward-compatible settings migration, frontend dual sliders | 7 backend + 3 frontend |
+| 49 | Model Edge + Realistic Fees | Model edge tracking endpoint, Kalshi fee formula fix (`ceil(0.07*C*P*(1-P))`), `fee_estimate_mode` setting (conservative/realistic), NO-side price fix in executor, settlement uses actual `taker_fees` | 13 backend + 5 frontend |
+| **Total** | | **1559 backend + 268 frontend = 1827 tests** | |
 
 ---
 

@@ -9,7 +9,7 @@ Build the trading decision engine: EV calculation, risk management, cooldown log
 ```
 backend/trading/
 ├── __init__.py
-├── ev_calculator.py   -> Expected value calculation + Kelly-sized signals for each bracket + guardrails (divergence cap, probability blending, YES market floor)
+├── ev_calculator.py   -> Expected value calculation + Kelly-sized signals for each bracket + guardrails (divergence cap, probability blending, YES market floor) + split YES/NO EV thresholds + fee estimate modes (conservative/realistic)
 ├── kelly.py           -> Kelly Criterion position sizing (fractional Kelly, fee-adjusted, safety caps)
 ├── risk_manager.py    -> Position limits, daily loss, exposure tracking
 ├── cooldown.py        -> Cooldown timer logic (per-loss with enable toggle, and consecutive loss with enable toggle)
@@ -60,24 +60,43 @@ The Kalshi API uses **cents** (integers 1-99), not dollars. A market price of `2
 
 ## Kalshi Fee Calculation
 
-Kalshi charges fees on **profit**, not on the trade cost. The fee structure:
+Kalshi charges fees per contract, based on contract count and probability. There are two fee estimation modes:
 
-- Fee = **15% of profit** (not 15% of cost)
-- Minimum fee = **1 cent per contract**
-- Payout is always 100 cents ($1.00) if the contract wins
-- Fee is charged only on winning trades, but we estimate it upfront for EV calculation
+### Fee Estimate Mode (`fee_estimate_mode` user setting)
 
-### Fee Examples
+- **`conservative`** (default): Uses the legacy formula `15% of profit` (overestimates fees, safer for users)
+- **`realistic`**: Uses Kalshi's actual formula `ceil(0.07 * C * P * (1-P))` where C = number of contracts, P = probability (price/100)
 
-| Side | Price (cents) | Profit if Win (cents) | 15% Fee (cents) | Actual Fee (cents) |
-|------|--------------|----------------------|-----------------|-------------------|
-| YES  | 22           | 78 (100 - 22)        | 11.7            | 12 (rounded)      |
-| YES  | 85           | 15 (100 - 85)        | 2.25            | 2 (rounded)       |
-| YES  | 95           | 5 (100 - 95)         | 0.75            | 1 (minimum)       |
-| NO   | 22           | 22 (the YES price)   | 3.3             | 3 (rounded)       |
-| NO   | 85           | 85                   | 12.75           | 13 (rounded)      |
+The `fee_estimate_mode` is a per-user setting stored on the User model.
 
-**Why NO profit = YES price:** When you buy NO at a market where YES costs 22 cents, your NO cost is 78 cents (100 - 22). If NO wins, you get 100 cents. Profit = 100 - 78 = 22 cents, which is the YES price.
+### Kalshi's Actual Fee Formula (Realistic Mode)
+
+```
+fee_cents = ceil(0.07 * contracts * price_cents * (100 - price_cents) / 100)
+fee_cents = max(fee_cents, 1)  # minimum 1 cent per contract
+```
+
+This formula charges based on the variance of the contract outcome, not on profit. It results in lower fees for contracts near the extremes (very high or very low probability) and higher fees near 50%.
+
+### Conservative Fee Formula (Legacy)
+
+```
+profit_if_win = (100 - price_cents) for YES, price_cents for NO
+fee_cents = max(1, int(profit_if_win * 0.15))
+```
+
+### Settlement Fee Handling
+
+At settlement time, `postmortem.py` uses the actual `taker_fees` value from the Kalshi API (stored on the Trade model at sync/execution time), NOT recalculated fees. This ensures P&L accuracy regardless of which estimation mode was used for EV calculation.
+
+### Split EV Thresholds
+
+The EV calculator supports separate thresholds for YES and NO sides:
+
+- `min_ev_threshold_yes`: Minimum EV to trigger a YES trade (default: 0.05)
+- `min_ev_threshold_no`: Minimum EV to trigger a NO trade (default: 0.05)
+
+This allows users to set asymmetric thresholds (e.g., higher threshold for NO trades which have different risk profiles). Both fields are stored on the User model and exposed via the settings API. For backward compatibility, the legacy `min_ev_threshold` field maps to `min_ev_threshold_yes`.
 
 ### Implementation (ev_calculator.py)
 
@@ -96,15 +115,13 @@ logger = get_logger("TRADING")
 ET = ZoneInfo("America/New_York")
 
 
-def estimate_fees(price_cents: int, side: str) -> float:
+def estimate_fees(price_cents: int, side: str, *, mode: str = "conservative") -> float:
     """Estimate Kalshi fees for EV calculation.
-
-    Kalshi charges 15% of profit, with min 1 cent per contract.
-    Price is in CENTS (Kalshi API uses cents, not dollars).
 
     Args:
         price_cents: Market price in cents (1-99).
         side: "yes" or "no".
+        mode: "conservative" (15% of profit) or "realistic" (Kalshi formula).
 
     Returns:
         Estimated fee in DOLLARS (float).
@@ -114,12 +131,16 @@ def estimate_fees(price_cents: int, side: str) -> float:
     if side not in ("yes", "no"):
         raise ValueError(f"side must be 'yes' or 'no', got {side!r}")
 
-    if side == "yes":
-        profit_if_win = 100 - price_cents  # payout is always 100 cents
-    else:  # "no"
-        profit_if_win = price_cents  # NO buyer profits the YES price if NO wins
+    if mode == "realistic":
+        p = price_cents / 100
+        fee_cents = max(1, math.ceil(0.07 * 1 * price_cents * (100 - price_cents) / 100))
+    else:  # conservative
+        if side == "yes":
+            profit_if_win = 100 - price_cents
+        else:
+            profit_if_win = price_cents
+        fee_cents = max(1, int(profit_if_win * 0.15))
 
-    fee_cents = max(1, int(profit_if_win * 0.15))
     return fee_cents / 100  # return in dollars
 ```
 

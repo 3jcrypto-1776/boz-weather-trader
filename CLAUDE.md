@@ -16,7 +16,7 @@ backend/
   ├── weather/     → Agent 1: NWS + Open-Meteo data pipeline
   ├── kalshi/      → Agent 2: Kalshi API client (auth, orders, markets, WS feed, Redis cache)
   ├── prediction/  → Agent 3: Statistical ensemble + multi-model ML (XGBoost+RF+Ridge) + bracket probabilities + accuracy tracking + auto-retrain
-  ├── trading/     → Agent 4: EV calculator, Kelly sizing, risk controls, trade queue, bracket cap, guardrails (divergence cap, prob blending, YES floor), Kalshi-based settlement, resting order sync
+  ├── trading/     → Agent 4: EV calculator (split YES/NO thresholds, realistic fee mode), Kelly sizing, risk controls, trade queue, bracket cap, guardrails (divergence cap, prob blending, YES floor), Kalshi-based settlement, resting order sync
   ├── backtesting/ → Backtesting engine: day-by-day simulation, synthetic prices, metrics
   ├── websocket/   → Real-time event push (Redis pub/sub → WebSocket → SWR revalidation)
   └── common/      → Shared schemas, config, database, logging, middleware, metrics
@@ -26,19 +26,20 @@ monitoring/
   ├── prometheus/  → Prometheus scrape config + alerting rules
   │   ├── prometheus.yml   → Scrape config, rule_files, alertmanager target
   │   └── rules/           → 6 alert rule YAML files (18 rules across http, celery, trading, weather, targets, kalshi_ws)
+
   ├── alertmanager/        → Alertmanager config (webhook routing, severity-based repeat, inhibit rules)
   └── grafana/     → Grafana provisioning + dashboard JSON files
       ├── provisioning/  → Auto-provisioned datasources + dashboard provider
       └── dashboards/    → API Overview (8 panels) + Trading & Weather (10 panels) + Kalshi WS Feed (6 panels)
-tests/                   → 1514 backend + 260 frontend = 1774 tests
+tests/                   → 1559 backend + 268 frontend = 1827 tests
   ├── common/      → Shared module tests: config, schemas, models, logging, encryption, middleware, metrics (123)
   ├── training/    → Training API endpoint tests (11)
   ├── weather/     → Weather pipeline: NWS, Open-Meteo, normalizer, stations, CLI parser, scheduler (140)
   ├── kalshi/      → Kalshi client: auth, REST, WS, markets, orders, models, cache, market feed (143)
   ├── prediction/  → Prediction engine: ensemble, multi-model ML, brackets, error dist, accuracy, calibration, pipeline, source weights, retraining (266)
-  ├── trading/     → Trading engine: EV calc + guardrails, Kelly sizing, risk, cooldowns, queue, executor, scheduler, safety, sync, retraining trigger, bracket cap, resting order sync, orderbook pricing (363)
+  ├── trading/     → Trading engine: EV calc (split YES/NO thresholds, fee modes) + guardrails, Kelly sizing, risk, cooldowns, queue, executor, scheduler, safety, sync, retraining trigger, bracket cap, resting order sync, orderbook pricing (389)
   ├── backtesting/ → Backtesting engine: schemas, risk sim, data loader, engine, metrics, integration (95)
-  ├── api/         → API endpoints: auth, dashboard, dashboard stats, health, markets, queue, settings, trades, trades/sync, accuracy, optimization, calendar, version, update, training (174)
+  ├── api/         → API endpoints: auth, dashboard, dashboard stats, health, markets, queue, settings, trades, trades/sync, accuracy (incl. model edge), optimization, calendar, version, update, training (180)
   ├── websocket/   → WebSocket: events, manager, subscriber, router (40)
   ├── e2e/         → End-to-end smoke tests (35)
   ├── integration/ → Cross-module integration tests (47)
@@ -94,7 +95,7 @@ tests/                   → 1514 backend + 260 frontend = 1774 tests
 - Business counters (trading cycles, trades executed, risk blocks, weather fetches) are incremented inline
 - The `/metrics` endpoint exposes all metrics for Prometheus scraping
 - Keep label cardinality bounded — normalize dynamic values (IDs, timestamps) before using as labels
-- **Alert rules** in `monitoring/prometheus/rules/` — 17 rules across 6 groups (http, celery, trading, weather, targets, kalshi_ws)
+- **Alert rules** in `monitoring/prometheus/rules/` — 18 rules across 6 groups (http, celery, trading, weather, targets, kalshi_ws)
 - **Alertmanager** routes alerts by severity via webhook to `backend:8000/api/alerts`
 
 ### Interface Contracts

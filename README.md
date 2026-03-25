@@ -16,7 +16,10 @@ Free, open-source automated trading bot for [Kalshi](https://kalshi.com) weather
 - **Forecast accuracy tracking** — Brier score calibration, per-source MAE/RMSE/bias
 - **Demo mode** — Safe sandbox for new users (no real trades)
 - **Monitoring** — Prometheus metrics, Grafana dashboards, Alertmanager (optional)
-- **1,630 tests** — Comprehensive test suite across backend and frontend
+- **Split EV thresholds** — Separate YES/NO minimum EV thresholds for fine-grained control
+- **Model edge tracking** — Per-bracket model edge accuracy endpoint for calibration analysis
+- **Realistic fee estimation** — Kalshi's actual fee formula (`ceil(0.07 * C * P * (1-P))`) with conservative/realistic toggle
+- **1,827 tests** — Comprehensive test suite across backend and frontend
 
 ## Quick Start (Docker Compose)
 
@@ -27,6 +30,7 @@ git clone https://github.com/aclarkson2013/boz-weather-trader.git
 cd boz-weather-trader
 bash scripts/generate-env.sh       # Creates .env with random encryption key
 nano .env                           # Set NWS_USER_AGENT with your email
+docker compose build                # Build all container images
 docker compose up -d                # Start all services
 ```
 
@@ -124,18 +128,18 @@ When monitoring is enabled:
 - **Grafana:** [http://localhost:3001](http://localhost:3001) (default: admin/admin)
 - **Prometheus:** [http://localhost:9090](http://localhost:9090)
 - 3 dashboards: API Overview, Trading & Weather, Kalshi WebSocket Feed
-- 17 alert rules across 6 groups
+- 18 alert rules across 6 groups
 
 ## Development
 
 ```bash
-# Backend tests (1,421 tests)
+# Backend tests (1,559 tests)
 python -m pytest tests/ -x -q --tb=short
 
 # Backend lint
 ruff check backend/ tests/ && ruff format --check backend/ tests/
 
-# Frontend tests (209 tests)
+# Frontend tests (268 tests)
 cd frontend && npm test
 
 # Frontend lint
