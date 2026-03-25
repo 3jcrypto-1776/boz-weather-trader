@@ -123,12 +123,12 @@ class TestSimulatedTrade:
             confidence="medium",
             actual_temp_f=55.5,
             won=True,
-            pnl_cents=140,
-            fees_cents=24,
-            bankroll_after_cents=100_140,
+            pnl_cents=156,
+            fees_cents=4,
+            bankroll_after_cents=100_156,
         )
         assert trade.won is True
-        assert trade.pnl_cents == 140
+        assert trade.pnl_cents == 156
 
     def test_losing_trade(self):
         trade = SimulatedTrade(

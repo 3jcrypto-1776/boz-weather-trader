@@ -271,10 +271,10 @@ class TestExecuteSimulatedTrade:
         assert trade.won is True
         assert trade.quantity == 3
         # Cost = 20 * 3 = 60, payout = 100 * 3 = 300, profit = 240
-        # Fee per contract = max(1, int(80 * 0.15)) = 12, total fees = 36
-        # PnL = 240 - 36 = 204
-        assert trade.pnl_cents == 204
-        assert trade.fees_cents == 36
+        # Fee per contract = max(1, ceil(7 * 0.20 * 0.80)) = 2, total fees = 6
+        # PnL = 240 - 6 = 234
+        assert trade.pnl_cents == 234
+        assert trade.fees_cents == 6
 
     def test_trade_date_set_correctly(self):
         signal = TradeSignal(

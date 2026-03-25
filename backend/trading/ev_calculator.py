@@ -8,9 +8,9 @@ generated as TradeSignal objects.
 CRITICAL: All prices are in CENTS (integers). EV output is in DOLLARS (float).
 Fee calculation returns CENTS (int).
 
-Fee structure:
-    - Kalshi charges 15% of profit on winning trades
-    - Minimum fee = 1 cent per contract
+Fee structure (Kalshi fee schedule, effective Feb 5, 2026):
+    - Taker fee = ceil(0.07 * C * P * (1-P)), where P = contract price in dollars
+    - The formula is symmetric: P*(1-P) is the same for YES at P and NO at (1-P)
     - For conservative EV, we subtract fees unconditionally (overestimates cost)
 
 Usage:
@@ -109,19 +109,22 @@ def apply_guardrails(
 
 
 def estimate_fees(price_cents: int, side: str) -> int:
-    """Estimate Kalshi fees for a trade in CENTS.
+    """Estimate Kalshi taker fees for a single contract in CENTS.
 
-    Kalshi charges 15% of profit, with a minimum of 1 cent per contract.
+    Kalshi fee formula (effective Feb 5, 2026):
+        fee = ceil(0.07 * C * P * (1-P))
 
-    For YES side: profit_if_win = 100 - price_cents (payout minus cost)
-    For NO side: profit_if_win = price_cents (the YES price is the NO profit)
+    Where P = contract price in dollars, C = contract count.
+    The formula is symmetric: P*(1-P) is the same for YES at P and NO at (1-P),
+    so the fee is identical regardless of side. We keep the side parameter for
+    API compatibility but it doesn't affect the result.
 
     Args:
         price_cents: Market YES price in cents (1-99).
-        side: "yes" or "no".
+        side: "yes" or "no" (kept for API compatibility; fee is side-agnostic).
 
     Returns:
-        Estimated fee in CENTS (int).
+        Estimated fee in CENTS per contract (int, minimum 1).
 
     Raises:
         ValueError: If price_cents is outside [1, 99] or side is invalid.
@@ -133,10 +136,10 @@ def estimate_fees(price_cents: int, side: str) -> int:
         msg = f"side must be 'yes' or 'no', got {side!r}"
         raise ValueError(msg)
 
-    profit_if_win = 100 - price_cents if side == "yes" else price_cents
-
-    fee_cents = max(1, int(profit_if_win * 0.15))
-    return fee_cents
+    # Kalshi: ceil(0.07 * 1 * P * (1-P)), convert to cents: ceil(7 * P * (1-P))
+    p = price_cents / 100
+    fee_cents = math.ceil(7 * p * (1 - p))
+    return max(1, fee_cents)
 
 
 def calculate_ev(

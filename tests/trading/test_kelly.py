@@ -4,7 +4,7 @@ Tests cover:
 - Raw Kelly fraction math (YES and NO sides, with fees)
 - Fractional Kelly sizing with safety caps
 - Edge cases (negative edge, zero bankroll, extreme probabilities)
-- Fee-adjusted calculations matching Kalshi's 15% profit fee
+- Fee-adjusted calculations matching Kalshi's ceil(7*P*(1-P)) fee formula
 - All 5 safety caps
 """
 
@@ -34,8 +34,8 @@ class TestCalculateKellyFraction:
     def test_positive_edge_no(self) -> None:
         """Model 10% for bracket vs market 80c YES → NO side has positive edge."""
         # Market says 80% chance, model says 10% → NO side prob = 90%
-        # NO cost = 20c, NO profit = 80c, fee = max(1, int(80*0.15)) = 12c
-        # net = 68c. Kelly = (0.90 * 68 - 0.10 * 20) / 68
+        # NO cost = 20c, NO profit = 80c, fee = max(1, ceil(7*0.80*0.20)) = 2c
+        # net = 78c. Kelly = (0.90 * 78 - 0.10 * 20) / 78
         f = calculate_kelly_fraction(0.10, 80, "no")
         assert f > 0
 
@@ -79,15 +79,23 @@ class TestCalculateKellyFraction:
     def test_expensive_contract_yes(self) -> None:
         """YES at 95c with model 97% → small positive edge after fees."""
         f = calculate_kelly_fraction(0.97, 95, "yes")
-        # Profit if win = 5c, fee = 1c (min), net = 4c
+        # Profit if win = 5c, fee = max(1, ceil(7*0.95*0.05)) = 1c, net = 4c
         # Kelly = (0.97 * 4 - 0.03 * 95) / 4
         assert f > 0  # Edge exists but small
 
     def test_fee_impact(self) -> None:
-        """Kelly with fees < Kelly without fees (fees reduce edge)."""
-        with_fees = calculate_kelly_fraction(0.35, 22, "yes", fee_rate=0.15)
-        without_fees = calculate_kelly_fraction(0.35, 22, "yes", fee_rate=0.0)
-        assert with_fees < without_fees
+        """Kelly fraction is reduced by fees (fee_rate param ignored; Kalshi formula used).
+
+        With Kalshi fees at P=22c, fee=2c, net_profit=76c.
+        Without fees, net_profit would be 78c, giving a higher Kelly fraction.
+        We verify fees reduce the Kelly fraction by checking it's below the
+        theoretical no-fee Kelly: (p*profit - q*cost)/profit.
+        """
+        with_fees = calculate_kelly_fraction(0.35, 22, "yes")
+        # Theoretical no-fee Kelly for YES at 22c, model=35%:
+        # profit=78, cost=22, Kelly = (0.35*78 - 0.65*22)/78
+        no_fee_kelly = (0.35 * 78 - 0.65 * 22) / 78
+        assert with_fees < no_fee_kelly
 
     def test_invalid_model_prob_low(self) -> None:
         """model_prob < 0 raises ValueError."""

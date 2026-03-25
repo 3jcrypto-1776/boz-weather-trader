@@ -79,7 +79,7 @@ async def test_winning_yes_trade(db: AsyncSession, test_user) -> None:
 
     assert trade.status == TradeStatus.WON
     # P&L: payout(100) - cost(22) - fees
-    fees = estimate_fees(22, "yes")  # max(1, int((100-22) * 0.15)) = 11
+    fees = estimate_fees(22, "yes")  # max(1, ceil(7 * 0.22 * 0.78)) = 2
     expected_pnl = 100 - 22 - fees
     assert trade.pnl_cents == expected_pnl
     assert trade.fees_cents == fees
@@ -117,9 +117,9 @@ async def test_winning_no_trade(db: AsyncSession, test_user) -> None:
 
     assert trade.status == TradeStatus.WON
     # price_cents=22 is actual NO cost. profit = 100 - 22 = 78c.
-    # fee = max(1, int(78 * 0.15)) = 11c.  pnl = 78 - 11 = 67c.
-    assert trade.pnl_cents == 67
-    assert trade.fees_cents == 11
+    # fee = max(1, ceil(7 * 0.22 * 0.78)) = 2c.  pnl = 78 - 2 = 76c.
+    assert trade.pnl_cents == 76
+    assert trade.fees_cents == 2
 
 
 @pytest.mark.asyncio

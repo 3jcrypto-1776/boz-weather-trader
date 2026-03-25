@@ -131,8 +131,8 @@ class TestGeneratePostmortemNarrative:
     def _make_trade(
         self,
         status: TradeStatus,
-        pnl_cents: int = 67,
-        fees_cents: int = 11,
+        pnl_cents: int = 76,
+        fees_cents: int = 2,
     ) -> MagicMock:
         """Create a mock Trade ORM object."""
         trade = MagicMock(spec=Trade)
@@ -162,7 +162,7 @@ class TestGeneratePostmortemNarrative:
 
     def test_includes_outcome(self) -> None:
         """A winning trade narrative contains 'WIN'."""
-        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=76)
         settlement = self._make_settlement(53.5)
         narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
         assert "WIN" in narrative
@@ -176,7 +176,7 @@ class TestGeneratePostmortemNarrative:
 
     def test_includes_actual_temp(self) -> None:
         """The actual settlement temperature appears in the narrative."""
-        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=76)
         settlement = self._make_settlement(53.5)
         narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
         # Should contain "53F" or "54F" (rounded)
@@ -184,7 +184,7 @@ class TestGeneratePostmortemNarrative:
 
     def test_has_section_headers(self) -> None:
         """Rich narrative contains all expected section headers."""
-        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=76)
         settlement = self._make_settlement(53.5)
         narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
         assert "WHAT WE TRADED" in narrative
@@ -194,7 +194,7 @@ class TestGeneratePostmortemNarrative:
 
     def test_includes_station_name(self) -> None:
         """Narrative includes the station name from STATION_CONFIGS."""
-        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=76)
         settlement = self._make_settlement(53.5)
         narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
         # NYC station is Central Park
@@ -202,14 +202,14 @@ class TestGeneratePostmortemNarrative:
 
     def test_includes_city_name(self) -> None:
         """Narrative includes the human-readable city name."""
-        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=76)
         settlement = self._make_settlement(53.5)
         narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
         assert "New York" in narrative
 
     def test_includes_edge_pp(self) -> None:
         """Narrative includes the model-vs-market edge in percentage points."""
-        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=76)
         settlement = self._make_settlement(53.5)
         narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
         # model=0.30, market=0.22 => 8 pp edge
@@ -217,17 +217,17 @@ class TestGeneratePostmortemNarrative:
 
     def test_includes_ev_at_entry(self) -> None:
         """Narrative includes the EV at entry."""
-        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=76)
         settlement = self._make_settlement(53.5)
         narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
         assert "EV at entry" in narrative
 
     def test_includes_fees_when_won(self) -> None:
         """A winning trade narrative includes the fee amount."""
-        trade = self._make_trade(TradeStatus.WON, pnl_cents=67, fees_cents=11)
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=76, fees_cents=2)
         settlement = self._make_settlement(53.5)
         narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
-        assert "Fees: $0.11" in narrative
+        assert "Fees: $0.02" in narrative
 
     def test_no_fees_line_when_lost(self) -> None:
         """A losing trade narrative does not have a Fees line (fees=0)."""
@@ -240,7 +240,7 @@ class TestGeneratePostmortemNarrative:
         """When forecasts are provided, narrative includes FORECAST ACCURACY."""
         from backend.common.models import WeatherForecast
 
-        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=76)
         settlement = self._make_settlement(53.5)
 
         fc = MagicMock(spec=WeatherForecast)
@@ -258,7 +258,7 @@ class TestGeneratePostmortemNarrative:
 
     def test_no_forecast_section_without_forecasts(self) -> None:
         """Without forecasts, no FORECAST ACCURACY section."""
-        trade = self._make_trade(TradeStatus.WON, pnl_cents=67)
+        trade = self._make_trade(TradeStatus.WON, pnl_cents=76)
         settlement = self._make_settlement(53.5)
         narrative = generate_postmortem_narrative(trade, settlement, forecasts=[])
         assert "FORECAST ACCURACY" not in narrative
@@ -312,8 +312,8 @@ class TestSettleTrade:
     @pytest.mark.asyncio
     async def test_winning_trade_pnl(self) -> None:
         """YES at 22c wins: pnl_cents = (100-22) - fee.
-        fee = estimate_fees(22, 'yes') = max(1, int(78*0.15)) = 11c.
-        pnl = 78 - 11 = 67c.
+        fee = estimate_fees(22, 'yes') = max(1, ceil(7*0.22*0.78)) = 2c.
+        pnl = 78 - 2 = 76c.
         """
         trade = self._make_trade()
         settlement = self._make_settlement(53.5)  # Within bracket 53-54F
@@ -322,8 +322,8 @@ class TestSettleTrade:
         await settle_trade(trade, settlement, mock_db)
 
         assert trade.status == TradeStatus.WON
-        assert trade.pnl_cents == 67
-        assert trade.fees_cents == 11
+        assert trade.pnl_cents == 76
+        assert trade.fees_cents == 2
 
     @pytest.mark.asyncio
     async def test_losing_trade_pnl(self) -> None:
@@ -369,7 +369,7 @@ class TestSettleTrade:
 
         # Should still settle correctly even without market_date
         assert trade.status == TradeStatus.WON
-        assert trade.pnl_cents == 67
+        assert trade.pnl_cents == 76
 
 
 # ---------------------------------------------------------------------------
@@ -461,14 +461,14 @@ class TestSettleFromKalshi:
 
     @pytest.mark.asyncio
     async def test_pnl_yes_win(self) -> None:
-        """YES at 22c wins: pnl = (100-22) - fee = 78 - 11 = 67c."""
+        """YES at 22c wins: pnl = (100-22) - fee = 78 - 2 = 76c."""
         trade = self._make_trade(side="yes", price_cents=22)
         mock_db = self._make_mock_db()
 
         await settle_from_kalshi(trade, "yes", mock_db)
 
-        assert trade.pnl_cents == 67
-        assert trade.fees_cents == 11
+        assert trade.pnl_cents == 76
+        assert trade.fees_cents == 2
 
     @pytest.mark.asyncio
     async def test_pnl_yes_loss(self) -> None:
@@ -483,7 +483,7 @@ class TestSettleFromKalshi:
 
     @pytest.mark.asyncio
     async def test_pnl_no_win(self) -> None:
-        """NO at actual cost 22c wins: cost=22, profit=78, fee=11, pnl=67c."""
+        """NO at actual cost 22c wins: cost=22, profit=78, fee=2, pnl=76c."""
         trade = self._make_trade(side="no", price_cents=22)
         mock_db = self._make_mock_db()
 
@@ -492,9 +492,9 @@ class TestSettleFromKalshi:
         assert trade.status == TradeStatus.WON
         # price_cents=22 is the actual NO cost per contract.
         # cost = 22 * 1 = 22c, profit = 100 - 22 = 78c
-        # fee = max(1, int((100-22) * 0.15)) = max(1, int(78*0.15)) = 11c
-        assert trade.pnl_cents == 67
-        assert trade.fees_cents == 11
+        # fee = max(1, ceil(7 * 0.22 * 0.78)) = 2c
+        assert trade.pnl_cents == 76
+        assert trade.fees_cents == 2
 
     @pytest.mark.asyncio
     async def test_pnl_no_loss(self) -> None:
@@ -611,11 +611,11 @@ class TestNoSidePnlCorrectness:
 
         await settle_from_kalshi(trade, "no", mock_db)  # "no" wins
 
-        # profit = 100 - 78 = 22c, fee = max(1, int(22 * 0.15)) = 3c
-        # pnl = 22 - 3 = 19c
+        # profit = 100 - 78 = 22c, fee = max(1, ceil(7 * 0.78 * 0.22)) = 2c
+        # pnl = 22 - 2 = 20c
         assert trade.status == TradeStatus.WON
-        assert trade.pnl_cents == 19
-        assert trade.fees_cents == 3
+        assert trade.pnl_cents == 20
+        assert trade.fees_cents == 2
 
     @pytest.mark.asyncio
     async def test_settle_no_lost_correct_pnl(self) -> None:

@@ -169,11 +169,14 @@ def make_winning_trade(
     quantity: int = 1,
 ) -> SimulatedTrade:
     """Helper to create a winning SimulatedTrade."""
-    # YES side win: pnl = (100 - price) * qty - fees * qty - 0 (no loss cost)
-    # Simplified: pnl = (100 * qty) - (price * qty) - fees
+    # YES side win: pnl = (100 - price) * qty - fees * qty
+    # Fee per contract = max(1, ceil(7 * P * (1-P))) where P = price_cents / 100
+    import math
+
     cost = price_cents * quantity
     payout = 100 * quantity
-    fee_per = max(1, int((100 - price_cents) * 0.15))
+    p = price_cents / 100
+    fee_per = max(1, math.ceil(7 * p * (1 - p)))
     fees = fee_per * quantity
     pnl = payout - cost - fees
     return SimulatedTrade(

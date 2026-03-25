@@ -35,15 +35,12 @@ Usage:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 from backend.common.logging import get_logger
 
 logger = get_logger("TRADING")
-
-# Kalshi fee: 15% of profit on winning contracts, minimum 1 cent
-KALSHI_FEE_RATE = 0.15
-MIN_FEE_CENTS = 1
 
 
 @dataclass
@@ -88,34 +85,17 @@ def calculate_kelly_fraction(
     model_prob: float,
     price_cents: int,
     side: str,
-    fee_rate: float = KALSHI_FEE_RATE,
+    fee_rate: float = 0.07,  # kept for API compat; ignored in favor of Kalshi formula
 ) -> float:
     """Calculate the raw Kelly fraction for a binary contract.
 
-    For YES side:
-        cost = price_cents
-        profit_if_win = 100 - price_cents
-        fee_if_win = max(1, int(profit_if_win * fee_rate))
-        net_profit_if_win = profit_if_win - fee_if_win
-
-        f* = (model_prob * net_profit_if_win - (1 - model_prob) * cost)
-             / net_profit_if_win
-
-    For NO side:
-        cost = 100 - price_cents
-        profit_if_win = price_cents
-        fee_if_win = max(1, int(profit_if_win * fee_rate))
-        net_profit_if_win = profit_if_win - fee_if_win
-
-        prob_win = 1 - model_prob (probability bracket does NOT hit)
-        f* = (prob_win * net_profit_if_win - (1 - prob_win) * cost)
-             / net_profit_if_win
+    Uses Kalshi's actual fee formula: ceil(0.07 * P * (1-P)) per contract.
 
     Args:
         model_prob: Model probability for the bracket (0.0-1.0).
         price_cents: Market YES price in cents (1-99).
         side: "yes" or "no".
-        fee_rate: Kalshi fee rate on profits (default 0.15).
+        fee_rate: Deprecated; kept for API compatibility.
 
     Returns:
         Raw Kelly fraction (can be negative = no edge).
@@ -142,8 +122,9 @@ def calculate_kelly_fraction(
         profit_if_win = price_cents
         prob_win = 1.0 - model_prob
 
-    # Fee-adjusted profit
-    fee_if_win = max(MIN_FEE_CENTS, int(profit_if_win * fee_rate))
+    # Kalshi fee: ceil(0.07 * P * (1-P)) per contract, P = YES price in dollars
+    p = price_cents / 100
+    fee_if_win = max(1, math.ceil(7 * p * (1 - p)))
     net_profit = profit_if_win - fee_if_win
 
     # Avoid division by zero (net_profit = 0 means no profit possible)
@@ -216,8 +197,9 @@ def calculate_kelly_size(
     optimal_bet_cents = adjusted * bankroll_cents
     cost_per_contract = price_cents if side == "yes" else 100 - price_cents
 
-    # Edge per contract (expected profit per contract in cents)
-    fee_cents = max(MIN_FEE_CENTS, int((100 - cost_per_contract) * KALSHI_FEE_RATE))
+    # Kalshi fee: ceil(0.07 * P * (1-P)) per contract, P = YES price in dollars
+    p = price_cents / 100  # price_cents is always YES price here
+    fee_cents = max(1, math.ceil(7 * p * (1 - p)))
     net_payout = 100 - fee_cents
     if side == "yes":
         result.edge_cents = round(model_prob * net_payout - cost_per_contract, 2)

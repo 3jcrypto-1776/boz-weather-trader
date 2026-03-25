@@ -20,6 +20,7 @@ Usage:
 
 from __future__ import annotations
 
+import math
 import re
 from datetime import UTC, datetime
 
@@ -181,8 +182,11 @@ async def settle_trade(
     if won:
         payout_cents = 100 * trade.quantity
         profit_cents = payout_cents - cost_cents
-        # Fee = 15% of profit per contract, min 1c
-        fee_cents = max(1, int((100 - trade.price_cents) * 0.15)) * trade.quantity
+        # Kalshi fee: ceil(0.07 * C * P * (1-P)), P = YES price in dollars
+        yes_price = trade.price_cents if trade.side == "yes" else (100 - trade.price_cents)
+        p = yes_price / 100
+        fee_per_contract = max(1, math.ceil(7 * p * (1 - p)))
+        fee_cents = fee_per_contract * trade.quantity
         pnl_cents = profit_cents - fee_cents
         trade.status = TradeStatus.WON
         trade.fees_cents = fee_cents
@@ -261,8 +265,11 @@ async def settle_from_kalshi(
     if won:
         payout_cents = 100 * trade.quantity
         profit_cents = payout_cents - cost_cents
-        # Fee = 15% of profit per contract, min 1c
-        fee_cents = max(1, int((100 - trade.price_cents) * 0.15)) * trade.quantity
+        # Kalshi fee: ceil(0.07 * C * P * (1-P)), P = YES price in dollars
+        yes_price = trade.price_cents if trade.side == "yes" else (100 - trade.price_cents)
+        p = yes_price / 100
+        fee_per_contract = max(1, math.ceil(7 * p * (1 - p)))
+        fee_cents = fee_per_contract * trade.quantity
         pnl_cents = profit_cents - fee_cents
         trade.status = TradeStatus.WON
         trade.fees_cents = fee_cents
