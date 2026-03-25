@@ -565,3 +565,67 @@ class TestSettleFromKalshi:
         # Should be a string (the generated narrative)
         assert isinstance(trade.postmortem_narrative, str)
         assert "WHAT WE TRADED" in trade.postmortem_narrative
+
+
+class TestNoSidePnlCorrectness:
+    """Verify P&L matches Kalshi's formula when price_cents = actual NO cost."""
+
+    def _make_no_trade(self, price_cents: int = 78) -> MagicMock:
+        """Create a mock NO-side Trade with correct actual cost."""
+        trade = MagicMock(spec=Trade)
+        trade.id = "no-pnl-test-1234"
+        trade.market_ticker = "KXHIGHNY-26MAR01-B42.5"
+        trade.bracket_label = "42° to 43°F"
+        trade.side = "no"
+        trade.price_cents = price_cents  # Actual NO cost
+        trade.quantity = 1
+        trade.city = MagicMock()
+        trade.city.value = "NYC"
+        trade.trade_date = datetime(2026, 3, 1, tzinfo=UTC)
+        trade.market_date = datetime(2026, 3, 1, 0, 0, 0)
+        trade.model_probability = 0.10
+        trade.market_probability = 0.22
+        trade.ev_at_entry = 0.05
+        trade.confidence = "medium"
+        trade.status = TradeStatus.OPEN
+        trade.pnl_cents = None
+        trade.fees_cents = None
+        trade.settlement_temp_f = None
+        trade.settlement_source = None
+        trade.settled_at = None
+        trade.postmortem_narrative = None
+        return trade
+
+    def _make_mock_db(self) -> AsyncMock:
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_db.execute.return_value = mock_result
+        return mock_db
+
+    @pytest.mark.asyncio
+    async def test_settle_no_won_correct_pnl(self) -> None:
+        """NO WON: pnl = (100 - actual_cost) * qty - fees. Matches Kalshi."""
+        trade = self._make_no_trade(price_cents=78)  # Paid 78c for NO
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "no", mock_db)  # "no" wins
+
+        # profit = 100 - 78 = 22c, fee = max(1, int(22 * 0.15)) = 3c
+        # pnl = 22 - 3 = 19c
+        assert trade.status == TradeStatus.WON
+        assert trade.pnl_cents == 19
+        assert trade.fees_cents == 3
+
+    @pytest.mark.asyncio
+    async def test_settle_no_lost_correct_pnl(self) -> None:
+        """NO LOST: pnl = -(actual_cost * qty). You lose what you paid."""
+        trade = self._make_no_trade(price_cents=78)
+        mock_db = self._make_mock_db()
+
+        await settle_from_kalshi(trade, "yes", mock_db)  # "yes" wins, NO loses
+
+        # Lost the full cost: -78c
+        assert trade.status == TradeStatus.LOST
+        assert trade.pnl_cents == -78
+        assert trade.fees_cents == 0

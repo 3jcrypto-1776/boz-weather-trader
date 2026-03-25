@@ -312,13 +312,13 @@ class TestExecuteTrade:
         assert trade_obj.price_cents == 41
 
     @pytest.mark.asyncio
-    async def test_no_side_fallback_uses_limit_price_unchanged(self, mock_db: AsyncMock) -> None:
-        """When taker_fill_cost is 0 for NO side, falls back to limit price."""
+    async def test_no_side_fallback_converts_to_actual_cost(self, mock_db: AsyncMock) -> None:
+        """When taker_fill_cost is 0 for NO side, converts YES price to actual NO cost."""
         signal = TradeSignal(
             city="AUS",
             bracket="65-66°F",
             side="no",
-            price_cents=40,
+            price_cents=40,  # YES market price
             quantity=1,
             model_probability=0.60,
             market_probability=0.40,
@@ -336,8 +336,8 @@ class TestExecuteTrade:
             user_id="test-user",
         )
 
-        # Falls back to signal's limit price — no YES-equivalent conversion
-        assert result.price_cents == 40
+        # price_cents = 100 - 40 = 60 (actual NO cost, not YES market price)
+        assert result.price_cents == 60
 
     @pytest.mark.asyncio
     async def test_yes_side_fill_price_not_converted(self, mock_db: AsyncMock) -> None:
@@ -464,3 +464,160 @@ class TestExecuteTrade:
         api_dict = order_arg.to_api_dict()
         assert "expiration_ts" in api_dict
         assert api_dict["expiration_ts"] > 0
+
+
+class TestNoSidePriceCents:
+    """Verify price_cents stores actual NO cost (not YES market price)."""
+
+    @pytest.mark.asyncio
+    async def test_no_side_price_stores_actual_cost_when_taker_fill_cost_zero(
+        self, mock_db: AsyncMock
+    ) -> None:
+        """When taker_fill_cost is 0 (fallback), NO price_cents = 100 - signal.price_cents."""
+        signal = TradeSignal(
+            city="NYC",
+            bracket="55-56°F",
+            side="no",
+            price_cents=22,  # YES market price
+            quantity=1,
+            model_probability=0.30,
+            market_probability=0.22,
+            ev=0.05,
+            confidence="medium",
+            market_ticker="KXHIGHNY-26FEB18-B3",
+            reasoning="test",
+        )
+
+        mock_response = MagicMock()
+        mock_response.order_id = "order-no-1"
+        mock_response.count = 1
+        mock_response.status = "filled"
+        mock_response.taker_fill_cost = 0  # Fallback path!
+        mock_response.taker_fees = 0
+
+        client = AsyncMock()
+        client.place_order.return_value = mock_response
+
+        result = await execute_trade(
+            signal=signal,
+            kalshi_client=client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        # price_cents should be 100 - 22 = 78 (actual NO cost), not 22 (YES price)
+        assert result.price_cents == 78
+
+    @pytest.mark.asyncio
+    async def test_no_side_price_stores_actual_cost_when_taker_fill_cost_positive(
+        self, mock_db: AsyncMock
+    ) -> None:
+        """When taker_fill_cost is positive, NO price_cents = 100 - (cost // count)."""
+        signal = TradeSignal(
+            city="NYC",
+            bracket="55-56°F",
+            side="no",
+            price_cents=22,
+            quantity=1,
+            model_probability=0.30,
+            market_probability=0.22,
+            ev=0.05,
+            confidence="medium",
+            market_ticker="KXHIGHNY-26FEB18-B3",
+            reasoning="test",
+        )
+
+        mock_response = MagicMock()
+        mock_response.order_id = "order-no-2"
+        mock_response.count = 1
+        mock_response.status = "filled"
+        mock_response.taker_fill_cost = 20  # YES-equivalent = 20c per contract
+        mock_response.taker_fees = 0
+
+        client = AsyncMock()
+        client.place_order.return_value = mock_response
+
+        result = await execute_trade(
+            signal=signal,
+            kalshi_client=client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        # price_cents should be 100 - 20 = 80 (actual NO cost)
+        assert result.price_cents == 80
+
+    @pytest.mark.asyncio
+    async def test_resting_no_order_stores_actual_cost(self, mock_db: AsyncMock) -> None:
+        """Resting NO orders store 100 - signal.price_cents as price_cents."""
+        signal = TradeSignal(
+            city="AUS",
+            bracket="90° to 91°F",
+            side="no",
+            price_cents=37,  # YES market price
+            quantity=1,
+            model_probability=0.06,
+            market_probability=0.37,
+            ev=0.05,
+            confidence="low",
+            market_ticker="KXHIGHAUS-26MAR24-B87.5",
+            reasoning="test",
+        )
+
+        mock_response = MagicMock()
+        mock_response.order_id = "order-rest-1"
+        mock_response.count = 0  # No fills — fully resting
+        mock_response.status = "resting"
+        mock_response.taker_fill_cost = 0
+        mock_response.taker_fees = 0
+
+        client = AsyncMock()
+        client.place_order.return_value = mock_response
+
+        result = await execute_trade(
+            signal=signal,
+            kalshi_client=client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        # Resting NO: price_cents should be 100 - 37 = 63 (actual NO cost)
+        assert result.price_cents == 63
+        assert result.status == "RESTING"
+
+    @pytest.mark.asyncio
+    async def test_yes_side_price_unchanged_in_fallback(self, mock_db: AsyncMock) -> None:
+        """YES-side trades are unaffected — price_cents = signal.price_cents."""
+        signal = TradeSignal(
+            city="NYC",
+            bracket="55-56°F",
+            side="yes",
+            price_cents=22,
+            quantity=1,
+            model_probability=0.30,
+            market_probability=0.22,
+            ev=0.05,
+            confidence="medium",
+            market_ticker="KXHIGHNY-26FEB18-B3",
+            reasoning="test",
+        )
+
+        mock_response = MagicMock()
+        mock_response.order_id = "order-yes-1"
+        mock_response.count = 1
+        mock_response.status = "filled"
+        mock_response.taker_fill_cost = 0  # Fallback path
+        mock_response.taker_fees = 0
+
+        client = AsyncMock()
+        client.place_order.return_value = mock_response
+
+        result = await execute_trade(
+            signal=signal,
+            kalshi_client=client,
+            db=mock_db,
+            user_id="test-user",
+        )
+
+        # YES side: price_cents stays as-is
+        assert result.price_cents == 22

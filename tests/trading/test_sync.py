@@ -503,8 +503,8 @@ class TestSyncPortfolio:
         assert trade.market_probability == 0.41
 
     @pytest.mark.asyncio
-    async def test_synced_no_trade_fallback_no_conversion(self) -> None:
-        """NO side with taker_fill_cost=0 falls back to yes_price, no conversion."""
+    async def test_synced_no_trade_fallback_converts_to_actual_cost(self) -> None:
+        """NO side with taker_fill_cost=0: converts YES price to actual NO cost."""
         order = _make_order(
             order_id="ord-no-fallback",
             ticker="KXHIGHAUS-26FEB23-B65.5",
@@ -528,8 +528,8 @@ class TestSyncPortfolio:
         await sync_portfolio(client, db, "user-1")
 
         trade = db.add.call_args[0][0]
-        # Falls back to yes_price, no conversion applied
-        assert trade.price_cents == 40
+        # price_cents = 100 - 40 = 60 (actual NO cost, not YES market price)
+        assert trade.price_cents == 60
 
     @pytest.mark.asyncio
     async def test_synced_yes_trade_not_converted(self) -> None:

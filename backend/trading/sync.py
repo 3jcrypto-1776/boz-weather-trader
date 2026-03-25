@@ -86,13 +86,14 @@ async def _create_synced_trade(
         else order.yes_price
     )
 
-    # For NO side, convert to YES-equivalent price.
-    # Kalshi's taker_fill_cost for NO = what you paid for the NO contract.
-    # Settlement code expects price_cents to always be the YES price:
-    #   YES cost = price_cents * qty
-    #   NO cost  = (100 - price_cents) * qty
-    # So for NO side: price_cents = 100 - (NO fill cost per contract)
-    if order.side == "no" and order.taker_fill_cost > 0 and order.fill_count > 0:
+    # For NO side, convert to actual NO cost.
+    # In both paths above, fill_price holds the YES-equivalent price:
+    #   - taker_fill_cost path: Kalshi reports YES-equivalent total for NO buys
+    #   - fallback path: order.yes_price is the YES market price
+    # Actual NO cost = 100 - YES price.
+    # price_cents stores actual cost per contract for both sides:
+    #   cost = price_cents * qty   (both YES and NO)
+    if order.side == "no":
         fill_price = 100 - fill_price
 
     trade = Trade(

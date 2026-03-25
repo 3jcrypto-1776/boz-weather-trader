@@ -131,12 +131,14 @@ async def execute_trade(
         else signal.price_cents
     )
 
-    # For NO side, convert Kalshi's taker_fill_cost to actual NO cost.
-    # Kalshi reports taker_fill_cost as the YES-equivalent total for NO buys.
-    # Dividing gives the YES price per contract; 100 - that = actual NO cost.
+    # For NO side, convert to actual NO cost.
+    # In both paths above, fill_price_cents holds the YES-equivalent price:
+    #   - taker_fill_cost path: Kalshi reports YES-equivalent total for NO buys
+    #   - fallback path: signal.price_cents is the YES market price
+    # Actual NO cost = 100 - YES price.
     # price_cents stores actual cost per contract for both sides:
     #   cost = price_cents * qty   (both YES and NO)
-    if signal.side == "no" and taker_fill_cost > 0 and filled_count > 0:
+    if signal.side == "no":
         fill_price_cents = 100 - fill_price_cents
 
     # Check for cancellation
@@ -171,7 +173,7 @@ async def execute_trade(
             market_ticker=signal.market_ticker,
             bracket_label=signal.bracket,
             side=signal.side,
-            price_cents=signal.price_cents,  # Limit price (not fill price)
+            price_cents=(100 - signal.price_cents) if signal.side == "no" else signal.price_cents,
             quantity=signal.quantity,  # Requested quantity (not filled yet)
             model_probability=signal.model_probability,
             blended_probability=signal.blended_probability,
@@ -200,6 +202,7 @@ async def execute_trade(
             },
         )
 
+        resting_price = (100 - signal.price_cents) if signal.side == "no" else signal.price_cents
         return TradeRecord(
             id=trade_id,
             kalshi_order_id=order_id,
@@ -208,7 +211,7 @@ async def execute_trade(
             market_ticker=signal.market_ticker,
             bracket_label=signal.bracket,
             side=signal.side,
-            price_cents=signal.price_cents,
+            price_cents=resting_price,
             quantity=signal.quantity,
             model_probability=signal.model_probability,
             market_probability=signal.market_probability,

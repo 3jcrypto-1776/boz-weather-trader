@@ -778,7 +778,10 @@ async def _sync_resting_orders(
                 # Filled! Update trade to OPEN with actual fill data
                 trade.status = TradeStatus.OPEN
 
-                # Update price to actual fill price
+                # Update price to actual fill price.
+                # taker_fill_cost is YES-equivalent for NO buys.
+                # If available, use it; otherwise keep the price already
+                # stored (which was converted at resting-order creation).
                 taker_fill_cost = order.taker_fill_cost or 0
                 if taker_fill_cost > 0 and order.fill_count > 0:
                     fill_price = taker_fill_cost // order.fill_count
