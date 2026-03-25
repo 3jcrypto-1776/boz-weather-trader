@@ -196,7 +196,9 @@ async def settle_trade(
         pnl_cents = profit_cents - fee_cents
         trade.status = TradeStatus.WON
     else:
-        pnl_cents = -cost_cents
+        # Fees are charged at trade time, so losses include the fee too
+        fee_cents = trade.fees_cents if trade.fees_cents is not None else 0
+        pnl_cents = -cost_cents - fee_cents
         trade.status = TradeStatus.LOST
         if trade.fees_cents is None:
             trade.fees_cents = 0
@@ -285,7 +287,9 @@ async def settle_from_kalshi(
         pnl_cents = profit_cents - fee_cents
         trade.status = TradeStatus.WON
     else:
-        pnl_cents = -cost_cents
+        # Fees are charged at trade time, so losses include the fee too
+        fee_cents = trade.fees_cents if trade.fees_cents is not None else 0
+        pnl_cents = -cost_cents - fee_cents
         trade.status = TradeStatus.LOST
         if trade.fees_cents is None:
             trade.fees_cents = 0
