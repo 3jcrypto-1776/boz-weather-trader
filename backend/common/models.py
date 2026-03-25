@@ -115,6 +115,8 @@ class User(Base):
     daily_loss_limit_cents = Column(Integer, default=1000)
     max_daily_exposure_cents = Column(Integer, default=2500)
     min_ev_threshold = Column(Float, default=0.05)
+    min_ev_threshold_yes = Column(Float, default=0.15)
+    min_ev_threshold_no = Column(Float, default=0.05)
     cooldown_per_loss_minutes = Column(Integer, default=60)
     consecutive_loss_limit = Column(Integer, default=3)
     active_cities = Column(String, default="NYC,CHI,MIA,AUS")  # Comma-separated

@@ -96,6 +96,8 @@ def user_to_settings(user: User) -> UserSettings:
     active_cities = [c.strip() for c in cities_str.split(",") if c.strip()]
 
     ev_thresh = user.min_ev_threshold if user.min_ev_threshold is not None else 0.05
+    ev_thresh_yes = user.min_ev_threshold_yes if user.min_ev_threshold_yes is not None else 0.15
+    ev_thresh_no = user.min_ev_threshold_no if user.min_ev_threshold_no is not None else 0.05
     cooldown = user.cooldown_per_loss_minutes if user.cooldown_per_loss_minutes is not None else 60
     consec = user.consecutive_loss_limit if user.consecutive_loss_limit is not None else 3
     notifs = user.notifications_enabled if user.notifications_enabled is not None else True
@@ -108,6 +110,8 @@ def user_to_settings(user: User) -> UserSettings:
         daily_loss_limit_cents=user.daily_loss_limit_cents or 1000,
         max_daily_exposure_cents=user.max_daily_exposure_cents or 2500,
         min_ev_threshold=ev_thresh,
+        min_ev_threshold_yes=ev_thresh_yes,
+        min_ev_threshold_no=ev_thresh_no,
         cooldown_per_loss_minutes=cooldown,
         consecutive_loss_limit=consec,
         active_cities=active_cities,

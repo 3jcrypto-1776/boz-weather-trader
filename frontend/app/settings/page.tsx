@@ -30,6 +30,8 @@ export default function SettingsPage() {
   const [dailyLossLimit, setDailyLossLimit] = useState(1000);
   const [maxExposure, setMaxExposure] = useState(2500);
   const [minEv, setMinEv] = useState(0.05);
+  const [minEvYes, setMinEvYes] = useState(0.15);
+  const [minEvNo, setMinEvNo] = useState(0.05);
   const [cooldown, setCooldown] = useState(60);
   const [consecutiveLossLimit, setConsecutiveLossLimit] = useState(3);
   const [enableConsecutiveLossLimit, setEnableConsecutiveLossLimit] = useState(true);
@@ -62,6 +64,8 @@ export default function SettingsPage() {
       setDailyLossLimit(settings.daily_loss_limit_cents);
       setMaxExposure(settings.max_daily_exposure_cents);
       setMinEv(settings.min_ev_threshold);
+      setMinEvYes(settings.min_ev_threshold_yes);
+      setMinEvNo(settings.min_ev_threshold_no);
       setCooldown(settings.cooldown_per_loss_minutes);
       setConsecutiveLossLimit(settings.consecutive_loss_limit);
       setEnableConsecutiveLossLimit(settings.enable_consecutive_loss_limit);
@@ -94,6 +98,8 @@ export default function SettingsPage() {
         daily_loss_limit_cents: dailyLossLimit,
         max_daily_exposure_cents: maxExposure,
         min_ev_threshold: minEv,
+        min_ev_threshold_yes: minEvYes,
+        min_ev_threshold_no: minEvNo,
         cooldown_per_loss_minutes: cooldown,
         consecutive_loss_limit: consecutiveLossLimit,
         enable_consecutive_loss_limit: enableConsecutiveLossLimit,
@@ -332,18 +338,41 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label className="flex justify-between text-xs mb-1">
-                      <span>Min EV Threshold</span>
-                      <span className="font-medium">{(minEv * 100).toFixed(0)}%</span>
+                      <span>Min EV (YES)</span>
+                      <span className="font-medium">{(minEvYes * 100).toFixed(0)}%</span>
                     </label>
                     <input
                       type="range"
-                      min={0}
+                      min={0.01}
                       max={0.5}
                       step={0.01}
-                      value={minEv}
-                      onChange={(e) => setMinEv(Number(e.target.value))}
+                      value={minEvYes}
+                      onChange={(e) => setMinEvYes(Number(e.target.value))}
                       className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                      data-testid="min-ev-yes-slider"
                     />
+                    <p className="text-xs text-boz-neutral mt-1">
+                      Minimum expected value to place a YES-side trade
+                    </p>
+                  </div>
+                  <div>
+                    <label className="flex justify-between text-xs mb-1">
+                      <span>Min EV (NO)</span>
+                      <span className="font-medium">{(minEvNo * 100).toFixed(0)}%</span>
+                    </label>
+                    <input
+                      type="range"
+                      min={0.01}
+                      max={0.5}
+                      step={0.01}
+                      value={minEvNo}
+                      onChange={(e) => setMinEvNo(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-boz-primary"
+                      data-testid="min-ev-no-slider"
+                    />
+                    <p className="text-xs text-boz-neutral mt-1">
+                      Minimum expected value to place a NO-side trade
+                    </p>
                   </div>
                   <div>
                     <label className="flex justify-between text-xs mb-1">

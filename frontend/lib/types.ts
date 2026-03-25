@@ -132,6 +132,8 @@ export interface UserSettings {
   daily_loss_limit_cents: number;
   max_daily_exposure_cents: number;
   min_ev_threshold: number;
+  min_ev_threshold_yes: number;
+  min_ev_threshold_no: number;
   cooldown_per_loss_minutes: number;
   consecutive_loss_limit: number;
   active_cities: CityCode[];
@@ -153,6 +155,8 @@ export interface SettingsUpdate {
   daily_loss_limit_cents?: number;
   max_daily_exposure_cents?: number;
   min_ev_threshold?: number;
+  min_ev_threshold_yes?: number;
+  min_ev_threshold_no?: number;
   cooldown_per_loss_minutes?: number;
   consecutive_loss_limit?: number;
   active_cities?: CityCode[];

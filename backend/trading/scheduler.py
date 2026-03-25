@@ -401,11 +401,12 @@ async def _run_trading_cycle() -> None:
                 prediction,
                 market_prices,
                 market_tickers,
-                user_settings.min_ev_threshold,
                 kelly_settings=kelly_settings,
                 bankroll_cents=bankroll_cents,
                 max_trade_size_cents=user_settings.max_trade_size_cents,
                 guardrail_settings=guardrail_settings,
+                min_ev_threshold_yes=user_settings.min_ev_threshold_yes,
+                min_ev_threshold_no=user_settings.min_ev_threshold_no,
             )
             if not signals:
                 logger.debug(
@@ -1023,6 +1024,12 @@ async def _load_user_settings(db) -> object | None:
         daily_loss_limit_cents=user.daily_loss_limit_cents or 1000,
         max_daily_exposure_cents=user.max_daily_exposure_cents or 2500,
         min_ev_threshold=user.min_ev_threshold or 0.05,
+        min_ev_threshold_yes=user.min_ev_threshold_yes
+        if user.min_ev_threshold_yes is not None
+        else 0.15,
+        min_ev_threshold_no=user.min_ev_threshold_no
+        if user.min_ev_threshold_no is not None
+        else 0.05,
         cooldown_per_loss_minutes=user.cooldown_per_loss_minutes or 60,
         consecutive_loss_limit=user.consecutive_loss_limit or 3,
         active_cities=cities or ["NYC", "CHI", "MIA", "AUS"],

@@ -18,6 +18,8 @@ async def test_get_settings(client: AsyncClient) -> None:
     assert data["daily_loss_limit_cents"] == 1000
     assert data["max_daily_exposure_cents"] == 2500
     assert data["min_ev_threshold"] == 0.05
+    assert data["min_ev_threshold_yes"] == 0.15
+    assert data["min_ev_threshold_no"] == 0.05
     assert data["cooldown_per_loss_minutes"] == 60
     assert data["consecutive_loss_limit"] == 3
     assert set(data["active_cities"]) == {"NYC", "CHI", "MIA", "AUS"}
@@ -164,3 +166,29 @@ async def test_patch_timezone_to_browser_default(client: AsyncClient) -> None:
     response = await client.patch("/api/settings", json={"timezone": ""})
     assert response.status_code == 200
     assert response.json()["timezone"] == ""
+
+
+async def test_get_settings_includes_split_ev_thresholds(client: AsyncClient) -> None:
+    """GET /api/settings includes split EV thresholds with correct defaults."""
+    response = await client.get("/api/settings")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["min_ev_threshold_yes"] == 0.15
+    assert data["min_ev_threshold_no"] == 0.05
+
+
+async def test_patch_split_ev_thresholds(client: AsyncClient) -> None:
+    """PATCH /api/settings can update split EV thresholds independently."""
+    response = await client.patch(
+        "/api/settings",
+        json={"min_ev_threshold_yes": 0.20, "min_ev_threshold_no": 0.08},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["min_ev_threshold_yes"] == 0.20
+    assert data["min_ev_threshold_no"] == 0.08
+
+    # Verify it persists on GET
+    get_resp = await client.get("/api/settings")
+    assert get_resp.json()["min_ev_threshold_yes"] == 0.20
+    assert get_resp.json()["min_ev_threshold_no"] == 0.08

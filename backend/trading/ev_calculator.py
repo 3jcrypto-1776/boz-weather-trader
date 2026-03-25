@@ -189,7 +189,8 @@ def scan_bracket(
     bracket_label: str,
     bracket_probability: float,
     market_price_cents: int,
-    min_ev_threshold: float,
+    min_ev_threshold_yes: float,
+    min_ev_threshold_no: float,
     city: str,
     prediction_date: str,
     confidence: str,
@@ -211,7 +212,8 @@ def scan_bracket(
         bracket_label: Bracket label string (e.g., "53-54F").
         bracket_probability: Model probability for this bracket (0.0-1.0).
         market_price_cents: Current Kalshi YES price in cents.
-        min_ev_threshold: Minimum EV in dollars to trigger a trade.
+        min_ev_threshold_yes: Minimum EV in dollars for YES-side trades.
+        min_ev_threshold_no: Minimum EV in dollars for NO-side trades.
         city: City code (e.g., "NYC").
         prediction_date: Date string for the event.
         confidence: Model confidence level ("high", "medium", "low").
@@ -269,11 +271,11 @@ def scan_bracket(
     best_ev = 0.0
     best_blended: float | None = None
 
-    if ev_yes >= ev_no and ev_yes >= min_ev_threshold:
+    if ev_yes >= ev_no and ev_yes >= min_ev_threshold_yes:
         best_side = "yes"
         best_ev = ev_yes
         best_blended = blended_yes if guardrail_settings is not None else None
-    elif ev_no > ev_yes and ev_no >= min_ev_threshold:
+    elif ev_no > ev_yes and ev_no >= min_ev_threshold_no:
         best_side = "no"
         best_ev = ev_no
         best_blended = blended_no if guardrail_settings is not None else None
@@ -354,11 +356,14 @@ def scan_all_brackets(
     prediction: BracketPrediction,
     market_prices: dict[str, int],
     market_tickers: dict[str, str],
-    min_ev_threshold: float,
+    min_ev_threshold: float | None = None,
     kelly_settings: object | None = None,
     bankroll_cents: int = 0,
     max_trade_size_cents: int = 100,
     guardrail_settings: GuardrailSettings | None = None,
+    *,
+    min_ev_threshold_yes: float | None = None,
+    min_ev_threshold_no: float | None = None,
 ) -> list[TradeSignal]:
     """Scan all brackets for a city and return all +EV trade signals.
 
@@ -366,15 +371,23 @@ def scan_all_brackets(
         prediction: Full bracket prediction for one city.
         market_prices: Mapping of bracket label to current YES price in cents.
         market_tickers: Mapping of bracket label to Kalshi market ticker string.
-        min_ev_threshold: Minimum EV in dollars to trigger a trade.
+        min_ev_threshold: Legacy single threshold (used for both sides when
+            split thresholds are not provided).
         kelly_settings: KellySettings for position sizing (None = 1 contract).
         bankroll_cents: Total bankroll in cents for Kelly sizing.
         max_trade_size_cents: Max cost per trade from risk manager.
         guardrail_settings: GuardrailSettings for probability guardrails (None = raw model).
+        min_ev_threshold_yes: Minimum EV for YES-side trades (overrides legacy).
+        min_ev_threshold_no: Minimum EV for NO-side trades (overrides legacy).
 
     Returns:
         List of TradeSignal objects, sorted by EV descending (best first).
     """
+    # Resolve split thresholds: prefer explicit split, fall back to legacy single
+    _legacy = min_ev_threshold if min_ev_threshold is not None else 0.05
+    _thresh_yes = min_ev_threshold_yes if min_ev_threshold_yes is not None else _legacy
+    _thresh_no = min_ev_threshold_no if min_ev_threshold_no is not None else _legacy
+
     signals: list[TradeSignal] = []
 
     for bracket in prediction.brackets:
@@ -408,7 +421,8 @@ def scan_all_brackets(
             bracket_label=bracket.bracket_label,
             bracket_probability=bracket.probability,
             market_price_cents=price,
-            min_ev_threshold=min_ev_threshold,
+            min_ev_threshold_yes=_thresh_yes,
+            min_ev_threshold_no=_thresh_no,
             city=prediction.city,
             prediction_date=str(prediction.date),
             confidence=prediction.confidence,

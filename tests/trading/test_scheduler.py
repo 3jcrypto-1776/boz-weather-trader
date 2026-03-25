@@ -39,6 +39,8 @@ def _make_user_settings(**overrides) -> UserSettings:
         "daily_loss_limit_cents": 1000,
         "max_daily_exposure_cents": 2500,
         "min_ev_threshold": 0.05,
+        "min_ev_threshold_yes": 0.15,
+        "min_ev_threshold_no": 0.05,
         "cooldown_per_loss_minutes": 60,
         "consecutive_loss_limit": 3,
         "active_cities": ["NYC", "CHI", "MIA", "AUS"],
@@ -62,6 +64,8 @@ def _make_mock_user(**overrides) -> MagicMock:
     user.daily_loss_limit_cents = overrides.get("daily_loss_limit_cents", 1000)
     user.max_daily_exposure_cents = overrides.get("max_daily_exposure_cents", 2500)
     user.min_ev_threshold = overrides.get("min_ev_threshold", 0.05)
+    user.min_ev_threshold_yes = overrides.get("min_ev_threshold_yes", 0.15)
+    user.min_ev_threshold_no = overrides.get("min_ev_threshold_no", 0.05)
     user.cooldown_per_loss_minutes = overrides.get("cooldown_per_loss_minutes", 60)
     user.consecutive_loss_limit = overrides.get("consecutive_loss_limit", 3)
     user.active_cities = overrides.get("active_cities", "NYC,CHI,MIA,AUS")

@@ -186,6 +186,8 @@ def _simulate_day(
             kelly_settings=kelly_settings,
             bankroll_cents=risk.bankroll_cents,
             max_trade_size_cents=risk.get_max_trade_size_cents(),
+            min_ev_threshold_yes=getattr(config, "min_ev_threshold_yes", None),
+            min_ev_threshold_no=getattr(config, "min_ev_threshold_no", None),
         )
 
         # Execute each signal through risk manager

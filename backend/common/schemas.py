@@ -210,7 +210,9 @@ class UserSettings(BaseModel):
     max_trade_size_cents: int = 100  # $1.00 default
     daily_loss_limit_cents: int = 1000  # $10.00 default
     max_daily_exposure_cents: int = 2500  # $25.00 default
-    min_ev_threshold: float = Field(default=0.05, ge=0.0, le=1.0)  # 5%
+    min_ev_threshold: float = Field(default=0.05, ge=0.0, le=1.0)  # 5% (legacy)
+    min_ev_threshold_yes: float = Field(default=0.15, ge=0.0, le=1.0)  # 15%
+    min_ev_threshold_no: float = Field(default=0.05, ge=0.0, le=1.0)  # 5%
     cooldown_per_loss_minutes: int = Field(default=60, ge=0, le=1440)
     consecutive_loss_limit: int = Field(default=3, ge=0, le=10)
     active_cities: list[CityCode] = ["NYC", "CHI", "MIA", "AUS"]

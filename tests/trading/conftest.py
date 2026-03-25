@@ -21,6 +21,8 @@ def user_settings() -> UserSettings:
         daily_loss_limit_cents=1000,
         max_daily_exposure_cents=2500,
         min_ev_threshold=0.05,
+        min_ev_threshold_yes=0.15,
+        min_ev_threshold_no=0.05,
         cooldown_per_loss_minutes=60,
         consecutive_loss_limit=3,
         active_cities=["NYC", "CHI", "MIA", "AUS"],

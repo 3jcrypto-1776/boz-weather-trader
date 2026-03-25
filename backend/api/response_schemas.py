@@ -213,6 +213,8 @@ class SettingsUpdate(BaseModel):
     daily_loss_limit_cents: int | None = None
     max_daily_exposure_cents: int | None = None
     min_ev_threshold: float | None = None
+    min_ev_threshold_yes: float | None = None
+    min_ev_threshold_no: float | None = None
     cooldown_per_loss_minutes: int | None = None
     consecutive_loss_limit: int | None = None
     active_cities: list[CityCode] | None = None
