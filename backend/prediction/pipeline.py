@@ -28,6 +28,7 @@ from backend.common.config import get_settings
 from backend.common.logging import get_logger
 from backend.common.metrics import ML_PREDICTIONS_TOTAL
 from backend.common.schemas import BracketPrediction, WeatherData
+from backend.prediction.bias_correction import calculate_rolling_bias
 from backend.prediction.brackets import calculate_bracket_probabilities
 from backend.prediction.ensemble import assess_confidence, calculate_ensemble_forecast
 from backend.prediction.error_dist import calculate_error_std
@@ -187,6 +188,28 @@ async def generate_prediction(
             },
         )
         ensemble_temp = final_temp
+
+    # Step 1c: Rolling bias correction (adjusts for systematic forecast error)
+    bias_adjustment = await calculate_rolling_bias(
+        city=city,
+        target_date=target_date,
+        db_session=db_session,
+    )
+    if bias_adjustment != 0.0:
+        pre_bias_temp = ensemble_temp
+        ensemble_temp += bias_adjustment
+        logger.debug(
+            "Bias correction applied",
+            extra={
+                "data": {
+                    "city": city,
+                    "date": str(target_date),
+                    "pre_bias_temp_f": round(pre_bias_temp, 2),
+                    "bias_adjustment_f": round(bias_adjustment, 2),
+                    "adjusted_temp_f": round(ensemble_temp, 2),
+                }
+            },
+        )
 
     # Step 2: Historical error distribution
     error_std = await calculate_error_std(

@@ -55,10 +55,10 @@ services:
     # so it's auto-loaded for dev but NOT used by the updater sidecar.
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
 
   # ─── Celery Worker (processes tasks) ───
   celery-worker:

@@ -1,10 +1,10 @@
 """Tests for backend.prediction.pipeline — full prediction orchestration.
 
 Validates ``generate_prediction`` ties together ensemble, error_dist,
-brackets, and confidence into a correct ``BracketPrediction``.
+brackets, bias correction, and confidence into a correct ``BracketPrediction``.
 
-All DB-dependent calls (``calculate_error_std``) are patched so these
-tests run without a real database.
+All DB-dependent calls (``calculate_error_std``, ``calculate_rolling_bias``)
+are patched so these tests run without a real database.
 """
 
 from __future__ import annotations
@@ -16,6 +16,20 @@ import pytest
 
 from backend.common.schemas import BracketPrediction
 from backend.prediction.pipeline import generate_prediction
+
+
+@pytest.fixture(autouse=True)
+def _patch_rolling_bias():
+    """Auto-patch calculate_rolling_bias to return 0.0 (no correction) by default.
+
+    Tests that specifically test bias correction override this via their own patch.
+    """
+    with patch(
+        "backend.prediction.pipeline.calculate_rolling_bias",
+        new_callable=AsyncMock,
+        return_value=0.0,
+    ):
+        yield
 
 
 class TestGeneratePrediction:
@@ -289,3 +303,92 @@ class TestPipelineMultiModelIntegration:
 
             assert "XGBoost" in result.model_sources
             assert len(result.model_sources) == len(sample_forecasts) + 1
+
+
+class TestPipelineBiasCorrection:
+    """Tests for rolling bias correction integration in the prediction pipeline."""
+
+    @pytest.mark.asyncio
+    async def test_bias_correction_adjusts_ensemble_temp(
+        self, sample_forecasts, sample_brackets
+    ) -> None:
+        """When bias correction returns +3.0, ensemble_mean_f is shifted up."""
+        with (
+            patch(
+                "backend.prediction.pipeline.calculate_error_std",
+                new_callable=AsyncMock,
+            ) as mock_std,
+            patch(
+                "backend.prediction.pipeline.calculate_rolling_bias",
+                new_callable=AsyncMock,
+            ) as mock_bias,
+        ):
+            mock_std.return_value = 2.0
+            mock_bias.return_value = 3.0
+
+            result_with_bias = await generate_prediction(
+                city="NYC",
+                target_date=date(2026, 2, 18),
+                forecasts=sample_forecasts,
+                kalshi_brackets=sample_brackets,
+                db_session=AsyncMock(),
+            )
+
+        # Now run without bias for comparison
+        with (
+            patch(
+                "backend.prediction.pipeline.calculate_error_std",
+                new_callable=AsyncMock,
+            ) as mock_std,
+            patch(
+                "backend.prediction.pipeline.calculate_rolling_bias",
+                new_callable=AsyncMock,
+            ) as mock_bias,
+        ):
+            mock_std.return_value = 2.0
+            mock_bias.return_value = 0.0
+
+            result_no_bias = await generate_prediction(
+                city="NYC",
+                target_date=date(2026, 2, 18),
+                forecasts=sample_forecasts,
+                kalshi_brackets=sample_brackets,
+                db_session=AsyncMock(),
+            )
+
+        # The biased result should be 3°F higher
+        assert result_with_bias.ensemble_mean_f == pytest.approx(
+            result_no_bias.ensemble_mean_f + 3.0, abs=0.01
+        )
+
+    @pytest.mark.asyncio
+    async def test_bias_correction_zero_has_no_effect(
+        self, sample_forecasts, sample_brackets
+    ) -> None:
+        """When bias correction returns 0.0, ensemble_mean_f is unchanged."""
+        with (
+            patch(
+                "backend.prediction.pipeline.calculate_error_std",
+                new_callable=AsyncMock,
+            ) as mock_std,
+            patch(
+                "backend.prediction.pipeline.calculate_rolling_bias",
+                new_callable=AsyncMock,
+            ) as mock_bias,
+        ):
+            mock_std.return_value = 2.0
+            mock_bias.return_value = 0.0
+
+            result = await generate_prediction(
+                city="NYC",
+                target_date=date(2026, 2, 18),
+                forecasts=sample_forecasts,
+                kalshi_brackets=sample_brackets,
+                db_session=AsyncMock(),
+            )
+
+        # ensemble_mean_f should be the same as raw ensemble calculation
+        from backend.prediction.ensemble import calculate_ensemble_forecast
+
+        raw_temp, _, _ = calculate_ensemble_forecast(sample_forecasts)
+        assert result.ensemble_mean_f == pytest.approx(round(raw_temp, 2), abs=0.01)

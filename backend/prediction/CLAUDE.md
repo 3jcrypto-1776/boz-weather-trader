@@ -11,7 +11,8 @@ This document is the complete specification. An agent should be able to build ev
 ```
 backend/prediction/
 ├── __init__.py
-├── pipeline.py         -> Prediction pipeline orchestrator (ensemble → multi-model ML blend → error dist → brackets)
+├── pipeline.py         -> Prediction pipeline orchestrator (ensemble → multi-model ML blend → bias correction → error dist → brackets)
+├── bias_correction.py  -> Rolling bias correction (14-day lookback, self-adjusting)
 ├── ensemble.py         -> Weighted ensemble of multiple forecast sources + confidence assessment
 ├── features.py         -> ML feature engineering (21 features, pure module, no I/O)
 ├── xgb_model.py        -> XGBoost model manager (load, predict, train, save, JSON serialization)
