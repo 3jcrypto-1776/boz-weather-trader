@@ -33,7 +33,7 @@ from backend.prediction.features import NUM_FEATURES
 logger = get_logger("MODEL")
 
 # Rejection threshold — same as XGBoost.
-MAX_ACCEPTABLE_RMSE = 7.0  # degrees Fahrenheit (raised from 5.0 for seasonal transitions)
+MAX_ACCEPTABLE_RMSE = 5.0  # degrees Fahrenheit
 
 # ─── Random Forest defaults ───
 RF_MODEL_FILENAME = "rf_temp.joblib"

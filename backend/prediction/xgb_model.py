@@ -47,7 +47,7 @@ MODEL_FILENAME = "xgb_temp.json"
 METADATA_FILENAME = "xgb_temp_meta.json"
 
 # Rejection threshold — don't deploy a model worse than this.
-MAX_ACCEPTABLE_RMSE = 7.0  # degrees Fahrenheit (raised from 5.0 for seasonal transitions)
+MAX_ACCEPTABLE_RMSE = 5.0  # degrees Fahrenheit
 
 
 class XGBModelManager:
