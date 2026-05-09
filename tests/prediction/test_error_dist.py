@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from backend.prediction.error_dist import (
+    ERROR_STD_INFLATION_FACTOR,
     FALLBACK_ERROR_STD,
     calculate_error_std,
     get_season,
@@ -52,7 +53,7 @@ class TestCalculateErrorStd:
 
     @pytest.mark.asyncio
     async def test_fallback_on_insufficient_data(self) -> None:
-        """When the DB returns fewer than 30 rows, the fallback is used."""
+        """When the DB returns fewer than 30 rows, the inflated fallback is used."""
         mock_session = AsyncMock()
         mock_result = MagicMock()
         # Return only 5 rows (< 30 minimum)
@@ -61,19 +62,21 @@ class TestCalculateErrorStd:
 
         std = await calculate_error_std("NYC", month=1, db_session=mock_session)
 
-        # Should use the NYC/winter fallback
-        assert std == pytest.approx(FALLBACK_ERROR_STD["NYC"]["winter"])
+        # Should use the NYC/winter fallback × inflation factor
+        expected = FALLBACK_ERROR_STD["NYC"]["winter"] * ERROR_STD_INFLATION_FACTOR
+        assert std == pytest.approx(expected)
 
     @pytest.mark.asyncio
     async def test_fallback_on_db_error(self) -> None:
-        """When the DB query raises an exception, the fallback is used."""
+        """When the DB query raises an exception, the inflated fallback is used."""
         mock_session = AsyncMock()
         mock_session.execute.side_effect = RuntimeError("DB connection lost")
 
         std = await calculate_error_std("NYC", month=7, db_session=mock_session)
 
-        # Should use the NYC/summer fallback
-        assert std == pytest.approx(FALLBACK_ERROR_STD["NYC"]["summer"])
+        # Should use the NYC/summer fallback × inflation factor
+        expected = FALLBACK_ERROR_STD["NYC"]["summer"] * ERROR_STD_INFLATION_FACTOR
+        assert std == pytest.approx(expected)
 
     def test_fallback_values_exist_for_all_cities(self) -> None:
         """Every supported city has fallback values for all 4 seasons."""
@@ -90,12 +93,12 @@ class TestCalculateErrorStd:
 
     @pytest.mark.asyncio
     async def test_unknown_city_gets_default(self) -> None:
-        """An unrecognized city code falls back to the 2.5 default."""
+        """An unrecognized city code falls back to the 2.5 default × inflation."""
         mock_session = AsyncMock()
         mock_session.execute.side_effect = RuntimeError("DB not available")
 
         std = await calculate_error_std("XYZ", month=3, db_session=mock_session)
-        assert std == pytest.approx(2.5)
+        assert std == pytest.approx(2.5 * ERROR_STD_INFLATION_FACTOR)
 
     @pytest.mark.asyncio
     async def test_returns_positive_float(self) -> None:
@@ -131,12 +134,12 @@ class TestCalculateErrorStd:
 
     @pytest.mark.asyncio
     async def test_calculated_std_matches_numpy(self) -> None:
-        """Verify the calculated value matches numpy's sample std (ddof=1)."""
+        """Verify the calculated value matches numpy's sample std × inflation factor."""
         import numpy as np
 
         errors_data = [(50.0, 52.0), (50.0, 53.0), (50.0, 51.0)] * 10  # 30 rows
         errors = [actual - forecast for forecast, actual in errors_data]
-        expected_std = float(np.std(errors, ddof=1))
+        expected_std = float(np.std(errors, ddof=1)) * ERROR_STD_INFLATION_FACTOR
 
         mock_session = AsyncMock()
         mock_result = MagicMock()

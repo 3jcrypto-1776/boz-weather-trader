@@ -21,6 +21,14 @@ from backend.common.models import Settlement, WeatherForecast
 
 logger = get_logger("MODEL")
 
+# Multiplier applied to the returned std to account for the gap between
+# raw NWS single-source forecast error (what we measure) and the spread of
+# the full blended pipeline output vs actuals (what brackets.py actually
+# needs). Calibration data (Phase 1, v1.9.5) showed the model was
+# systematically overconfident in the 0.3–0.9 probability range — widening
+# the std shifts probability mass out of those buckets and onto the tails.
+ERROR_STD_INFLATION_FACTOR = 1.4
+
 # Fallback error standard deviations (used when insufficient historical data).
 # These are conservative estimates based on typical NWS forecast accuracy.
 # Values are in degrees Fahrenheit.
@@ -113,14 +121,17 @@ async def calculate_error_std(
         errors: list[float] = [actual_high - forecast_high for forecast_high, actual_high in rows]
 
         if len(errors) >= min_samples:
-            error_std = float(np.std(errors, ddof=1))  # sample std dev
+            raw_std = float(np.std(errors, ddof=1))  # sample std dev
+            error_std = raw_std * ERROR_STD_INFLATION_FACTOR
             logger.info(
                 "Calculated historical error std",
                 extra={
                     "data": {
                         "city": city,
                         "season": season,
+                        "raw_std_f": round(raw_std, 2),
                         "std_f": round(error_std, 2),
+                        "inflation_factor": ERROR_STD_INFLATION_FACTOR,
                         "sample_count": len(errors),
                     }
                 },
@@ -152,14 +163,17 @@ async def calculate_error_std(
         )
 
     # Fall back to hardcoded conservative estimates.
-    fallback = FALLBACK_ERROR_STD.get(city, {}).get(season, 2.5)
+    raw_fallback = FALLBACK_ERROR_STD.get(city, {}).get(season, 2.5)
+    fallback = raw_fallback * ERROR_STD_INFLATION_FACTOR
     logger.info(
         "Using fallback error std",
         extra={
             "data": {
                 "city": city,
                 "season": season,
-                "std_f": fallback,
+                "raw_std_f": raw_fallback,
+                "std_f": round(fallback, 2),
+                "inflation_factor": ERROR_STD_INFLATION_FACTOR,
                 "reason": "insufficient_data",
             }
         },

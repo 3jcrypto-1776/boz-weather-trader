@@ -62,9 +62,13 @@ async def test_most_likely_bracket_near_ensemble_mean(
     sample_weather_data: list[WeatherData],
     sample_kalshi_brackets: list[dict],
 ) -> None:
-    """Highest-probability bracket should contain or be near ensemble mean.
+    """Bracket containing the ensemble mean should be among the most likely.
 
-    With forecasts around 53-55F, the highest-prob bracket should be 53-55.
+    With forecasts around 53-55F (ensemble ~54.2F), the 53-55 bracket
+    should rank in the top half. Note: the ERROR_STD_INFLATION_FACTOR
+    intentionally widens the distribution so catch-all edge brackets
+    can rival the centered bracket on probability — this is the
+    expected behavior, not a regression.
     """
     pred = await generate_prediction(
         city="NYC",
@@ -73,9 +77,10 @@ async def test_most_likely_bracket_near_ensemble_mean(
         kalshi_brackets=sample_kalshi_brackets,
         db_session=db,
     )
-    best_bracket = max(pred.brackets, key=lambda b: b.probability)
-    # Ensemble mean is ~54.2F (weighted), best bracket should be 53-55
-    assert best_bracket.bracket_label == "53-55"
+    # Rank brackets by probability and assert 53-55 is in the top 3.
+    sorted_by_prob = sorted(pred.brackets, key=lambda b: b.probability, reverse=True)
+    top_labels = [b.bracket_label for b in sorted_by_prob[:3]]
+    assert "53-55" in top_labels, f"53-55 should be among top 3, got {top_labels}"
 
 
 @pytest.mark.asyncio
@@ -93,8 +98,10 @@ async def test_uses_fallback_error_std_on_empty_db(
         kalshi_brackets=sample_kalshi_brackets,
         db_session=db,
     )
-    # NYC winter fallback is 3.0°F
-    assert pred.ensemble_std_f == 3.0
+    # NYC winter fallback is 3.0°F × ERROR_STD_INFLATION_FACTOR (1.4) = 4.2°F
+    from backend.prediction.error_dist import ERROR_STD_INFLATION_FACTOR
+
+    assert pred.ensemble_std_f == round(3.0 * ERROR_STD_INFLATION_FACTOR, 2)
 
 
 @pytest.mark.asyncio
