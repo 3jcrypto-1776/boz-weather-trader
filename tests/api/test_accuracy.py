@@ -153,9 +153,14 @@ class TestGetCalibration:
 
     async def test_with_sufficient_data(self, client: AsyncClient, db: AsyncSession) -> None:
         """Returns calibration report when enough data exists."""
-        # Add 10 prediction+settlement pairs
+        # Add 10 prediction+settlement pairs dated within the default 90-day
+        # lookback window. Using fixed dates (e.g., 2026-01-01) makes this
+        # test silently rot once those dates fall outside the window.
+        from datetime import timedelta
+
+        now = datetime.now(UTC)
         for i in range(10):
-            dt = datetime(2026, 1, i + 1, tzinfo=UTC)
+            dt = now - timedelta(days=i + 1)
             pred = _make_prediction(city="NYC", prediction_date=dt)
             settle = _make_settlement(city="NYC", settlement_date=dt, actual_high_f=55.5)
             db.add(pred)

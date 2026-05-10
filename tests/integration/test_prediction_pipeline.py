@@ -98,10 +98,8 @@ async def test_uses_fallback_error_std_on_empty_db(
         kalshi_brackets=sample_kalshi_brackets,
         db_session=db,
     )
-    # NYC winter fallback is 3.0°F × ERROR_STD_INFLATION_FACTOR (1.4) = 4.2°F
-    from backend.prediction.error_dist import ERROR_STD_INFLATION_FACTOR
-
-    assert pred.ensemble_std_f == round(3.0 * ERROR_STD_INFLATION_FACTOR, 2)
+    # NYC winter fallback is 3.0°F (no inflation as of v1.9.7).
+    assert pred.ensemble_std_f == 3.0
 
 
 @pytest.mark.asyncio

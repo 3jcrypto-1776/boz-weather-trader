@@ -146,10 +146,7 @@ class TestFitCalibration:
     async def test_sufficient_data_fits_real_curve(self) -> None:
         """With enough data, a non-identity curve is returned."""
         # 50 rows × 6 brackets = 300 pairs, above MIN_SAMPLES_PER_CITY.
-        rows = [
-            _row([0.1, 0.2, 0.4, 0.2, 0.05, 0.05], 55.5)
-            for _ in range(50)
-        ]
+        rows = [_row([0.1, 0.2, 0.4, 0.2, 0.05, 0.05], 55.5) for _ in range(50)]
         session = _mock_session_with_rows(rows)
 
         curve = await fit_calibration("NYC", session, min_samples=100)
@@ -168,10 +165,7 @@ class TestFitCalibration:
         for i in range(200):
             # Most days, the actual high is 50 (bottom catch-all wins).
             # Bracket 3 (which was given prob 0.40) almost never wins.
-            if i % 10 == 0:
-                actual = 57.5  # bracket 3 wins
-            else:
-                actual = 50.0  # bracket 0 wins
+            actual = 57.5 if i % 10 == 0 else 50.0
             rows.append(_row([0.05, 0.10, 0.20, 0.40, 0.15, 0.10], actual))
         session = _mock_session_with_rows(rows)
 

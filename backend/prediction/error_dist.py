@@ -1,8 +1,13 @@
 """Historical forecast error distribution analysis.
 
-Compares past NWS forecasts to actual NWS CLI settlement data to build
-error distributions per city and season. Falls back to hardcoded estimates
-when insufficient historical data is available (the "bootstrap problem").
+Compares past full-pipeline predictions to actual NWS CLI settlement
+data to build error distributions per city and season. The std measured
+here describes the spread of ``Prediction.ensemble_mean_f`` (the blended
+ensemble + ML + bias-corrected output) versus realized highs — i.e. the
+actual variance the bracket CDF needs to model.
+
+Falls back to hardcoded estimates when insufficient historical data is
+available (the "bootstrap problem", first ~30 days of operation).
 
 Usage:
     from backend.prediction.error_dist import calculate_error_std, get_season
@@ -13,24 +18,19 @@ Usage:
 from __future__ import annotations
 
 import numpy as np
-from sqlalchemy import extract, select
+from sqlalchemy import cast, extract, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.types import Date
 
 from backend.common.logging import get_logger
-from backend.common.models import Settlement, WeatherForecast
+from backend.common.models import Prediction, Settlement
 
 logger = get_logger("MODEL")
 
-# Multiplier applied to the returned std to account for the gap between
-# raw NWS single-source forecast error (what we measure) and the spread of
-# the full blended pipeline output vs actuals (what brackets.py actually
-# needs). Calibration data (Phase 1, v1.9.5) showed the model was
-# systematically overconfident in the 0.3–0.9 probability range — widening
-# the std shifts probability mass out of those buckets and onto the tails.
-ERROR_STD_INFLATION_FACTOR = 1.4
-
 # Fallback error standard deviations (used when insufficient historical data).
-# These are conservative estimates based on typical NWS forecast accuracy.
+# These are conservative estimates — the v1.9.7 pipeline uses Student's t in
+# brackets.py with df=10, which provides heavier tails than Normal at the
+# same scale, so these values do not need to be inflated.
 # Values are in degrees Fahrenheit.
 FALLBACK_ERROR_STD: dict[str, dict[str, float]] = {
     "NYC": {"winter": 3.0, "spring": 2.5, "summer": 1.8, "fall": 2.3},
@@ -73,73 +73,82 @@ async def calculate_error_std(
     db_session: AsyncSession,
     min_samples: int = 30,
 ) -> float:
-    """Calculate historical forecast error standard deviation for a city/season.
+    """Calculate historical full-pipeline error standard deviation.
 
-    Compares past NWS forecasts to actual NWS CLI settlements for the same
-    city and season. If insufficient data (<min_samples), falls back to
-    hardcoded conservative estimates.
+    Joins ``Prediction.ensemble_mean_f`` (the deployed pipeline output —
+    ensemble + ML + bias correction) with ``Settlement.actual_high_f`` per
+    day for the given city and season. Multiple predictions per day are
+    averaged to one (predicted, actual) pair before computing the std,
+    matching the pattern used by ``bias_correction.calculate_rolling_bias``.
+
+    If insufficient data (<min_samples), falls back to hardcoded conservative
+    estimates from ``FALLBACK_ERROR_STD``.
 
     Args:
         city: City code ("NYC", "CHI", "MIA", "AUS").
         month: Month number (1-12) to determine season.
         db_session: SQLAlchemy async session.
-        min_samples: Minimum historical data points needed.
+        min_samples: Minimum day-pairs needed before using calculated std.
 
     Returns:
-        Standard deviation of forecast errors in degrees Fahrenheit.
+        Standard deviation of full-pipeline forecast errors in °F.
         Always returns a positive float.
     """
     season = get_season(month)
     season_months = _SEASON_MONTHS[season]
 
     try:
-        # Query historical forecasts vs settlements for this city and season.
-        # Join WeatherForecast with Settlement on (city, forecast_date == settlement_date).
-        # Filter to same season months using extract().
+        # Subquery: average ensemble_mean_f per day (one row per date).
+        daily_pred = (
+            select(
+                cast(Prediction.prediction_date, Date).label("pred_date"),
+                func.avg(Prediction.ensemble_mean_f).label("avg_predicted"),
+            )
+            .where(
+                Prediction.city == city,
+                extract("month", Prediction.prediction_date).in_(season_months),
+            )
+            .group_by(cast(Prediction.prediction_date, Date))
+            .subquery("daily_pred")
+        )
+
+        # Join daily averages with settlements to get (predicted, actual) pairs.
         stmt = (
             select(
-                WeatherForecast.forecast_high_f,
+                daily_pred.c.avg_predicted,
                 Settlement.actual_high_f,
             )
             .join(
                 Settlement,
-                (WeatherForecast.city == Settlement.city)
-                & (WeatherForecast.forecast_date == Settlement.settlement_date),
+                (cast(Settlement.settlement_date, Date) == daily_pred.c.pred_date)
+                & (Settlement.city == city),
             )
-            .where(
-                WeatherForecast.city == city,
-                WeatherForecast.source == "NWS",
-                Settlement.actual_high_f.isnot(None),
-                extract("month", WeatherForecast.forecast_date).in_(season_months),
-            )
+            .where(Settlement.actual_high_f.isnot(None))
         )
 
         result = await db_session.execute(stmt)
         rows = result.all()
 
-        # Calculate forecast errors (actual - predicted) for each pair.
-        errors: list[float] = [actual_high - forecast_high for forecast_high, actual_high in rows]
+        # Calculate full-pipeline forecast errors (actual - predicted).
+        errors: list[float] = [float(actual_high - predicted) for predicted, actual_high in rows]
 
         if len(errors) >= min_samples:
-            raw_std = float(np.std(errors, ddof=1))  # sample std dev
-            error_std = raw_std * ERROR_STD_INFLATION_FACTOR
+            error_std = float(np.std(errors, ddof=1))  # sample std dev
             logger.info(
-                "Calculated historical error std",
+                "Calculated full-pipeline error std",
                 extra={
                     "data": {
                         "city": city,
                         "season": season,
-                        "raw_std_f": round(raw_std, 2),
                         "std_f": round(error_std, 2),
-                        "inflation_factor": ERROR_STD_INFLATION_FACTOR,
                         "sample_count": len(errors),
                     }
                 },
             )
-            return error_std
+            return max(error_std, 0.5)  # floor to avoid degenerate distributions
 
         logger.info(
-            "Insufficient historical data for error std",
+            "Insufficient pipeline history for error std",
             extra={
                 "data": {
                     "city": city,
@@ -152,7 +161,7 @@ async def calculate_error_std(
 
     except Exception as e:
         logger.warning(
-            "Error querying historical data, using fallback",
+            "Error querying pipeline history, using fallback",
             extra={
                 "data": {
                     "city": city,
@@ -163,17 +172,14 @@ async def calculate_error_std(
         )
 
     # Fall back to hardcoded conservative estimates.
-    raw_fallback = FALLBACK_ERROR_STD.get(city, {}).get(season, 2.5)
-    fallback = raw_fallback * ERROR_STD_INFLATION_FACTOR
+    fallback = FALLBACK_ERROR_STD.get(city, {}).get(season, 2.5)
     logger.info(
         "Using fallback error std",
         extra={
             "data": {
                 "city": city,
                 "season": season,
-                "raw_std_f": raw_fallback,
-                "std_f": round(fallback, 2),
-                "inflation_factor": ERROR_STD_INFLATION_FACTOR,
+                "std_f": fallback,
                 "reason": "insufficient_data",
             }
         },

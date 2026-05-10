@@ -192,3 +192,58 @@ def test_normalization_handles_float_drift() -> None:
     )
     total = sum(r.probability for r in results)
     assert total == pytest.approx(1.0, abs=1e-12)
+
+
+# ═══════════════════════════════════════════════════════════════
+# Student's t-distribution behavior (v1.9.7)
+# ═══════════════════════════════════════════════════════════════
+
+
+def test_t_distribution_has_heavier_tails_than_normal() -> None:
+    """Low df concentrates less mass in the centered bracket than high df.
+
+    df=4 has visibly fatter tails than df=100 (≈Normal). For a forecast
+    centered in 53-55 with std=2.0, the centered bracket should hold less
+    probability under df=4 than under df=100 (mass spreads to the wings).
+    """
+    centered_df4 = calculate_bracket_probabilities(
+        ensemble_forecast_f=54.0, error_std_f=2.0, brackets=SAMPLE_BRACKETS, df=4
+    )
+    centered_df100 = calculate_bracket_probabilities(
+        ensemble_forecast_f=54.0, error_std_f=2.0, brackets=SAMPLE_BRACKETS, df=100
+    )
+    # Bracket index 2 is "53-55" (contains 54.0).
+    assert centered_df4[2].probability < centered_df100[2].probability
+    # And the catch-all tails should hold more mass under df=4.
+    assert centered_df4[0].probability > centered_df100[0].probability
+    assert centered_df4[-1].probability > centered_df100[-1].probability
+
+
+def test_df_zero_raises() -> None:
+    """df=0 is invalid and must raise ValueError."""
+    with pytest.raises(ValueError, match="df"):
+        calculate_bracket_probabilities(
+            ensemble_forecast_f=54.0,
+            error_std_f=2.0,
+            brackets=SAMPLE_BRACKETS,
+            df=0,
+        )
+
+
+def test_df_negative_raises() -> None:
+    """Negative df is invalid and must raise ValueError."""
+    with pytest.raises(ValueError, match="df"):
+        calculate_bracket_probabilities(
+            ensemble_forecast_f=54.0,
+            error_std_f=2.0,
+            brackets=SAMPLE_BRACKETS,
+            df=-3,
+        )
+
+
+def test_default_df_is_moderate() -> None:
+    """The default df should be small enough to be heavier-tailed than Normal."""
+    from backend.prediction.brackets import DEFAULT_DF
+
+    # Heavy-tailed default — somewhere in the 5–30 range is reasonable.
+    assert 5 <= DEFAULT_DF <= 30

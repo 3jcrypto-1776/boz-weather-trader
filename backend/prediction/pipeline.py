@@ -96,8 +96,7 @@ def _get_calibration_curves() -> dict[str, dict] | None:
         _calibration_loaded = True
         if _calibration_curves is not None:
             sample_counts = {
-                city: curve.get("sample_count", 0)
-                for city, curve in _calibration_curves.items()
+                city: curve.get("sample_count", 0) for city, curve in _calibration_curves.items()
             }
             logger.info(
                 "Probability calibration loaded from disk",

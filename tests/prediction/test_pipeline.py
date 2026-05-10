@@ -413,9 +413,7 @@ class TestPipelineProbabilityCalibration:
     """Tests for probability calibration integration in the prediction pipeline."""
 
     @pytest.mark.asyncio
-    async def test_no_curves_keeps_raw_probs(
-        self, sample_forecasts, sample_brackets
-    ) -> None:
+    async def test_no_curves_keeps_raw_probs(self, sample_forecasts, sample_brackets) -> None:
         """When no calibration file exists, bracket probs are not modified."""
         with (
             patch(
@@ -441,9 +439,7 @@ class TestPipelineProbabilityCalibration:
             assert abs(total - 1.0) < 1e-6
 
     @pytest.mark.asyncio
-    async def test_identity_curve_keeps_raw_probs(
-        self, sample_forecasts, sample_brackets
-    ) -> None:
+    async def test_identity_curve_keeps_raw_probs(self, sample_forecasts, sample_brackets) -> None:
         """An identity curve for the city is treated as no-op."""
         from backend.prediction.probability_calibration import _identity_curve
 
