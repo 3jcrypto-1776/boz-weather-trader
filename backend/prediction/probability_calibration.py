@@ -200,11 +200,15 @@ async def _collect_pairs(
             prob = bracket.get("probability")
             if prob is None:
                 continue
-            outcome = 1 if _temp_in_bracket(
-                actual_high,
-                bracket.get("lower_bound_f"),
-                bracket.get("upper_bound_f"),
-            ) else 0
+            outcome = (
+                1
+                if _temp_in_bracket(
+                    actual_high,
+                    bracket.get("lower_bound_f"),
+                    bracket.get("upper_bound_f"),
+                )
+                else 0
+            )
             pairs.append((float(prob), outcome))
     return pairs
 
