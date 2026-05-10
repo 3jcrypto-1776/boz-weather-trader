@@ -34,6 +34,7 @@ from backend.prediction.ensemble import assess_confidence, calculate_ensemble_fo
 from backend.prediction.error_dist import calculate_error_std
 from backend.prediction.features import extract_features
 from backend.prediction.model_ensemble import MultiModelEnsemble
+from backend.prediction.probability_calibration import apply_calibration
 
 logger = get_logger("MODEL")
 
@@ -43,6 +44,10 @@ _ml_ensemble: MultiModelEnsemble | None = None
 # ─── Source weights singleton (lazy-loaded from disk) ───
 _source_weights: dict[str, float] | None = None
 _source_weights_loaded: bool = False
+
+# ─── Probability calibration singleton (lazy-loaded from disk) ───
+_calibration_curves: dict[str, dict] | None = None
+_calibration_loaded: bool = False
 
 
 def _get_ml_ensemble() -> MultiModelEnsemble:
@@ -80,16 +85,40 @@ def _get_source_weights() -> dict[str, float] | None:
     return _source_weights
 
 
+def _get_calibration_curves() -> dict[str, dict] | None:
+    """Get saved per-city probability calibration curves from disk."""
+    global _calibration_curves, _calibration_loaded  # noqa: PLW0603
+    if not _calibration_loaded:
+        from backend.prediction.probability_calibration import load_calibration
+
+        settings = get_settings()
+        _calibration_curves = load_calibration(settings.xgb_model_dir)
+        _calibration_loaded = True
+        if _calibration_curves is not None:
+            sample_counts = {
+                city: curve.get("sample_count", 0)
+                for city, curve in _calibration_curves.items()
+            }
+            logger.info(
+                "Probability calibration loaded from disk",
+                extra={"data": {"sample_counts": sample_counts}},
+            )
+    return _calibration_curves
+
+
 def reload_models() -> None:
-    """Invalidate cached models and source weights, forcing reload on next use.
+    """Invalidate cached models, source weights, and calibration curves.
 
     Called after retraining completes (from train_models.py) so the
-    prediction pipeline picks up fresh model weights.
+    prediction pipeline picks up fresh weights and calibration.
     """
     global _ml_ensemble, _source_weights, _source_weights_loaded  # noqa: PLW0603
+    global _calibration_curves, _calibration_loaded  # noqa: PLW0603
     _ml_ensemble = None
     _source_weights = None
     _source_weights_loaded = False
+    _calibration_curves = None
+    _calibration_loaded = False
     logger.info("ML model cache invalidated — will reload on next prediction")
 
 
@@ -224,6 +253,27 @@ async def generate_prediction(
         error_std_f=error_std,
         brackets=kalshi_brackets,
     )
+
+    # Step 3b: Probability calibration (per-city isotonic curve learned
+    # from settled history — fixes systematic over-/under-confidence in
+    # the raw CDF bracket probabilities).
+    curves = _get_calibration_curves()
+    city_curve = curves.get(city) if curves else None
+    if city_curve is not None and not city_curve.get("is_identity", False):
+        raw_probs = [b.probability for b in bracket_probs]
+        calibrated = apply_calibration(raw_probs, city_curve)
+        for bracket, new_prob in zip(bracket_probs, calibrated, strict=True):
+            bracket.probability = new_prob
+        logger.debug(
+            "Probability calibration applied",
+            extra={
+                "data": {
+                    "city": city,
+                    "raw_probs": [round(p, 4) for p in raw_probs],
+                    "calibrated_probs": [round(p, 4) for p in calibrated],
+                }
+            },
+        )
 
     # Step 4: Confidence assessment
     # Calculate data age from the oldest forecast timestamp.

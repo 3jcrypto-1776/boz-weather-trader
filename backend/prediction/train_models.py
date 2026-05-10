@@ -198,6 +198,21 @@ async def _train_all_async(
             )
             source_weights_after = source_weights_before
 
+        # ── Step 4b: Refit per-city probability calibration curves ──
+        try:
+            from backend.prediction.probability_calibration import (
+                fit_all_cities,
+                save_calibration,
+            )
+
+            curves = await fit_all_cities(session)
+            save_calibration(curves, settings.xgb_model_dir)
+        except Exception:
+            logger.warning(
+                "Probability calibration fit failed — keeping existing curves",
+                exc_info=True,
+            )
+
         # ── Step 5: Capture "after" Brier score ──
         brier_after = await _get_avg_brier_score(session)
 
