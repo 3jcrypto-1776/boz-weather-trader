@@ -32,6 +32,21 @@ def _patch_rolling_bias():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_calibration_cache():
+    """Reset the pipeline's lazy-loaded calibration cache between tests.
+
+    Without this, a curve loaded by one test would leak into the next.
+    """
+    from backend.prediction import pipeline as _pipe
+
+    _pipe._calibration_curves = None
+    _pipe._calibration_loaded = False
+    yield
+    _pipe._calibration_curves = None
+    _pipe._calibration_loaded = False
+
+
 class TestGeneratePrediction:
     """Integration-level tests for the prediction pipeline."""
 
@@ -392,3 +407,172 @@ class TestPipelineBiasCorrection:
 
         raw_temp, _, _ = calculate_ensemble_forecast(sample_forecasts)
         assert result.ensemble_mean_f == pytest.approx(round(raw_temp, 2), abs=0.01)
+
+
+class TestPipelineProbabilityCalibration:
+    """Tests for probability calibration integration in the prediction pipeline."""
+
+    @pytest.mark.asyncio
+    async def test_no_curves_keeps_raw_probs(
+        self, sample_forecasts, sample_brackets
+    ) -> None:
+        """When no calibration file exists, bracket probs are not modified."""
+        with (
+            patch(
+                "backend.prediction.pipeline.calculate_error_std",
+                new_callable=AsyncMock,
+            ) as mock_std,
+            patch(
+                "backend.prediction.probability_calibration.load_calibration",
+                return_value=None,
+            ),
+        ):
+            mock_std.return_value = 2.0
+
+            result = await generate_prediction(
+                city="NYC",
+                target_date=date(2026, 2, 18),
+                forecasts=sample_forecasts,
+                kalshi_brackets=sample_brackets,
+                db_session=AsyncMock(),
+            )
+            # Probabilities still sum to 1.0 (sanity)
+            total = sum(b.probability for b in result.brackets)
+            assert abs(total - 1.0) < 1e-6
+
+    @pytest.mark.asyncio
+    async def test_identity_curve_keeps_raw_probs(
+        self, sample_forecasts, sample_brackets
+    ) -> None:
+        """An identity curve for the city is treated as no-op."""
+        from backend.prediction.probability_calibration import _identity_curve
+
+        with (
+            patch(
+                "backend.prediction.pipeline.calculate_error_std",
+                new_callable=AsyncMock,
+            ) as mock_std,
+            patch(
+                "backend.prediction.probability_calibration.load_calibration",
+                return_value={"NYC": _identity_curve()},
+            ),
+        ):
+            mock_std.return_value = 2.0
+
+            no_cal = await generate_prediction(
+                city="NYC",
+                target_date=date(2026, 2, 18),
+                forecasts=sample_forecasts,
+                kalshi_brackets=sample_brackets,
+                db_session=AsyncMock(),
+            )
+
+        # Reset cache between calls (autouse fixture handles this between tests
+        # but inside one test we have to clear manually)
+        from backend.prediction import pipeline as _pipe
+
+        _pipe._calibration_curves = None
+        _pipe._calibration_loaded = False
+
+        with (
+            patch(
+                "backend.prediction.pipeline.calculate_error_std",
+                new_callable=AsyncMock,
+            ) as mock_std,
+            patch(
+                "backend.prediction.probability_calibration.load_calibration",
+                return_value=None,
+            ),
+        ):
+            mock_std.return_value = 2.0
+
+            baseline = await generate_prediction(
+                city="NYC",
+                target_date=date(2026, 2, 18),
+                forecasts=sample_forecasts,
+                kalshi_brackets=sample_brackets,
+                db_session=AsyncMock(),
+            )
+
+        for a, b in zip(no_cal.brackets, baseline.brackets, strict=True):
+            assert a.probability == pytest.approx(b.probability, abs=1e-9)
+
+    @pytest.mark.asyncio
+    async def test_active_curve_changes_probabilities(
+        self, sample_forecasts, sample_brackets
+    ) -> None:
+        """A non-identity curve actually transforms the bracket probabilities."""
+        # Aggressive shrinkage curve: anything in (0.2, 0.9) → ~0.1.
+        squashing_curve = {
+            "x_thresholds": [0.0, 0.1, 0.2, 0.9, 1.0],
+            "y_thresholds": [0.0, 0.05, 0.10, 0.10, 0.20],
+            "is_identity": False,
+            "sample_count": 1000,
+        }
+
+        with (
+            patch(
+                "backend.prediction.pipeline.calculate_error_std",
+                new_callable=AsyncMock,
+            ) as mock_std,
+            patch(
+                "backend.prediction.probability_calibration.load_calibration",
+                return_value={"NYC": squashing_curve},
+            ),
+        ):
+            mock_std.return_value = 2.0
+
+            result = await generate_prediction(
+                city="NYC",
+                target_date=date(2026, 2, 18),
+                forecasts=sample_forecasts,
+                kalshi_brackets=sample_brackets,
+                db_session=AsyncMock(),
+            )
+
+        # Output still sums to 1.0
+        total = sum(b.probability for b in result.brackets)
+        assert total == pytest.approx(1.0, abs=1e-6)
+        # And the maximum bracket probability is no longer extreme — every
+        # bucket should be somewhere between roughly 0.05 and 0.40 after
+        # renormalization through the squashing curve.
+        max_prob = max(b.probability for b in result.brackets)
+        assert max_prob < 0.45, f"Expected calibration to flatten, got max={max_prob}"
+
+    @pytest.mark.asyncio
+    async def test_curve_for_other_city_not_applied(
+        self, sample_forecasts, sample_brackets
+    ) -> None:
+        """A curve keyed under CHI must not be applied to a NYC prediction."""
+        chi_only_curve = {
+            "CHI": {
+                "x_thresholds": [0.0, 1.0],
+                "y_thresholds": [0.0, 0.5],
+                "is_identity": False,
+                "sample_count": 1000,
+            }
+        }
+
+        with (
+            patch(
+                "backend.prediction.pipeline.calculate_error_std",
+                new_callable=AsyncMock,
+            ) as mock_std,
+            patch(
+                "backend.prediction.probability_calibration.load_calibration",
+                return_value=chi_only_curve,
+            ),
+        ):
+            mock_std.return_value = 2.0
+
+            result = await generate_prediction(
+                city="NYC",
+                target_date=date(2026, 2, 18),
+                forecasts=sample_forecasts,
+                kalshi_brackets=sample_brackets,
+                db_session=AsyncMock(),
+            )
+
+        # Probabilities still sum to 1.0 — no transformation applied.
+        total = sum(b.probability for b in result.brackets)
+        assert total == pytest.approx(1.0, abs=1e-6)

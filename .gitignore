@@ -50,3 +50,6 @@ data/processed/
 # Logs
 logs/
 *.log
+
+# Trained model artifacts (persisted via Docker volume in production)
+models/

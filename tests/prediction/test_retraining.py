@@ -231,6 +231,14 @@ class TestTrainAllAsync:
                 return_value={"NWS": 0.4, "ECMWF": 0.6},
             ),
             patch("backend.prediction.pipeline.reload_models") as mock_reload,
+            patch(
+                "backend.prediction.probability_calibration.fit_all_cities",
+                new_callable=AsyncMock,
+                return_value={},
+            ),
+            patch(
+                "backend.prediction.probability_calibration.save_calibration",
+            ),
         ):
             mock_settings.return_value = MagicMock(
                 xgb_model_dir="models",
@@ -296,6 +304,14 @@ class TestTrainAllAsync:
                 return_value={"NWS": 0.5, "ECMWF": 0.5},
             ),
             patch("backend.prediction.pipeline.reload_models"),
+            patch(
+                "backend.prediction.probability_calibration.fit_all_cities",
+                new_callable=AsyncMock,
+                return_value={},
+            ),
+            patch(
+                "backend.prediction.probability_calibration.save_calibration",
+            ),
         ):
             mock_settings.return_value = MagicMock(
                 xgb_model_dir="models",
